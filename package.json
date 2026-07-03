@@ -1,0 +1,13 @@
+{
+  "name": "adamant-generador-scripts",
+  "version": "1.0.0",
+  "description": "Generador de scripts Ruby para SketchUp: estructuras Steel Frame y Wood Frame + cómputo, presupuesto y lista de corte.",
+  "private": true,
+  "scripts": {
+    "validate": "node tools/validate.js",
+    "gen": "node tools/gen-samples.js",
+    "serve": "node -e \"const h=require('http'),f=require('fs');h.createServer((q,s)=>{s.setHeader('content-type','text/html');s.end(f.readFileSync('adamant-generador-scripts.html'))}).listen(5173,()=>console.log('http://localhost:5173'))\""
+  },
+  "keywords": ["steel-frame", "wood-framing", "sketchup", "ruby", "adamant"],
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adamant · Generador de scripts Steel Frame</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --obsidian:#0A1A22;--obsidian-2:#0F2731;--panel:#0d222b;
+    --teal:#1BB6A4;--teal-dim:#137e72;--tangerine:#E85D2A;
+    --paper:#EAF1F0;--muted:#7d9498;--line:rgba(27,182,164,.16);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--obsidian);color:var(--paper);
+    font-family:'Space Grotesk',system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 22px 80px}
+  header{padding:46px 0 20px;border-bottom:1px solid var(--line)}
+  .brand{font-family:'Barlow Condensed';font-weight:700;letter-spacing:.42em;
+    text-transform:uppercase;font-size:13px;color:var(--teal);display:flex;align-items:center;gap:11px}
+  .brand::before{content:"";width:20px;height:20px;flex:none;
+    background:conic-gradient(from 210deg,var(--tangerine),var(--teal),var(--tangerine));
+    clip-path:polygon(50% 0,100% 100%,68% 100%,50% 55%,32% 100%,0 100%)}
+  h1{font-family:'Barlow Condensed';font-weight:700;font-size:clamp(30px,6vw,48px);
+    line-height:1;margin:18px 0 8px;text-transform:uppercase}
+  h1 span{color:var(--tangerine)}
+  .lede{color:var(--muted);max-width:64ch;font-size:14.5px;margin:0}
+
+  .tabs{display:flex;gap:8px;margin:26px 0 22px;flex-wrap:wrap}
+  .tab{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+    font-size:16px;padding:9px 18px;border:1px solid var(--line);border-radius:10px;
+    background:var(--obsidian-2);color:var(--muted);cursor:pointer;transition:.15s}
+  .tab.on{color:var(--obsidian);background:var(--teal);border-color:var(--teal)}
+
+  .grid{display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:22px;align-items:start}
+  @media(max-width:800px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--obsidian-2);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .card h2{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    font-size:18px;margin:0 0 4px}
+  .card .sub{color:var(--muted);font-size:12.5px;margin:0 0 16px}
+  .fieldrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .f{margin-bottom:13px}
+  .f.full{grid-column:1/-1}
+  label{display:block;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:5px}
+  input,select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    color:var(--paper);font-family:'Space Grotesk';font-size:15px;padding:9px 11px;outline:none}
+  input:focus,select:focus{border-color:var(--teal)}
+  .divider{border-top:1px solid var(--line);margin:6px 0 16px;padding-top:14px}
+  .divider span{font-family:'Barlow Condensed';font-weight:700;color:var(--teal-dim);
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+
+  .out{position:relative;background:#071319;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .outbar{display:flex;align-items:center;justify-content:space-between;
+    padding:11px 15px;border-bottom:1px solid var(--line);background:#0a1a22}
+  .outbar .t{font-family:'JetBrains Mono';font-size:12px;color:var(--muted)}
+  .copy{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+    font-size:13px;padding:7px 15px;border:none;border-radius:8px;cursor:pointer;
+    background:var(--tangerine);color:#fff;transition:.15s}
+  .copy.ok{background:var(--teal);color:var(--obsidian)}
+  pre{margin:0;padding:16px 15px;font-family:'JetBrains Mono';font-size:12px;line-height:1.55;
+    color:#bfe6df;white-space:pre;overflow:auto;max-height:64vh}
+
+  /* habitaciones */
+  .room{display:grid;grid-template-columns:1fr 70px 70px 70px 70px 30px;gap:6px;margin-bottom:8px;align-items:center}
+  .room input{padding:8px 9px;font-size:14px}
+  .room .rm{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;
+    cursor:pointer;height:38px;font-size:16px}
+  .room .rm:hover{color:var(--tangerine);border-color:var(--tangerine)}
+  .roomhead{display:grid;grid-template-columns:1fr 70px 70px 70px 70px 30px;gap:6px;margin-bottom:6px}
+  .roomhead span{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .add{margin-top:6px;width:100%;background:transparent;border:1px dashed var(--teal-dim);color:var(--teal);
+    border-radius:9px;padding:9px;cursor:pointer;font-family:'Barlow Condensed';font-weight:700;
+    text-transform:uppercase;letter-spacing:.05em;font-size:14px}
+
+  /* vanos */
+  .room-block{border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:11px;background:var(--panel)}
+  .room-block .room{margin-bottom:0}
+  .vanohead{display:grid;grid-template-columns:62px 1fr 56px 56px 56px 62px 26px;gap:5px;margin:9px 0 4px}
+  .vanohead span{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .vano{display:grid;grid-template-columns:62px 1fr 56px 56px 56px 62px 26px;gap:5px;margin-bottom:5px;align-items:center}
+  .vano select,.vano input{padding:6px 5px;font-size:12.5px}
+  .vano .rm{height:32px;font-size:13px}
+  .add-vano{margin-top:5px;width:100%;background:transparent;border:1px dashed var(--tangerine);color:var(--tangerine);
+    border-radius:8px;padding:6px;cursor:pointer;font-family:'Barlow Condensed';font-weight:700;
+    text-transform:uppercase;letter-spacing:.04em;font-size:12.5px}
+  .add-vano:hover{background:rgba(232,93,42,.08)}
+
+  .imgload{border:1px solid var(--teal-dim);border-radius:12px;padding:13px;margin-bottom:14px;background:rgba(27,182,164,.05)}
+  .imgload-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;
+    font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);font-weight:700}
+  #img-status{color:var(--tangerine);font-weight:600;letter-spacing:0;text-transform:none}
+  .imgbtn{display:block;text-align:center;background:var(--teal);color:#04231f;border-radius:9px;padding:11px;
+    cursor:pointer;font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:15px}
+  .imgbtn:hover{filter:brightness(1.08)}
+  .imgbtn.busy{opacity:.6;pointer-events:none}
+  .imghint{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.4}
+
+  .divider2{display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px;
+    border-top:1px solid var(--line);padding-top:14px}
+  .divider2 span{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--teal);font-size:15px}
+  .csvbtn{background:var(--tangerine);color:#fff;border:none;border-radius:8px;padding:7px 12px;cursor:pointer;
+    font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:12.5px}
+  .csvbtn:hover{filter:brightness(1.08)}
+  .cuttable{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+  .cuttable table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .cuttable th{background:rgba(27,182,164,.08);color:var(--teal);text-align:left;padding:8px 10px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.03em;font-size:10.5px;position:sticky;top:0}
+  .cuttable td{padding:7px 10px;border-top:1px solid var(--line)}
+  .cuttable td.cd{font-family:'JetBrains Mono';color:var(--tangerine);font-weight:600}
+  .cuttable .warn{color:var(--tangerine);font-size:11px}
+  .barlen{font-size:12px;color:var(--muted)}
+  .barlen input{width:70px;padding:4px 6px;margin:0 2px}
+  .preciogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+  .preciogrid .pf label{font-size:10.5px;color:var(--muted);display:block;margin-bottom:3px}
+  .preciogrid .pf input{width:100%;padding:6px}
+  .presu{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel)}
+  .presu .prow{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
+  .presu .prow.sub{border-top:1px solid var(--line);margin-top:5px;padding-top:9px}
+  .presu .prow.tot{border-top:2px solid var(--teal);margin-top:6px;padding-top:10px;font-size:17px}
+  .presu .prow.tot b{color:var(--teal);font-family:'Barlow Condensed'}
+
+  /* computo */
+  .computo{margin-top:22px}
+  .computo h2{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+    font-size:20px;margin:0 0 12px}
+  .ccards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .cc{background:var(--obsidian-2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .cc .k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px}
+  .cc .row{display:flex;justify-content:space-between;font-size:14px;margin:5px 0}
+  .cc .row b{font-family:'Barlow Condensed';font-size:18px;color:var(--teal)}
+  .cc .row.big b{color:var(--tangerine)}
+  .note{margin-top:14px;color:var(--muted);font-size:12px;line-height:1.5}
+
+  .how{margin-top:24px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:640px){.how{grid-template-columns:1fr}}
+  .step{background:var(--obsidian-2);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+  .step b{font-family:'Barlow Condensed';color:var(--tangerine);font-size:20px;display:block;margin-bottom:3px}
+  .step p{margin:0;font-size:13px;color:#c6d4d4}
+  footer{margin-top:34px;text-align:center;color:var(--muted);font-size:12px;letter-spacing:.03em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Adamant</div>
+    <h1>Generador de scripts <span>·</span> Steel Frame</h1>
+    <p class="lede">Cargá las medidas, copiá el código y pegalo en la Consola Ruby de SketchUp (Extensions → Developer → Ruby Console). Perfiles según norma IRAM-IAS U 500-205 (Barbieri).</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" data-mod="muro">Muro / Tabique</button>
+    <button class="tab" data-mod="cielo">Cielorraso</button>
+    <button class="tab" data-mod="casa">Casa completa</button>
+  </div>
+
+  <div class="grid">
+    <div class="card" id="form"></div>
+    <div class="out">
+      <div class="outbar">
+        <span class="t" id="fname">tabique.rb</span>
+        <button class="copy" id="copy">Copiar código</button>
+      </div>
+      <pre id="code"></pre>
+    </div>
+  </div>
+
+  <div class="computo" id="computo" style="display:none"></div>
+
+  <div class="how">
+    <div class="step"><b>01</b><p>Abrí SketchUp → Extensions → Developer → Ruby Console.</p></div>
+    <div class="step"><b>02</b><p>Copiá el código y pegalo en la barra de abajo de la consola.</p></div>
+    <div class="step"><b>03</b><p>Enter. Aparece la estructura, cada perfil como grupo editable y en su tag.</p></div>
+  </div>
+
+  <footer>ADAMANT · Cómputo con fines de estimación de costos. El cálculo estructural definitivo lo realiza un profesional habilitado.</footer>
+</div>
+
+<script>
+// ============ BASE DE PERFILES (IRAM-IAS U 500-205, Barbieri) ============
+// PGC: ala B=40, labio C=15.  PGU: ala B=35 (encastra sobre el PGC).
+const PGC={
+ "PGC 90x0.90":{a:90,e:0.9,kg:1.42},"PGC 90x1.25":{a:90,e:1.25,kg:1.97},"PGC 90x1.60":{a:90,e:1.6,kg:2.52},
+ "PGC 100x0.90":{a:100,e:0.9,kg:1.51},"PGC 100x1.25":{a:100,e:1.25,kg:2.1},"PGC 100x1.60":{a:100,e:1.6,kg:2.68},
+ "PGC 140x0.90":{a:140,e:0.9,kg:1.87},"PGC 140x1.25":{a:140,e:1.25,kg:2.6},"PGC 140x1.60":{a:140,e:1.6,kg:3.32},"PGC 140x2.00":{a:140,e:2.0,kg:4.15},
+ "PGC 150x1.60":{a:150,e:1.6,kg:3.48},"PGC 200x1.60":{a:200,e:1.6,kg:4.28},"PGC 250x2.00":{a:250,e:2.0,kg:6.35}
+};
+const PGU={
+ "PGU 90x0.90":{a:92,e:0.9,kg:1.11},"PGU 90x1.25":{a:93,e:1.25,kg:1.54},"PGU 90x1.60":{a:94,e:1.6,kg:1.97},
+ "PGU 100x0.90":{a:102,e:0.9,kg:1.18},"PGU 100x1.25":{a:103,e:1.25,kg:1.64},"PGU 100x1.60":{a:104,e:1.6,kg:2.1},
+ "PGU 140x0.90":{a:142,e:0.9,kg:1.46},"PGU 140x1.25":{a:143,e:1.25,kg:2.04},"PGU 140x1.60":{a:144,e:1.6,kg:2.6},"PGU 140x2.00":{a:145,e:2.0,kg:3.25},
+ "PGU 150x1.60":{a:154,e:1.6,kg:2.73},"PGU 200x1.60":{a:204,e:1.6,kg:3.35},"PGU 250x2.00":{a:255,e:2.0,kg:4.98}
+};
+// Revestimientos: peso kg/m2 (Manual Barbieri, Info. técnica)
+const REVEST={
+ "Ninguno":0,"Durlock 12.5":8.9,"Durlock 9.5":7.0,"OSB / Fenólico 10":7.0,
+ "Placa cementicia 12":15.97,"Placa cementicia 8":13.19,"Siding cementicio 12":13.91,"PVC (aprox)":3.5
+};
+const PGC_ALA=40, PGC_LABIO=15, PGU_ALA=35;
+// ============ BASE DE MADERAS (Wood Framing, medidas reales mm) ============
+// Nominal 2x → real: espesor 38mm; ancho según pieza. Douglas Fir ~480 kg/m3.
+const WOOD_DENS=480;
+const LUMBER={
+ "2x3 (38×64)":{e:38,a:64},"2x4 (38×89)":{e:38,a:89},"2x6 (38×140)":{e:38,a:140},
+ "2x8 (38×184)":{e:38,a:184},"2x10 (38×235)":{e:38,a:235},"2x12 (38×286)":{e:38,a:286}
+};
+function lumberKg(sz){const L=LUMBER[sz];return L.e*L.a*WOOD_DENS/1e6;} // kg por metro lineal
+// Espesor de muro (profundidad) según sistema
+function wallThk(p){ return p.sistema==="wood" ? LUMBER[p.lumber].a : PGU[p.pgu].a; }
+
+// ============ Ruby helper compartido ============
+const HELPER=`
+def _profile(parent, pts2d, mapper, dist, axis, origin, mat, tag, xf=nil)
+  g = parent.add_group
+  f = g.entities.add_face(pts2d.map { |u, v| mapper.call(u, v) })
+  f.pushpull(dist.mm)
+  b = g.bounds
+  mn = axis == :x ? b.min.x : (axis == :y ? b.min.y : b.min.z)
+  if mn < -0.01
+    v = axis == :x ? [dist.mm,0,0] : (axis == :y ? [0,dist.mm,0] : [0,0,dist.mm])
+    g.transform!(Geom::Transformation.new(v))
+  end
+  g.transform!(Geom::Transformation.new([origin[0].mm, origin[1].mm, origin[2].mm]))
+  g.transform!(xf) if xf
+  g.material = mat; g.layer = tag
+  if defined?(ETIQUETAS) && ETIQUETAS
+    pf = (mat.is_a?(String) ? (PIECE_PREF[mat]||"P") : "PL")
+    $PCNT[pf] = ($PCNT[pf]||0)+1
+    g.name = sprintf("%s-%02d", pf, $PCNT[pf])
+    begin; t=parent.add_text(g.name, g.bounds.center); rescue; end
+  end
+  g
+end
+MAP_YZ = ->(y,z){ Geom::Point3d.new(0, y.mm, z.mm) }
+MAP_XZ = ->(x,z){ Geom::Point3d.new(x.mm, 0, z.mm) }
+MAP_XY = ->(x,y){ Geom::Point3d.new(x.mm, y.mm, 0) }`;
+
+// ============ MÓDULO MURO ============
+function scriptMuro(p){
+  const wood=p.sistema==="wood";
+  if(wood){
+    const L=LUMBER[p.lumber||"2x6 (38×140)"];
+return `# ADAMANT · Tabique Wood Frame ${p.lumber||"2x6"} (double top plate) | unidades en mm
+LARGO=${p.largo}; ALTURA=${p.altura}; MODULO=${p.modulo}
+WE=${L.e}; WA=${L.a}
+${HELPER}
+model=Sketchup.active_model; model.start_operation("Tabique wood",true); we_root=model.active_entities
+t_sol=model.layers.add("Estructura-Soleras"); t_mon=model.layers.add("Estructura-Montantes")
+wall=we_root.add_group; wall.name="Tabique wood #{LARGO.to_i}x#{ALTURA.to_i}"; we=wall.entities
+plate=[[0,0],[WA,0],[WA,WE],[0,WE]]
+stud=[[0,0],[WE,0],[WE,WA],[0,WA]]
+_profile(we,plate,MAP_YZ,LARGO,:x,[0,0,0],"Silver",t_sol)                 # solera inferior
+_profile(we,plate,MAP_YZ,LARGO,:x,[0,0,ALTURA-WE],"Silver",t_sol)         # top plate 1
+_profile(we,plate,MAP_YZ,LARGO,:x,[0,0,ALTURA-2*WE],"Silver",t_sol)       # top plate 2 (doble)
+hmon=ALTURA-3*WE; pos=[]; x=0.0
+while x<LARGO; pos<<x; x+=MODULO; end
+pos<<LARGO unless (pos.last-LARGO).abs<1.0
+pos.each do |pp|
+  ox=pp-WE/2.0; ox=0.0 if ox<0; ox=LARGO-WE if ox>LARGO-WE
+  _profile(we,stud,MAP_XY,hmon,:z,[ox,0,WE],"SaddleBrown",t_mon)
+end
+wall.explode
+model.commit_operation; model.active_view.zoom_extents
+puts "Tabique wood OK: #{pos.length} montantes + double top plate. Perfiles sueltos y editables."`;
+  }
+return `# ADAMANT · Tabique Steel Frame (generado) | unidades en mm
+LARGO=${p.largo}; ALTURA=${p.altura}; MODULO=${p.modulo}
+PGC_ALMA=${p.pgcAlma}; PGC_ALA=${p.pgcAla}; PGC_LABIO=${p.pgcLabio}; PGC_ESP=${p.pgcEsp}
+PGU_ALMA=${p.pguAlma}; PGU_ALA=${p.pguAla}; PGU_ESP=${p.pguEsp}
+${HELPER}
+model=Sketchup.active_model; model.start_operation("Tabique",true); we_root=model.active_entities
+t_sol=model.layers.add("Estructura-Soleras"); t_mon=model.layers.add("Estructura-Montantes")
+wall=we_root.add_group; wall.name="Tabique #{LARGO.to_i}x#{ALTURA.to_i}"; we=wall.entities
+a=PGU_ALMA; fl=PGU_ALA; t=PGU_ESP
+u_bot=[[0,fl],[0,0],[a,0],[a,fl],[a-t,fl],[a-t,t],[t,t],[t,fl]]
+u_top=[[0,0],[0,fl],[a,fl],[a,0],[a-t,0],[a-t,fl-t],[t,fl-t],[t,0]]
+_profile(we,u_bot,MAP_YZ,LARGO,:x,[0,0,0],"Silver",t_sol)
+_profile(we,u_top,MAP_YZ,LARGO,:x,[0,0,ALTURA-fl],"Silver",t_sol)
+a=PGC_ALMA; fl=PGC_ALA; l=PGC_LABIO; t=PGC_ESP
+c=[[fl,l],[fl,0],[0,0],[0,a],[fl,a],[fl,a-l],[fl-t,a-l],[fl-t,a-t],[t,a-t],[t,t],[fl-t,t],[fl-t,l]]
+hmon=ALTURA-2*PGU_ESP; pos=[]; x=0.0
+while x<LARGO; pos<<x; x+=MODULO; end
+pos<<LARGO unless (pos.last-LARGO).abs<1.0
+pos.each do |pp|
+  ox=pp-fl/2.0; ox=0.0 if ox<0; ox=LARGO-fl if ox>LARGO-fl
+  _profile(we,c,MAP_XY,hmon,:z,[ox,0,PGU_ESP],"SteelBlue",t_mon)
+end
+wall.explode
+model.commit_operation; model.active_view.zoom_extents
+puts "Tabique OK: #{pos.length} montantes. Perfiles sueltos, cada uno es un grupo movible/editable sin explotar."`;
+}
+
+// ============ MÓDULO CIELORRASO ============
+function scriptCielo(p){
+return `# ADAMANT · Cielorraso suspendido (generado) | unidades en mm
+LARGO=${p.largo}; ANCHO=${p.ancho}; ALT=${p.alt}; MODULO=${p.modulo}
+PA=${p.alma}; PL=${p.ala}; PE=${p.esp}
+${HELPER}
+model=Sketchup.active_model; model.start_operation("Cielorraso",true); root=model.active_entities
+tp=model.layers.add("Cielorraso-Perimetro"); tf=model.layers.add("Cielorraso-Perfiles")
+ceil=root.add_group; ceil.name="Cielorraso #{LARGO.to_i}x#{ANCHO.to_i}"; ce=ceil.entities
+a=PA; fl=PL; t=PE
+u=[[fl,0],[0,0],[0,a],[fl,a],[fl,a-t],[t,a-t],[t,t],[fl,t]]
+_profile(ce,u,MAP_YZ,LARGO,:x,[0,0,0],"Gray",tp)
+_profile(ce,u,MAP_YZ,LARGO,:x,[0,ANCHO-fl,0],"Gray",tp)
+_profile(ce,u,MAP_XZ,ANCHO,:y,[0,0,0],"Gray",tp)
+_profile(ce,u,MAP_XZ,ANCHO,:y,[LARGO-fl,0,0],"Gray",tp)
+n=0; y=MODULO
+while y<ANCHO-fl
+  _profile(ce,u,MAP_YZ,LARGO,:x,[0,y,0],"Silver",tf); n+=1; y+=MODULO
+end
+ceil.transform!(Geom::Transformation.new([0,0,ALT.mm]))
+ceil.explode
+model.commit_operation; model.active_view.zoom_extents
+puts "Cielorraso OK: #{n} perfiles portantes. Perfiles sueltos, cada uno es un grupo movible/editable sin explotar."`;
+}
+
+// ============ MÓDULO CASA COMPLETA ============
+const VANO_TIPOS={
+  "Puerta":{ancho:800,alto:2050,sill:0},
+  "Puerta balcón":{ancho:1500,alto:2050,sill:0},
+  "Ventana":{ancho:1200,alto:1100,sill:900},
+  "Abertura":{ancho:1000,alto:2100,sill:0},
+  "Arcada":{ancho:1200,alto:2100,sill:0}
+};
+const LADOS={frente:"Frente",fondo:"Fondo",izq:"Izq",der:"Der"};
+
+// Devuelve los 4 muros de una habitación con sus vanos en coords locales del muro
+function roomWalls(r,alma){
+  const L=r.largo, W=r.ancho;
+  const mk=(lado,larg)=>({lado,larg,vanos:(r.vanos||[]).filter(v=>v.lado===lado).map(v=>{
+    const x1=Math.max(0,+v.pos), x2=Math.min(larg,+v.pos+ +v.ancho);
+    return {x1,x2,h:+v.alto,sill:+v.sill,ancho:Math.max(0,x2-x1),tipo:v.tipo};
+  }).filter(v=>v.ancho>1)});
+  return [mk("frente",L),mk("fondo",L),mk("izq",W-2*alma),mk("der",W-2*alma)];
+}
+
+// Planta absoluta: convierte habitaciones (con posX/posY) en segmentos de muro
+// y FUSIONA muros compartidos colineales (un solo panel, no doble).
+function planWalls(p){
+  const alma=wallThk(p);
+  const raw=[];
+  const push=(orient,c,a1,a2,vanos,off)=>{
+    raw.push({orient,c,a1,a2,vanos:vanos.map(v=>({x1:v.x1+off,x2:v.x2+off,h:v.h,sill:v.sill}))});
+  };
+  p.rooms.forEach(r=>{
+    if(!(r.largo>0&&r.ancho>0))return;
+    const X=+r.posX||0, Y=+r.posY||0, L=r.largo, W=r.ancho;
+    const wl=roomWalls(r,alma);
+    push('h',Y,        X, X+L, wl[0].vanos, X);        // frente
+    push('h',Y+W-alma, X, X+L, wl[1].vanos, X);        // fondo
+    push('v',X,        Y+alma, Y+W-alma, wl[2].vanos, Y+alma); // izq
+    push('v',X+L-alma, Y+alma, Y+W-alma, wl[3].vanos, Y+alma); // der
+  });
+  // merge: mismo eje, misma línea (tolerancia = alma), rangos que se tocan
+  const segs=[];
+  raw.forEach(s=>{
+    const m=segs.find(t=>t.orient===s.orient && Math.abs(t.c-s.c)<=alma+0.5 && s.a1<=t.a2+0.5 && s.a2>=t.a1-0.5);
+    if(m){
+      m.c=Math.min(m.c,s.c); m.a1=Math.min(m.a1,s.a1); m.a2=Math.max(m.a2,s.a2);
+      s.vanos.forEach(v=>{ if(!m.vanos.some(u=>Math.abs(u.x1-v.x1)<1&&Math.abs(u.x2-v.x2)<1)) m.vanos.push(v); });
+    } else segs.push({...s,vanos:[...s.vanos]});
+  });
+  segs.forEach(s=>s.vanos.sort((a,b)=>a.x1-b.x1));
+  return {segs,alma};
+}
+
+function planBBox(p){
+  const {segs,alma}=planWalls(p);
+  if(!segs.length) return null;
+  let x1=1e9,x2=-1e9,y1=1e9,y2=-1e9;
+  segs.forEach(s=>{
+    if(s.orient==='h'){x1=Math.min(x1,s.a1);x2=Math.max(x2,s.a2);y1=Math.min(y1,s.c);y2=Math.max(y2,s.c+alma);}
+    else{y1=Math.min(y1,s.a1);y2=Math.max(y2,s.a2);x1=Math.min(x1,s.c);x2=Math.max(x2,s.c+alma);}
+  });
+  return {x1,x2,y1,y2};
+}
+
+const PGO_KG=0.75; // kg/m fleje PGO 37/22/12.5 x0.9 aprox
+
+function computeCasa(p){
+  const pc=PGC[p.pgc], pu=PGU[p.pgu];
+  const wood=p.sistema==="wood", L=wood?LUMBER[p.lumber]:null;
+  const tS=wood?L.e:pu.e, headH=wood?L.a:pc.a;
+  const kgV=wood?lumberKg(p.lumber):pc.kg, kgP=wood?lumberKg(p.lumber):pu.kg;
+  const kgCorrea=wood?lumberKg(p.lumber):PGO_KG, platesMul=wood?3:2;
+  const {segs}=planWalls(p);
+  let mPGC=0,mPGU=0,area=0,nMont=0,nVanos=0;
+  const hmon=wood?(p.altura-3*L.e)/1000:(p.altura-2*pu.e)/1000;
+  segs.forEach(w=>{
+    const larg=w.a2-w.a1;
+    if(larg<=0)return;
+    mPGU+=platesMul*(larg/1000);
+    let n=Math.ceil(larg/p.modulo)+1;
+    w.vanos.forEach(v=>{ n=Math.max(0,n-Math.floor((v.x2-v.x1)/p.modulo)); });
+    nMont+=n; mPGC+=n*hmon;
+    let aMuro=(larg/1000)*(p.altura/1000);
+    w.vanos.forEach(v=>{
+      nVanos++;
+      const wv=(v.x2-v.x1)/1000;
+      aMuro-=wv*((v.h-v.sill)/1000);
+      mPGC+=2*hmon;                    // kings
+      mPGC+=2*((v.h-tS)/1000);         // jacks
+      if(wood){ mPGC+=2*wv; }          // dintel: 2 piezas built-up
+      else { mPGC+=2*wv; mPGU+=wv; }   // dintel: 2 PGC + 1 PGU
+      mPGU+=(wv+0.2);                  // solera/durmiente de vano sup
+      const ncs=Math.max(0,Math.floor((v.x2-v.x1)/p.modulo));
+      const hcs=(p.altura-tS-(v.h+headH))/1000;
+      if(hcs>0.01) mPGC+=ncs*hcs;
+      if(v.sill>tS+1){
+        mPGU+=(wv+0.2);
+        mPGC+=ncs*((v.sill-tS)/1000);
+      }
+    });
+    area+=Math.max(0,aMuro);
+  });
+  // techo
+  let techo=null;
+  const bb=planBBox(p);
+  if(p.techoOn&&bb){
+    const D=(bb.y2-bb.y1)/1000, Lx=(bb.x2-bb.x1)/1000, pnd=p.pendiente/100;
+    const nCab=Math.floor((bb.x2-bb.x1)/p.sepCab)+1+(((bb.x2-bb.x1)%p.sepCab)>50?1:0);
+    const tipo=p.techoTipo||"Dos aguas", slope=Math.sqrt(1+pnd*pnd);
+    let mCab=0,mPGO=0;
+    if(tipo==="Dos aguas"||tipo==="Cuatro aguas"){
+      mCab=nCab*(D + 2*(D/2+p.alero/1000)*slope + (D/2*pnd));
+      mPGO=2*(Math.floor((D*500)/600)+1)*Lx;
+      if(tipo==="Cuatro aguas") mCab+=4*Math.hypot(D/2,D/2)*slope;
+    } else if(tipo==="Una agua"){
+      mCab=nCab*(D + (D+2*p.alero/1000)*slope);
+      mPGO=(Math.floor((D*1000)/600)+1)*Lx;
+    } else { // Plano
+      mCab=nCab*D*slope; mPGO=(Math.floor((D*1000)/600)+1)*Lx;
+    }
+    techo={nCab,mCab,mPGO,kg:mCab*kgV+mPGO*kgCorrea,tipo};
+    mPGC+=mCab;
+  }
+  // entrepiso
+  let entrepiso=null;
+  if(p.entrepisoOn&&bb){
+    const D=(bb.y2-bb.y1)/1000, Lx=(bb.x2-bb.x1)/1000;
+    const nV=Math.max(0,Math.floor((bb.x2-bb.x1)/p.sepViga)-1);
+    const mVig=nV*D, mCen=2*(D+Lx);
+    entrepiso={nV,mVig,mCen,kg:mVig*kgV+mCen*kgP};
+    mPGC+=mVig; mPGU+=mCen;
+  }
+  // platea
+  let platea=null;
+  if(p.plateaOn&&bb){
+    const ax=(bb.x2-bb.x1+2*p.vuelo)/1000, ay=(bb.y2-bb.y1+2*p.vuelo)/1000;
+    platea={m2:ax*ay, m3:ax*ay*(p.espesor/1000)};
+  }
+  const kgPerf=mPGC*kgV+mPGU*kgP+(techo?techo.mPGO*kgCorrea:0);
+  const volM3=wood?((mPGC+mPGU+(techo?techo.mPGO:0))*L.e*L.a/1e6):0;
+  const kgInt=REVEST[p.revInt], kgExt=REVEST[p.revExt];
+  const areaExt=(p.revExt==="Ninguno")?0:area;
+  const areaInt=(p.revInt==="Ninguno")?0:area;
+  const placaArea=areaInt+areaExt;
+  const placas=Math.ceil(placaArea/2.88);
+  return {mPGC,mPGU,kgPerf,area,areaInt,areaExt,kgInt:areaInt*kgInt,kgExt:areaExt*kgExt,
+          placas, t2:Math.round(placaArea*20), t1:nMont*4, nMont, nVanos, techo, platea, entrepiso, nMuros:segs.length, wood, volM3};
+}
+
+// Genera literal Ruby con los vanos de un muro
+function vanosRuby(vanos){
+  if(!vanos.length) return "[]";
+  return "["+vanos.map(v=>`{x1:${v.x1.toFixed(0)}.0,x2:${v.x2.toFixed(0)}.0,h:${v.h.toFixed(0)}.0,sill:${v.sill.toFixed(0)}.0}`).join(",")+"]";
+}
+
+function techoRuby(p,bb){
+  const pnd=(p.pendiente||30)/100;
+  const tipo=p.techoTipo||"Dos aguas";
+  const head=`
+# --- Techo: ${tipo} (pendiente ${p.pendiente}%) ---
+t_t=Sketchup.active_model.layers["Estructura-Techo"]
+BX1=${bb.x1.toFixed(0)}.0; BX2=${bb.x2.toFixed(0)}.0; BY1=${bb.y1.toFixed(0)}.0; BY2=${bb.y2.toFixed(0)}.0
+MIDY=(BY1+BY2)/2.0; PND=${pnd}; ALERO=${p.alero}.0; SEP=${p.sepCab}.0; ZT=ALTURA.to_f
+D=BY2-BY1; LX=BX2-BX1; RISE=D/2.0*PND; ca=PGC_ALMA
+csec=_csec
+og=0.9
+osec=[[0,0],[12.5+og,0],[12.5+og,22-og],[49.5-og,22-og],[49.5-og,0],[62,0],[62,og],[49.5,og],[49.5,22],[12.5,22],[12.5,og],[0,og]]
+osec=_usec if SIS=="wood"
+`;
+  if(tipo==="Dos aguas"){
+    return head+`
+cab=lambda do |xc|
+  _beam3d(we,[xc,BY1,ZT],[xc,BY2,ZT],csec,"Brown",t_t)
+  _beam3d(we,[xc,BY1-ALERO,ZT-ALERO*PND],[xc,MIDY,ZT+RISE],csec,"Brown",t_t)
+  _beam3d(we,[xc,MIDY,ZT+RISE],[xc,BY2+ALERO,ZT-ALERO*PND],csec,"Brown",t_t)
+  _profile(we,csec,MAP_XY,RISE,:z,[0,0,0],"Peru",t_t,_T(xc,MIDY-ca/2.0,ZT)) if RISE>50
+  _beam3d(we,[xc,(BY1+MIDY)/2.0,ZT],[xc,(BY1+MIDY)/2.0,ZT+RISE/2.0],csec,"Peru",t_t) if RISE>150
+  _beam3d(we,[xc,(MIDY+BY2)/2.0,ZT],[xc,(MIDY+BY2)/2.0,ZT+RISE/2.0],csec,"Peru",t_t) if RISE>150
+end
+xc=BX1; lastx=BX1
+while xc<=BX2+1.0; lastx=[xc,BX2-PGC_ALA].min; cab.call(lastx); xc+=SEP; end
+cab.call(BX2-PGC_ALA) if (BX2-PGC_ALA)-lastx>50
+s=0.0
+while s<=D/2.0+1
+  z=ZT+s*PND+ca
+  _beam3d(we,[BX1,BY1+s,z],[BX2,BY1+s,z],osec,"DarkGray",t_t)
+  _beam3d(we,[BX1,BY2-s,z],[BX2,BY2-s,z],osec,"DarkGray",t_t)
+  s+=600
+end
+`;
+  }
+  if(tipo==="Una agua"){
+    return head+`
+cab=lambda do |xc|
+  _beam3d(we,[xc,BY1,ZT],[xc,BY2,ZT],csec,"Brown",t_t)
+  _beam3d(we,[xc,BY1-ALERO,ZT-ALERO*PND],[xc,BY2+ALERO,ZT+(D+ALERO)*PND],csec,"Brown",t_t)
+  yy=BY1+600.0
+  while yy<BY2
+    hh=(yy-BY1)*PND
+    _profile(we,csec,MAP_XY,hh,:z,[0,0,0],"Peru",t_t,_T(xc,yy,ZT)) if hh>100
+    yy+=600.0
+  end
+end
+xc=BX1; lastx=BX1
+while xc<=BX2+1.0; lastx=[xc,BX2-PGC_ALA].min; cab.call(lastx); xc+=SEP; end
+cab.call(BX2-PGC_ALA) if (BX2-PGC_ALA)-lastx>50
+s=0.0
+while s<=D+1
+  z=ZT+s*PND+ca
+  _beam3d(we,[BX1,BY1+s,z],[BX2,BY1+s,z],osec,"DarkGray",t_t)
+  s+=600
+end
+`;
+  }
+  if(tipo==="Plano"){
+    return head+`
+# techo plano: vigas PGC en Y con leve pendiente + correas
+xc=BX1; lastx=BX1
+vig=lambda do |xx|
+  _beam3d(we,[xx,BY1,ZT],[xx,BY2,ZT+D*PND],csec,"Brown",t_t)
+end
+while xc<=BX2+1.0; lastx=[xc,BX2-PGC_ALA].min; vig.call(lastx); xc+=SEP; end
+vig.call(BX2-PGC_ALA) if (BX2-PGC_ALA)-lastx>50
+s=0.0
+while s<=D+1
+  z=ZT+s*PND+ca
+  _beam3d(we,[BX1,BY1+s,z],[BX2,BY1+s,z],osec,"DarkGray",t_t)
+  s+=600
+end
+`;
+  }
+  // Cuatro aguas
+  return head+`
+INSET=[D/2.0, LX/2.0-1.0].min
+RX1=BX1+INSET; RX2=BX2-INSET
+_beam3d(we,[RX1,MIDY,ZT+RISE],[RX2,MIDY,ZT+RISE],csec,"Sienna",t_t)   # cumbrera
+cab=lambda do |xc|
+  _beam3d(we,[xc,BY1,ZT],[xc,BY2,ZT],csec,"Brown",t_t)
+  _beam3d(we,[xc,BY1-ALERO,ZT-ALERO*PND],[xc,MIDY,ZT+RISE],csec,"Brown",t_t)
+  _beam3d(we,[xc,MIDY,ZT+RISE],[xc,BY2+ALERO,ZT-ALERO*PND],csec,"Brown",t_t)
+  _profile(we,csec,MAP_XY,RISE,:z,[0,0,0],"Peru",t_t,_T(xc,MIDY-ca/2.0,ZT)) if RISE>50
+end
+xc=RX1
+while xc<=RX2+1.0; cab.call([xc,RX2].min); xc+=SEP; end
+_beam3d(we,[BX1,BY1,ZT],[RX1,MIDY,ZT+RISE],csec,"Sienna",t_t)   # limatesas
+_beam3d(we,[BX1,BY2,ZT],[RX1,MIDY,ZT+RISE],csec,"Sienna",t_t)
+_beam3d(we,[BX2,BY1,ZT],[RX2,MIDY,ZT+RISE],csec,"Sienna",t_t)
+_beam3d(we,[BX2,BY2,ZT],[RX2,MIDY,ZT+RISE],csec,"Sienna",t_t)
+s=0.0
+while s<=D/2.0+1
+  z=ZT+s*PND+ca
+  _beam3d(we,[RX1,BY1+s,z],[RX2,BY1+s,z],osec,"DarkGray",t_t)
+  _beam3d(we,[RX1,BY2-s,z],[RX2,BY2-s,z],osec,"DarkGray",t_t)
+  s+=600
+end
+`;
+}
+
+function entrepisoRuby(p,bb){
+  return `
+# --- Entrepiso (nivel ${p.nivelEnt} mm) ---
+t_e=Sketchup.active_model.layers["Estructura-Entrepiso"]
+EX1=${bb.x1.toFixed(0)}.0; EX2=${bb.x2.toFixed(0)}.0; EY1=${bb.y1.toFixed(0)}.0; EY2=${bb.y2.toFixed(0)}.0
+NIV=${p.nivelEnt}.0; SEPV=${p.sepViga}.0; ca=PGC_ALMA
+usec=_usec; csec=_csec
+_beam3d(we,[EX1,EY1,NIV],[EX2,EY1,NIV],usec,"MediumTurquoise",t_e)   # cenefa frente
+_beam3d(we,[EX1,EY2,NIV],[EX2,EY2,NIV],usec,"MediumTurquoise",t_e)   # cenefa fondo
+_beam3d(we,[EX1,EY1,NIV],[EX1,EY2,NIV],usec,"MediumTurquoise",t_e)   # cenefa izq
+_beam3d(we,[EX2,EY1,NIV],[EX2,EY2,NIV],usec,"MediumTurquoise",t_e)   # cenefa der
+xv=EX1+SEPV
+while xv<EX2-1
+  _beam3d(we,[xv,EY1,NIV],[xv,EY2,NIV],csec,"SteelBlue",t_e)         # viga PGC
+  _profile(we,csec,MAP_XY,ca,:z,[0,0,0],"Orange",t_e,_T(xv,EY1,NIV))       # rigidizador apoyo 1
+  _profile(we,csec,MAP_XY,ca,:z,[0,0,0],"Orange",t_e,_T(xv,EY2-ca,NIV))    # rigidizador apoyo 2
+  xv+=SEPV
+end
+`;
+}
+
+function scriptCasa(p){
+  const pc=PGC[p.pgc], pu=PGU[p.pgu];
+  const {segs,alma}=planWalls(p);
+  const placaExt=(p.revExt!=="Ninguno"), placaInt=(p.revInt!=="Ninguno");
+  const espExt=Math.max(6,Math.round(REVEST[p.revExt]?12.5:12.5)); // espesor visual
+  let calls="";
+  segs.forEach(s=>{
+    const larg=s.a2-s.a1;
+    if(larg<=0)return;
+    const vv=s.vanos.map(v=>({x1:v.x1-s.a1,x2:v.x2-s.a1,h:v.h,sill:v.sill,ancho:v.x2-v.x1}));
+    const xf=(s.orient==='h')?`_T(${s.a1.toFixed(0)},${s.c.toFixed(0)},0)`
+                             :`_T(${(s.c+alma).toFixed(0)},${s.a1.toFixed(0)},0)*ROTZ90`;
+    calls+=`_wall(we, ${larg.toFixed(0)}, ${xf}, ${vanosRuby(vv)})\n`;
+    if(p.bracesOn) calls+=`_brace(we, ${larg.toFixed(0)}, ${xf}, ${vanosRuby(vv)})\n`;
+    if(p.placasOn&&placaExt) calls+=`_plate(we, ${larg.toFixed(0)}, ${xf}, :ext, 12.5, matPlaca)\n`;
+    if(p.placasOn&&placaInt) calls+=`_plate(we, ${larg.toFixed(0)}, ${xf}, :int, 12.5, matPlaca)\n`;
+  });
+  // esquinas multi-montante (4 por habitación, dedupe)
+  if(p.esquinasOn){
+    const cs=new Map();
+    p.rooms.forEach(r=>{
+      if(!(r.largo>0&&r.ancho>0))return;
+      const X=+r.posX||0,Y=+r.posY||0,L=r.largo,W=r.ancho;
+      [[X,Y,1,1],[X+L-alma,Y,-1,1],[X,Y+W-alma,1,-1],[X+L-alma,Y+W-alma,-1,-1]].forEach(([x,y,sx,sy])=>{
+        const k=Math.round(x/10)+"_"+Math.round(y/10);
+        if(!cs.has(k)) cs.set(k,`_corner(we, ${x.toFixed(0)}, ${y.toFixed(0)}, ${sx}, ${sy})`);
+      });
+    });
+    if(cs.size) calls+="# esquinas multi-montante\n"+[...cs.values()].join("\n")+"\n";
+  }
+  const matPlaca=(p.placasOn&&(placaExt||placaInt))?
+    `matPlaca=model.materials.add("Placa"); matPlaca.color=Sketchup::Color.new(212,210,205); matPlaca.alpha=0.55\n`:``;
+  const bb=planBBox(p);
+  let extra="";
+  if(p.plateaOn&&bb){
+    extra+=`
+# --- Platea de hormigón (referencia visual) ---
+t_h=model.layers.add("Hormigon")
+pl=we.add_group; pl.name="Platea"
+pf=pl.entities.add_face([[${(bb.x1-p.vuelo).toFixed(0)}.mm,${(bb.y1-p.vuelo).toFixed(0)}.mm,0],[${(bb.x2+p.vuelo).toFixed(0)}.mm,${(bb.y1-p.vuelo).toFixed(0)}.mm,0],[${(bb.x2+p.vuelo).toFixed(0)}.mm,${(bb.y2+p.vuelo).toFixed(0)}.mm,0],[${(bb.x1-p.vuelo).toFixed(0)}.mm,${(bb.y2+p.vuelo).toFixed(0)}.mm,0]])
+pf.reverse! if pf.normal.z < 0
+pf.pushpull(-${p.espesor}.mm)
+pl.material=Sketchup::Color.new(155,155,150); pl.layer=t_h
+`;
+  }
+  if(p.entrepisoOn&&bb){
+    extra+=entrepisoRuby(p,bb);
+  }
+  if(p.techoOn&&bb){
+    extra+=techoRuby(p,bb);
+  }
+  const c=computeCasa(p);
+return `# ============================================================
+# ADAMANT · Casa ${p.sistema==='wood'?'Wood Frame (madera)':'Steel Frame (acero)'} · planta real, muros fusionados
+# ${p.sistema==='wood'?`Escuadría: ${p.lumber} (double top plate)`:`Perfiles: ${p.pgc} (montantes) / ${p.pgu} (soleras)`}
+# CÓMPUTO ESTIMADO:
+#   ${p.sistema==='wood'?'Verticales':'Montantes PGC'}: ${c.mPGC.toFixed(1)} m   |   ${p.sistema==='wood'?'Soleras/plates':'Soleras PGU'}: ${c.mPGU.toFixed(1)} m${c.wood?`
+#   Volumen madera: ${c.volM3.toFixed(2)} m3`:''}${c.techo?`
+#   Techo (${c.techo.tipo}): ${c.techo.nCab} cabriadas`:''}${c.platea?`
+#   Platea: ${c.platea.m2.toFixed(1)} m2 · ${c.platea.m3.toFixed(2)} m3 hormigón`:''}
+#   Peso estructura: ${c.kgPerf.toFixed(0)} kg   |   Superficie neta muros: ${c.area.toFixed(1)} m2
+#   Muros: ${c.nMuros} paños · Vanos: ${c.nVanos}
+# (Estimación para costos; el cálculo estructural lo hace un profesional.)
+# Unidades en mm: Window > Model Info > Units
+# ============================================================
+ALTURA=${p.altura}; MODULO=${p.modulo}
+PGC_ALMA=${pc.a}; PGC_ALA=${PGC_ALA}; PGC_LABIO=${PGC_LABIO}; PGC_ESP=${pc.e}
+PGU_ALMA=${pu.a}; PGU_ALA=${PGU_ALA}; PGU_ESP=${pu.e}
+SIS="${p.sistema||'steel'}"; WOOD_ESP=${p.sistema==='wood'?LUMBER[p.lumber].e:38}; WOOD_ANC=${p.sistema==='wood'?LUMBER[p.lumber].a:89}
+${HELPER}
+model=Sketchup.active_model; model.start_operation("Casa ${p.sistema==='wood'?'Wood':'Steel'} Frame",true); root=model.active_entities
+model.layers.add("Estructura-Soleras"); model.layers.add("Estructura-Montantes"); model.layers.add("Estructura-Vanos")
+model.layers.add("Estructura-Techo"); model.layers.add("Estructura-Entrepiso"); model.layers.add("Estructura-Arriostres"); model.layers.add("Revestimientos")
+casa=root.add_group; casa.name="Casa ${p.sistema==='wood'?'wood':'steel'} frame"; we=casa.entities
+
+def _T(x,y,z); Geom::Transformation.new([x.mm, y.mm, z.mm]); end
+ROTZ90 = Geom::Transformation.rotation(ORIGIN, Z_AXIS, 90.degrees)
+ETIQUETAS=${p.etiquetasOn?'true':'false'}; $PCNT={}
+PIECE_PREF={"SteelBlue"=>"M","SaddleBrown"=>"M","Orange"=>"K","Cyan"=>"J","Gray"=>"D","Silver"=>"S","Brown"=>"CB","Sienna"=>"CB","Peru"=>"W","DarkGray"=>"CO","MediumTurquoise"=>"CE","DodgerBlue"=>"PE","Gold"=>"CSA"}
+
+# Dibuja un muro completo (soleras + montantes + vanos) corriendo en X local; xf lo ubica en planta.
+def _wall(we, larg, xf, vanos)
+  ts=Sketchup.active_model.layers["Estructura-Soleras"]
+  tm=Sketchup.active_model.layers["Estructura-Montantes"]
+  tv=Sketchup.active_model.layers["Estructura-Vanos"]
+  if SIS=="wood"
+    a=WOOD_ANC; te=WOOD_ESP; cf=WOOD_ESP; headH=WOOD_ANC
+    ub=[[0,0],[a,0],[a,te],[0,te]]; ut=ub          # plates rectangulares
+    c=[[0,0],[cf,0],[cf,a],[0,a]]                   # montante sólido
+    zb=te; ztopC=ALTURA-2*te; hmon=ztopC-zb; ntop=2
+  else
+    a=PGU_ALMA; fl=PGU_ALA; t=PGU_ESP; cf=PGC_ALA; headH=PGC_ALMA
+    ub=[[0,fl],[0,0],[a,0],[a,fl],[a-t,fl],[a-t,t],[t,t],[t,fl]]
+    ut=[[0,0],[0,fl],[a,fl],[a,0],[a-t,0],[a-t,fl-t],[t,fl-t],[t,0]]
+    ca=PGC_ALMA; cl=PGC_LABIO; ct=PGC_ESP
+    c=[[cf,cl],[cf,0],[0,0],[0,ca],[cf,ca],[cf,ca-cl],[cf-ct,ca-cl],[cf-ct,ca-ct],[ct,ca-ct],[ct,ct],[cf-ct,ct],[cf-ct,cl]]
+    zb=PGU_ESP; ztopC=ALTURA-fl; hmon=ALTURA-2*PGU_ESP; ntop=1
+  end
+  # solera/durmiente inferior, cortada en umbrales (sill=0)
+  cortes=vanos.select{|v| v[:sill]<=zb+1.0}.map{|v| [v[:x1],v[:x2]]}.sort_by{|q| q[0]}
+  sx=0.0
+  cortes.each do |q1,q2|
+    _profile(we,ub,MAP_YZ,q1-sx,:x,[sx,0,0],"Silver",ts,xf) if q1-sx>5
+    sx=q2
+  end
+  _profile(we,ub,MAP_YZ,larg-sx,:x,[sx,0,0],"Silver",ts,xf) if larg-sx>5
+  # solera superior (simple steel / doble madera)
+  if SIS=="wood"
+    _profile(we,ut,MAP_YZ,larg,:x,[0,0,ALTURA-te],"Silver",ts,xf)
+    _profile(we,ut,MAP_YZ,larg,:x,[0,0,ALTURA-2*te],"Silver",ts,xf)
+  else
+    _profile(we,ut,MAP_YZ,larg,:x,[0,0,ALTURA-fl],"Silver",ts,xf)
+  end
+  inv=lambda{|xx| vanos.any?{|v| xx>=v[:x1]-1.0 && xx<=v[:x2]+1.0}}
+  pos=[]; x=0.0
+  while x<larg; pos<<x; x+=MODULO; end
+  pos<<larg unless (pos.last-larg).abs<1.0
+  pos.each do |pp|
+    dx=pp-cf/2.0; dx=0.0 if dx<0; dx=larg-cf if dx>larg-cf
+    next if inv.call(dx+cf/2.0)
+    _profile(we,c,MAP_XY,hmon,:z,[dx,0,zb],"SteelBlue",tm,xf)
+  end
+  vanos.each do |v|
+    x1=v[:x1]; x2=v[:x2]; hv=v[:h]; sill=v[:sill]
+    xd=x1+cf; wd=(x2-cf)-(x1+cf)
+    _profile(we,c,MAP_XY,hmon,:z,[x1,0,zb],"Orange",tv,xf)        # king izq
+    _profile(we,c,MAP_XY,hmon,:z,[x2-cf,0,zb],"Orange",tv,xf)     # king der
+    hj=hv-zb
+    _profile(we,c,MAP_XY,hj,:z,[x1+cf,0,zb],"Cyan",tv,xf)         # jack izq
+    _profile(we,c,MAP_XY,hj,:z,[x2-2*cf,0,zb],"Cyan",tv,xf)       # jack der
+    if wd>10
+      if SIS=="wood"
+        _profile(we,c,MAP_YZ,wd,:x,[xd,0,hv],"Gray",tv,xf)            # dintel built-up 1
+        _profile(we,c,MAP_YZ,wd,:x,[xd,te,hv],"Gray",tv,xf)          # dintel built-up 2
+      else
+        _profile(we,c,MAP_YZ,wd,:x,[xd,0,hv],"Gray",tv,xf)           # dintel PGC 1
+        _profile(we,c,MAP_YZ,wd,:x,[xd,a-cf,hv],"Gray",tv,xf)        # dintel PGC 2
+        _profile(we,ub,MAP_YZ,wd,:x,[xd,0,hv+headH],"Gray",tv,xf)    # dintel PGU
+      end
+    end
+    zc=hv+headH; hcs=ztopC-zc; cx=xd
+    while cx<x2-2*cf
+      _profile(we,c,MAP_XY,hcs,:z,[cx,0,zc],"SteelBlue",tv,xf) if hcs>10
+      cx+=MODULO
+    end
+    if sill>zb+1
+      _profile(we,ub,MAP_YZ,wd,:x,[xd,0,sill],"Silver",tv,xf) if wd>10   # solera/durmiente de vano
+      hci=sill-zb; cx=xd
+      while cx<x2-2*cf
+        _profile(we,c,MAP_XY,hci,:z,[cx,0,zb],"SteelBlue",tv,xf) if hci>10
+        cx+=MODULO
+      end
+    end
+  end
+end
+
+# Perfil recto entre dos puntos 3D (cordones inclinados, limatesas, vigas)
+def _beam3d(we, p0, p1, sec, mat, tag)
+  dx=p1[0]-p0[0]; dy=p1[1]-p0[1]; dz=p1[2]-p0[2]
+  ln=Math.sqrt(dx*dx+dy*dy+dz*dz); return if ln<1
+  vx=Geom::Vector3d.new(dx,dy,dz); vx.normalize!
+  up=(vx.parallel?(Z_AXIS)) ? Geom::Vector3d.new(0,1,0) : Geom::Vector3d.new(0,0,1)
+  vy=up.cross(vx); vy.normalize!
+  vz=vx.cross(vy); vz.normalize!
+  org=Geom::Point3d.new(p0[0].mm,p0[1].mm,p0[2].mm)
+  t=Geom::Transformation.axes(org, vx, vy, vz)
+  _profile(we, sec, MAP_YZ, ln, :x, [0,0,0], mat, tag, t)
+end
+
+def _csec
+  if SIS=="wood"
+    return [[0,0],[WOOD_ESP,0],[WOOD_ESP,WOOD_ANC],[0,WOOD_ANC]]
+  end
+  ca=PGC_ALMA; cf=PGC_ALA; cl=PGC_LABIO; ct=PGC_ESP
+  [[cf,cl],[cf,0],[0,0],[0,ca],[cf,ca],[cf,ca-cl],[cf-ct,ca-cl],[cf-ct,ca-ct],[ct,ca-ct],[ct,ct],[cf-ct,ct],[cf-ct,cl]]
+end
+
+def _usec
+  if SIS=="wood"
+    return [[0,0],[WOOD_ANC,0],[WOOD_ANC,WOOD_ESP],[0,WOOD_ESP]]
+  end
+  a=PGU_ALMA; fl=PGU_ALA; t=PGU_ESP
+  [[0,0],[fl,0],[fl,t],[t,t],[t,a-t],[fl,a-t],[fl,a],[0,a]]
+end
+
+# Poste de esquina multi-montante (L de 2 PGC), sx/sy = cuadrante interior (+/-1)
+def _corner(we, x, y, sx, sy)
+  tm=Sketchup.active_model.layers["Estructura-Montantes"]
+  h=ALTURA-2*PGU_ESP; c=_csec
+  sc=Geom::Transformation.scaling(ORIGIN, sx.to_f, sy.to_f, 1.0)
+  base=_T(x,y,PGU_ESP)*sc
+  g1=_profile(we,c,MAP_XY,h,:z,[0,0,0],"DodgerBlue",tm,base);          g1.name="Poste esquina"
+  g2=_profile(we,c,MAP_XY,h,:z,[0,0,0],"DodgerBlue",tm,base*ROTZ90);   g2.name="Poste esquina"
+end
+
+# Cruz de San Andrés (fleje 30x0.5) sobre la cara exterior de un paño lleno
+def _brace(we, larg, xf, vanos)
+  return unless vanos.empty?
+  tb=Sketchup.active_model.layers["Estructura-Arriostres"]
+  z0=PGU_ESP; z1=ALTURA-PGU_ESP; w=30.0; th=0.5
+  [[[0.0,z0],[larg,z1]],[[0.0,z1],[larg,z0]]].each do |a,b|
+    dx=b[0]-a[0]; dz=b[1]-a[1]; ln=Math.sqrt(dx*dx+dz*dz); next if ln<1
+    ux=dx/ln; uz=dz/ln; nx=-uz; nz=ux
+    pts=[[a[0]+nx*w/2,a[1]+nz*w/2],[b[0]+nx*w/2,b[1]+nz*w/2],[b[0]-nx*w/2,b[1]-nz*w/2],[a[0]-nx*w/2,a[1]-nz*w/2]]
+    g=_profile(we,pts,MAP_XZ,th,:y,[0,0,0],"Gold",tb,xf); g.name="Cruz San Andrés"
+  end
+end
+
+# Placa de revestimiento sobre una cara del muro. lado: :ext (y<0) o :int (y>a)
+def _plate(we, larg, xf, lado, esp, mat)
+  tp=Sketchup.active_model.layers["Revestimientos"]
+  oy = lado==:ext ? -esp : PGU_ALMA.to_f
+  pts=[[0.0,0.0],[larg,0.0],[larg,ALTURA.to_f],[0.0,ALTURA.to_f]]
+  g=_profile(we,pts,MAP_XZ,esp,:y,[0,oy,0],mat,tp,xf); g.name="Placa #{lado}"
+end
+
+${matPlaca}${calls}${extra}${p.etiquetasOn?'# etiquetado ON: piezas quedan como grupos nombrados (sin explotar)':'casa.explode'}
+model.commit_operation; model.active_view.zoom_extents
+puts "Casa OK: ${c.nMuros} muros, ${c.nVanos} vano(s)${p.etiquetasOn?', piezas etiquetadas':''}. ${p.etiquetasOn?'Grupos nombrados M-/K-/J-/D-/S-…':'Perfiles sueltos y editables'}."`;
+}
+
+// ============ FORMULARIOS ============
+function opts(obj,sel){return Object.keys(obj).map(k=>`<option ${k===sel?'selected':''}>${k}</option>`).join('')}
+let muroSys={sistema:"steel",lumber:"2x6 (38×140)"};
+function muroFields(){
+  const base=[{k:"largo",l:"Largo (mm)",v:3000},{k:"altura",l:"Altura (mm)",v:2600},
+    {k:"modulo",l:"Modulación (mm)",v:400,opt:[400,600]}];
+  if(muroSys.sistema==="wood"){
+    return base.concat([{d:"Escuadría de madera"},{k:"lumber",l:"Pieza (2x)",sopt:LUMBER,v:muroSys.lumber}]);
+  }
+  return base.concat([{d:"Perfil montante PGC (C)"},
+    {k:"pgcAlma",l:"Alma",v:100},{k:"pgcAla",l:"Ala",v:40},{k:"pgcLabio",l:"Pestaña",v:15},{k:"pgcEsp",l:"Espesor",v:0.9},
+    {d:"Perfil solera PGU (U)"},{k:"pguAlma",l:"Alma",v:102},{k:"pguAla",l:"Ala",v:35},{k:"pguEsp",l:"Espesor",v:0.9}]);
+}
+const FORMS={
+  muro:{file:"tabique.rb",build:scriptMuro,title:"Muro / Tabique",
+    sub:"Steel: soleras PGU + montantes PGC. Wood: solera simple + double top plate + studs sólidos.",
+    get fields(){return muroFields();}},
+  cielo:{file:"cielorraso.rb",build:scriptCielo,title:"Cielorraso suspendido",
+    sub:"Perímetro en U + perfiles portantes en la modulación, a la altura elegida.",
+    fields:[{k:"largo",l:"Largo (mm)",v:4000},{k:"ancho",l:"Ancho (mm)",v:3000},
+      {k:"alt",l:"Altura cielo (mm)",v:2400},{k:"modulo",l:"Modulación (mm)",v:400,opt:[400,600]},
+      {d:"Perfil"},{k:"alma",l:"Alma",v:70},{k:"ala",l:"Ala",v:30},{k:"esp",l:"Espesor",v:0.94}]}
+};
+
+let current="muro";
+let rooms=[{nombre:"Living",largo:4000,ancho:3500,posX:0,posY:0,vanos:[{lado:"frente",tipo:"Ventana",pos:1200,ancho:1200,alto:1100,sill:900},{lado:"izq",tipo:"Puerta",pos:800,ancho:800,alto:2050,sill:0}]},
+           {nombre:"Dormitorio",largo:3500,ancho:3500,posX:3898,posY:0,vanos:[{lado:"der",tipo:"Abertura",pos:1200,ancho:900,alto:2100,sill:0}]}];
+let casaCfg={sistema:"steel",lumber:"2x6 (38×140)",pgc:"PGC 100x0.90",pgu:"PGU 100x0.90",altura:2600,modulo:400,revInt:"Durlock 12.5",revExt:"OSB / Fenólico 10",
+  techoOn:true,techoTipo:"Dos aguas",pendiente:30,sepCab:1200,alero:300,
+  plateaOn:true,espesor:120,vuelo:200,
+  entrepisoOn:false,nivelEnt:2700,sepViga:400,
+  esquinasOn:true,bracesOn:true,placasOn:false,etiquetasOn:false};
+
+const formEl=document.getElementById('form');
+const codeEl=document.getElementById('code');
+const fnameEl=document.getElementById('fname');
+const computoEl=document.getElementById('computo');
+
+function renderForm(){
+  computoEl.style.display=(current==="casa")?"block":"none";
+  if(current==="casa"){ renderCasaForm(); fnameEl.textContent="casa.rb"; genCasa(); return; }
+  const cfg=FORMS[current];
+  let html=`<h2>${cfg.title}</h2><p class="sub">${cfg.sub}</p>`;
+  if(current==="muro"){
+    const w=muroSys.sistema==="wood";
+    html+=`<div class="fieldrow"><div class="f full"><label>Sistema constructivo</label>
+      <select id="m_sis"><option value="steel" ${!w?'selected':''}>Steel Frame (acero)</option><option value="wood" ${w?'selected':''}>Wood Frame (madera)</option></select></div></div>`;
+  }
+  let open=false;
+  cfg.fields.forEach(f=>{
+    if(f.d){ if(open) html+=`</div>`; html+=`<div class="divider"><span>${f.d}</span></div><div class="fieldrow">`; open=true; return; }
+    let ctl;
+    if(f.sopt) ctl=`<select data-k="${f.k}" data-str="1">${opts(f.sopt,f.v)}</select>`;
+    else if(f.opt) ctl=`<select data-k="${f.k}">${f.opt.map(o=>`<option ${o==f.v?'selected':''}>${o}</option>`).join('')}</select>`;
+    else ctl=`<input type="number" step="any" data-k="${f.k}" value="${f.v}">`;
+    html+=`<div class="f${open?'':' full'}"><label>${f.l}</label>${ctl}</div>`;
+  });
+  if(open) html+=`</div>`;
+  formEl.innerHTML=html;
+  if(current==="muro"){
+    document.getElementById('m_sis').addEventListener('change',e=>{muroSys.sistema=e.target.value;renderForm();});
+  }
+  formEl.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',gen));
+  fnameEl.textContent=cfg.file; gen();
+}
+function gen(){
+  const cfg=FORMS[current]; const p={};
+  formEl.querySelectorAll('[data-k]').forEach(el=>p[el.dataset.k]=el.dataset.str?el.value:(parseFloat(el.value)||0));
+  if(current==="muro"){ p.sistema=muroSys.sistema; if(p.lumber) muroSys.lumber=p.lumber; }
+  codeEl.textContent=cfg.build(p);
+}
+
+function renderCasaForm(){
+  let html=`<h2>Casa completa</h2><p class="sub">Cargá las habitaciones o subí un boceto/plano y la IA lo resuelve. Genera la estructura 3D y el cómputo.</p>`;
+  html+=`<div class="imgload">
+    <div class="imgload-head"><span>Boceto o plano → estructura</span><span id="img-status"></span></div>
+    <label class="imgbtn" id="img-label">📐 Subir imagen (boceto a mano / plano con medidas)
+      <input type="file" id="c_img" accept="image/*" style="display:none">
+    </label>
+    <div class="imghint">La IA interpreta ambientes, medidas y aberturas, y arma las habitaciones. Requiere estar logueado en Claude.</div>
+  </div>`;
+  const wood=casaCfg.sistema==="wood";
+  html+=`<div class="fieldrow">
+    <div class="f"><label>Sistema constructivo</label><select id="c_sis"><option value="steel" ${!wood?'selected':''}>Steel Frame (acero)</option><option value="wood" ${wood?'selected':''}>Wood Frame (madera)</option></select></div>
+    ${wood?`<div class="f"><label>Escuadría (2x)</label><select id="c_lum">${opts(LUMBER,casaCfg.lumber)}</select></div>`
+          :`<div class="f"><label>Perfil montante (PGC)</label><select id="c_pgc">${opts(PGC,casaCfg.pgc)}</select></div>
+    <div class="f"><label>Perfil solera (PGU)</label><select id="c_pgu">${opts(PGU,casaCfg.pgu)}</select></div>`}
+    <div class="f"><label>Altura muros (mm)</label><input type="number" id="c_alt" value="${casaCfg.altura}"></div>
+    <div class="f"><label>Modulación (mm)</label><select id="c_mod"><option ${casaCfg.modulo==400?'selected':''}>400</option><option ${casaCfg.modulo==600?'selected':''}>600</option></select></div>
+    <div class="f"><label>Revest. interior</label><select id="c_ri">${opts(REVEST,casaCfg.revInt)}</select></div>
+    <div class="f"><label>Revest. exterior</label><select id="c_re">${opts(REVEST,casaCfg.revExt)}</select></div>
+  </div>`;
+  html+=`<div class="divider"><span>Refuerzos y revestimientos</span></div><div class="fieldrow">
+    <div class="f"><label><input type="checkbox" id="c_esq" ${casaCfg.esquinasOn?'checked':''}> Esquinas multi-montante</label></div>
+    <div class="f"><label><input type="checkbox" id="c_brace" ${casaCfg.bracesOn?'checked':''}> Cruz de San Andrés</label></div>
+    <div class="f"><label><input type="checkbox" id="c_placas" ${casaCfg.placasOn?'checked':''}> Dibujar placas (capa Revestimientos)</label></div>
+    <div class="f"><label><input type="checkbox" id="c_etiq" ${casaCfg.etiquetasOn?'checked':''}> Etiquetar piezas en 3D (M-01, K-01…)</label></div>
+  </div>`;
+  html+=`<div class="divider"><span>Habitaciones</span></div>`;
+  html+=`<div class="roomhead"><span>Nombre</span><span>Largo</span><span>Ancho</span><span>Pos X</span><span>Pos Y</span><span></span></div><div id="rooms"></div>`;
+  html+=`<button class="add" id="addRoom">＋ Habitación</button>`;
+  html+=`<div class="divider"><span>Techo</span></div><div class="fieldrow">
+    <div class="f"><label><input type="checkbox" id="c_techo" ${casaCfg.techoOn?'checked':''}> Generar techo</label></div>
+    <div class="f"><label>Tipo</label><select id="c_ttipo">${["Dos aguas","Una agua","Plano","Cuatro aguas"].map(t=>`<option ${t===casaCfg.techoTipo?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="f"><label>Pendiente (%)</label><input type="number" id="c_pend" value="${casaCfg.pendiente}"></div>
+    <div class="f"><label>Sep. cabriadas (mm)</label><input type="number" id="c_sep" value="${casaCfg.sepCab}"></div>
+    <div class="f"><label>Alero (mm)</label><input type="number" id="c_alero" value="${casaCfg.alero}"></div>
+  </div>`;
+  html+=`<div class="divider"><span>Entrepiso</span></div><div class="fieldrow">
+    <div class="f"><label><input type="checkbox" id="c_entre" ${casaCfg.entrepisoOn?'checked':''}> Generar entrepiso</label></div>
+    <div class="f"><label>Nivel (mm)</label><input type="number" id="c_niv" value="${casaCfg.nivelEnt}"></div>
+    <div class="f"><label>Sep. vigas (mm)</label><input type="number" id="c_sepv" value="${casaCfg.sepViga}"></div>
+  </div>`;
+  html+=`<div class="divider"><span>Platea de hormigón</span></div><div class="fieldrow">
+    <div class="f"><label><input type="checkbox" id="c_platea" ${casaCfg.plateaOn?'checked':''}> Generar platea</label></div>
+    <div class="f"><label>Espesor (mm)</label><input type="number" id="c_esp" value="${casaCfg.espesor}"></div>
+    <div class="f"><label>Vuelo perimetral (mm)</label><input type="number" id="c_vuelo" value="${casaCfg.vuelo}"></div>
+  </div>`;
+  formEl.innerHTML=html;
+  renderRooms();
+  const bind=(id,key,num)=>{const e=document.getElementById(id);if(e)e.addEventListener('input',()=>{casaCfg[key]=num?parseFloat(e.value):e.value;genCasa();});};
+  bind('c_pgc','pgc');bind('c_pgu','pgu');bind('c_lum','lumber');bind('c_alt','altura',1);bind('c_mod','modulo',1);bind('c_ri','revInt');bind('c_re','revExt');
+  document.getElementById('c_sis').addEventListener('change',e=>{casaCfg.sistema=e.target.value;renderCasaForm();});
+  bind('c_ttipo','techoTipo');bind('c_pend','pendiente',1);bind('c_sep','sepCab',1);bind('c_alero','alero',1);
+  bind('c_niv','nivelEnt',1);bind('c_sepv','sepViga',1);bind('c_esp','espesor',1);bind('c_vuelo','vuelo',1);
+  const chk=(id,key)=>{const e=document.getElementById(id);e.addEventListener('change',()=>{casaCfg[key]=e.checked;genCasa();});};
+  chk('c_techo','techoOn');chk('c_platea','plateaOn');chk('c_entre','entrepisoOn');
+  chk('c_esq','esquinasOn');chk('c_brace','bracesOn');chk('c_placas','placasOn');chk('c_etiq','etiquetasOn');
+  document.getElementById('c_img').addEventListener('change',onImageUpload);
+  document.getElementById('addRoom').onclick=()=>{
+    const alma=wallThk(casaCfg), last=rooms[rooms.length-1];
+    const px=last?((+last.posX||0)+last.largo-alma):0, py=last?(+last.posY||0):0;
+    rooms.push({nombre:"Habitación",largo:3000,ancho:3000,posX:px,posY:py,vanos:[]});renderRooms();genCasa();
+  };
+}
+function renderRooms(){
+  const box=document.getElementById('rooms'); box.innerHTML="";
+  rooms.forEach((r,i)=>{
+    if(!r.vanos) r.vanos=[];
+    const blk=document.createElement('div'); blk.className="room-block";
+    const vanosHtml=r.vanos.map((v,j)=>`
+      <div class="vano" data-i="${i}" data-j="${j}">
+        <select data-vf="lado">${Object.keys(LADOS).map(k=>`<option value="${k}" ${k===v.lado?'selected':''}>${LADOS[k]}</option>`).join('')}</select>
+        <select data-vf="tipo">${Object.keys(VANO_TIPOS).map(k=>`<option ${k===v.tipo?'selected':''}>${k}</option>`).join('')}</select>
+        <input type="number" data-vf="pos" value="${v.pos}" title="Posición desde inicio del muro (mm)">
+        <input type="number" data-vf="ancho" value="${v.ancho}" title="Ancho (mm)">
+        <input type="number" data-vf="alto" value="${v.alto}" title="Alto (mm)">
+        <input type="number" data-vf="sill" value="${v.sill}" title="Alféizar / antepecho (mm)">
+        <button class="rm rmv" data-i="${i}" data-j="${j}">✕</button>
+      </div>`).join('');
+    blk.innerHTML=`
+      <div class="room">
+        <input value="${r.nombre}" data-i="${i}" data-f="nombre">
+        <input type="number" value="${r.largo}" data-i="${i}" data-f="largo" title="Largo (mm)">
+        <input type="number" value="${r.ancho}" data-i="${i}" data-f="ancho" title="Ancho (mm)">
+        <input type="number" value="${r.posX||0}" data-i="${i}" data-f="posX" title="Posición X en planta (mm)">
+        <input type="number" value="${r.posY||0}" data-i="${i}" data-f="posY" title="Posición Y en planta (mm)">
+        <button class="rm rmr" data-i="${i}">✕</button>
+      </div>
+      ${r.vanos.length?`<div class="vanohead"><span>Muro</span><span>Tipo</span><span>Pos</span><span>Ancho</span><span>Alto</span><span>Alféizar</span><span></span></div>`:''}
+      <div class="vanos">${vanosHtml}</div>
+      <button class="add-vano" data-i="${i}">＋ Vano</button>`;
+    box.appendChild(blk);
+  });
+  // habitación: nombre/largo/ancho
+  box.querySelectorAll('.room input').forEach(el=>el.addEventListener('input',()=>{
+    const i=+el.dataset.i,f=el.dataset.f; rooms[i][f]=(f==="nombre")?el.value:(parseFloat(el.value)||0); genCasa();
+  }));
+  box.querySelectorAll('.rmr').forEach(b=>b.onclick=()=>{rooms.splice(+b.dataset.i,1);renderRooms();genCasa();});
+  // vanos: campos
+  box.querySelectorAll('.vano [data-vf]').forEach(el=>el.addEventListener('input',()=>{
+    const p=el.closest('.vano'), i=+p.dataset.i, j=+p.dataset.j, f=el.dataset.vf;
+    if(f==="tipo"){ const d=VANO_TIPOS[el.value]; Object.assign(rooms[i].vanos[j],{tipo:el.value,ancho:d.ancho,alto:d.alto,sill:d.sill}); renderRooms(); genCasa(); return; }
+    rooms[i].vanos[j][f]=(f==="lado")?el.value:(parseFloat(el.value)||0); genCasa();
+  }));
+  box.querySelectorAll('.rmv').forEach(b=>b.onclick=()=>{rooms[+b.dataset.i].vanos.splice(+b.dataset.j,1);renderRooms();genCasa();});
+  box.querySelectorAll('.add-vano').forEach(b=>b.onclick=()=>{
+    const d=VANO_TIPOS["Ventana"]; rooms[+b.dataset.i].vanos.push({lado:"frente",tipo:"Ventana",pos:500,ancho:d.ancho,alto:d.alto,sill:d.sill});
+    renderRooms(); genCasa();
+  });
+}
+async function onImageUpload(ev){
+  const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+  const status=document.getElementById('img-status');
+  const label=document.getElementById('img-label');
+  status.textContent="Analizando…"; label.classList.add('busy');
+  try{
+    const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=()=>rej(new Error('read'));r.readAsDataURL(file);});
+    const media=file.type||"image/jpeg";
+    const prompt=`Sos un experto en steel frame. Analizá este boceto/plano de una vivienda y devolvé SOLO un JSON válido (sin markdown, sin texto extra) con esta forma exacta:
+{"rooms":[{"nombre":string,"largo":number,"ancho":number,"posX":number,"posY":number,"vanos":[{"lado":"frente"|"fondo"|"izq"|"der","tipo":"Puerta"|"Puerta balcón"|"Ventana"|"Abertura"|"Arcada","pos":number,"ancho":number,"alto":number,"sill":number}]}]}
+Reglas: todas las medidas en milímetros. "largo" corre en X, "ancho" en Y. posX/posY = esquina inferior-izquierda de cada ambiente en la planta, ubicá los ambientes adyacentes compartiendo muros (si comparten un muro, hacé coincidir sus bordes; el espesor de muro es ~102mm, restalo al compartir). "lado" indica en qué muro va la abertura; "pos" = distancia desde el inicio de ese muro; "sill" = alféizar (0 para puertas, ~900 ventanas). Si el plano trae cotas usalas; si no, estimá proporciones razonables. Devolvé solo el JSON.`;
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2000,
+        messages:[{role:"user",content:[
+          {type:"image",source:{type:"base64",media_type:media,data:b64}},
+          {type:"text",text:prompt}
+        ]}]})
+    });
+    const data=await resp.json();
+    let txt=(data.content||[]).filter(x=>x.type==="text").map(x=>x.text).join("\n");
+    txt=txt.replace(/```json/gi,"").replace(/```/g,"").trim();
+    const m=txt.match(/\{[\s\S]*\}/); if(m) txt=m[0];
+    const parsed=JSON.parse(txt);
+    if(!parsed.rooms||!parsed.rooms.length) throw new Error("sin ambientes");
+    rooms=parsed.rooms.map(r=>({nombre:r.nombre||"Ambiente",largo:+r.largo||3000,ancho:+r.ancho||3000,
+      posX:+r.posX||0,posY:+r.posY||0,
+      vanos:(r.vanos||[]).map(v=>({lado:["frente","fondo","izq","der"].includes(v.lado)?v.lado:"frente",
+        tipo:VANO_TIPOS[v.tipo]?v.tipo:"Ventana",pos:+v.pos||500,ancho:+v.ancho||1000,alto:+v.alto||2000,sill:+v.sill||0}))}));
+    renderRooms(); genCasa();
+    status.textContent=`✓ ${rooms.length} ambiente(s)`;
+  }catch(e){
+    status.textContent="No se pudo interpretar";
+    console.error(e);
+  }finally{ label.classList.remove('busy'); ev.target.value=""; }
+}
+
+// ============ LISTA DE CORTE POR PIEZA ============
+const CODE_PREF={"MONTANTE":"M","KING":"K","JACK":"J","CRIPPLE":"C","DINTEL":"D","SOL.PANEL":"SP","SOL.VANO":"SV","SOL.DINTEL":"SD","CORDON INF":"CI","CORDON SUP":"CS","VIGA TECHO":"VT","CORREA":"CO","VIGA ENTREP.":"VE","CENEFA":"CE"};
+function cutList(p){
+  const wood=p.sistema==="wood", L=wood?LUMBER[p.lumber]:null;
+  const perfV=wood?p.lumber:p.pgc, perfP=wood?p.lumber:p.pgu;
+  const tS=wood?L.e:PGU[p.pgu].e, headH=wood?L.a:PGC[p.pgc].a;
+  const cf=wood?L.e:PGC_ALA;
+  const hmon=wood?(p.altura-3*L.e):(p.altura-2*PGU[p.pgu].e);
+  const {segs}=planWalls(p);
+  const raw=[];
+  const add=(tipo,perfil,largo,cant=1)=>{ largo=Math.round(largo); if(largo>1&&cant>0) raw.push({tipo,perfil,largo,cant}); };
+  segs.forEach(w=>{
+    const larg=w.a2-w.a1; if(larg<=0)return;
+    const ntop=wood?2:1;
+    add("SOL.PANEL",perfP,larg,1+ntop);
+    let n=Math.ceil(larg/p.modulo)+1;
+    w.vanos.forEach(v=>{ n=Math.max(0,n-Math.floor((v.x2-v.x1)/p.modulo)); });
+    add("MONTANTE",perfV,hmon,n);
+    w.vanos.forEach(v=>{
+      const wv=v.x2-v.x1, wd=wv-2*cf;
+      add("KING",perfV,hmon,2);
+      add("JACK",perfV,v.h-tS,2);
+      if(wood){ add("DINTEL",perfV,wd,2); }
+      else { add("DINTEL",perfP,wd,2); add("SOL.DINTEL",perfP,wd,1); }
+      add("SOL.VANO",perfP,wv+200,1);
+      const ncs=Math.max(0,Math.floor(wv/p.modulo));
+      const hcs=p.altura-tS-(v.h+headH);
+      if(hcs>10) add("CRIPPLE",perfV,hcs,ncs);
+      if(v.sill>tS+1){ add("SOL.VANO",perfP,wv+200,1); add("CRIPPLE",perfV,v.sill-tS,ncs); }
+    });
+  });
+  const bb=planBBox(p);
+  if(p.techoOn&&bb){
+    const D=bb.y2-bb.y1, pnd=p.pendiente/100, slope=Math.sqrt(1+pnd*pnd), tipo=p.techoTipo;
+    const nCab=Math.floor((bb.x2-bb.x1)/p.sepCab)+1+(((bb.x2-bb.x1)%p.sepCab)>50?1:0);
+    if(tipo==="Dos aguas"||tipo==="Cuatro aguas"){
+      add("CORDON INF",perfV,D,nCab); add("CORDON SUP",perfV,(D/2+p.alero)*slope,2*nCab);
+    } else if(tipo==="Una agua"){
+      add("CORDON INF",perfV,D,nCab); add("CORDON SUP",perfV,(D+2*p.alero)*slope,nCab);
+    } else { add("VIGA TECHO",perfV,D*slope,nCab); }
+    const nCor=(tipo==="Dos aguas"||tipo==="Cuatro aguas")?2*(Math.floor((D/2)/600)+1):(Math.floor(D/600)+1);
+    add("CORREA",wood?perfP:"PGO 37/22/12.5",bb.x2-bb.x1,nCor);
+  }
+  if(p.entrepisoOn&&bb){
+    const D=bb.y2-bb.y1, nV=Math.max(0,Math.floor((bb.x2-bb.x1)/p.sepViga)-1);
+    add("VIGA ENTREP.",perfV,D,nV); add("CENEFA",perfP,bb.x2-bb.x1,2); add("CENEFA",perfP,D,2);
+  }
+  const map=new Map();
+  raw.forEach(r=>{ const k=r.tipo+"|"+r.perfil+"|"+r.largo;
+    if(map.has(k)) map.get(k).cant+=r.cant; else map.set(k,{...r}); });
+  const groups=[...map.values()].sort((a,b)=> a.tipo<b.tipo?-1:a.tipo>b.tipo?1:a.largo-b.largo);
+  const seq={};
+  groups.forEach(g=>{ const pf=CODE_PREF[g.tipo]||"P"; seq[pf]=(seq[pf]||0)+1; g.code=pf+seq[pf]; });
+  const byProfile={};
+  groups.forEach(g=>{ (byProfile[g.perfil]=byProfile[g.perfil]||[]).push(...Array(g.cant).fill(g.largo)); });
+  return {groups, byProfile};
+}
+
+// Optimizador de corte (First-Fit Decreasing) sobre barras comerciales
+function optimizeCuts(byProfile, barLen){
+  const out=[];
+  Object.keys(byProfile).forEach(perfil=>{
+    const all=byProfile[perfil];
+    const lens=all.filter(l=>l<=barLen).slice().sort((a,b)=>b-a);
+    const over=all.filter(l=>l>barLen).length;
+    const bars=[];
+    lens.forEach(l=>{ let b=bars.find(x=>x.rem>=l); if(b){b.rem-=l;} else bars.push({rem:barLen-l}); });
+    const usado=lens.reduce((s,l)=>s+l,0);
+    const waste=bars.length?(1-usado/(bars.length*barLen))*100:0;
+    out.push({perfil,piezas:lens.length,bars:bars.length,waste,over});
+  });
+  return out.sort((a,b)=>a.perfil<b.perfil?-1:1);
+}
+
+// Precios (persistencia en localStorage)
+function loadPrecios(){ try{return JSON.parse(localStorage.getItem('adamant_precios'))||{};}catch(e){return {};} }
+function savePrecios(pr){ try{localStorage.setItem('adamant_precios',JSON.stringify(pr));}catch(e){} }
+let precios=loadPrecios();
+if(precios.margen===undefined) precios.margen=35;
+if(!precios.perfiles) precios.perfiles={};
+
+function presupuesto(p,c,cl){
+  const pr=precios;
+  let costPerf=0;
+  cl.groups.forEach(g=>{ const pm=+(pr.perfiles[g.perfil]||0); costPerf+=g.cant*(g.largo/1000)*pm; });
+  const areaPlaca=c.areaInt+c.areaExt;
+  const costPlaca=areaPlaca*(+(pr.placa||0));
+  const costHorm=(c.platea?c.platea.m3:0)*(+(pr.hormigon||0));
+  const costTorn=(c.t1+c.t2)*(+(pr.tornillo||0));
+  const sub=costPerf+costPlaca+costHorm+costTorn;
+  const total=sub*(1+(+(pr.margen||0))/100);
+  return {costPerf,costPlaca,costHorm,costTorn,sub,total};
+}
+
+function exportCSV(p,c,cl){
+  const opt=optimizeCuts(cl.byProfile,+(precios.barLen||6000));
+  let s="ADAMANT - Computo y lista de corte\n\n";
+  s+="LISTA DE CORTE\nCodigo,Elemento,Perfil,Largo(mm),Cantidad,Total(m)\n";
+  cl.groups.forEach(g=>{ s+=`${g.code},${g.tipo},${g.perfil},${g.largo},${g.cant},${(g.cant*g.largo/1000).toFixed(2)}\n`; });
+  s+="\nOPTIMIZACION DE CORTE (barra "+(precios.barLen||6000)+" mm)\nPerfil,Piezas,Barras,Desperdicio(%)\n";
+  opt.forEach(o=>{ s+=`${o.perfil},${o.piezas},${o.bars},${o.waste.toFixed(1)}\n`; });
+  const pu=presupuesto(p,c,cl);
+  s+="\nPRESUPUESTO\nItem,Costo\n";
+  s+=`Perfileria/Madera,${pu.costPerf.toFixed(0)}\nPlacas,${pu.costPlaca.toFixed(0)}\nHormigon,${pu.costHorm.toFixed(0)}\nTornillos,${pu.costTorn.toFixed(0)}\nSubtotal,${pu.sub.toFixed(0)}\nMargen ${precios.margen}%,${(pu.total-pu.sub).toFixed(0)}\nTOTAL,${pu.total.toFixed(0)}\n`;
+  const blob=new Blob([s],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download="adamant-computo.csv"; a.click();
+}
+
+function genCasa(){
+  const p=Object.assign({},casaCfg,{rooms});
+  codeEl.textContent=scriptCasa(p);
+  const c=computeCasa(p);
+  computoEl.innerHTML=`<h2>Cómputo de materiales</h2>
+   <div class="ccards">
+    <div class="cc"><div class="k">${c.wood?'Madera':'Perfilería'}</div>
+      <div class="row"><span>${c.wood?'Verticales':'Montantes PGC'}</span><b>${c.mPGC.toFixed(1)} m</b></div>
+      <div class="row"><span>${c.wood?'Soleras/plates':'Soleras PGU'}</span><b>${c.mPGU.toFixed(1)} m</b></div>
+      ${c.wood?`<div class="row"><span>Volumen</span><b>${c.volM3.toFixed(2)} m³</b></div>`:''}
+      <div class="row big"><span>Peso total</span><b>${c.kgPerf.toFixed(0)} kg</b></div></div>
+    <div class="cc"><div class="k">Muros</div>
+      <div class="row"><span>Superficie neta</span><b>${c.area.toFixed(1)} m²</b></div>
+      <div class="row"><span>Montantes</span><b>${c.nMont} u</b></div>
+      <div class="row"><span>Vanos</span><b>${c.nVanos} u</b></div></div>
+    <div class="cc"><div class="k">Revestimientos</div>
+      <div class="row"><span>Interior</span><b>${c.areaInt.toFixed(1)} m²</b></div>
+      <div class="row"><span>${(casaCfg.revInt).slice(0,14)}</span><b>${c.kgInt.toFixed(0)} kg</b></div>
+      <div class="row"><span>Exterior</span><b>${c.areaExt.toFixed(1)} m²</b></div>
+      <div class="row"><span>Placas (1,2×2,4)</span><b>${c.placas} u</b></div></div>
+    <div class="cc"><div class="k">Fijaciones (aprox)</div>
+      <div class="row"><span>T1 estructural</span><b>${c.t1} u</b></div>
+      <div class="row"><span>T2 placa</span><b>${c.t2} u</b></div></div>
+    ${c.techo?`<div class="cc"><div class="k">Techo · ${c.techo.tipo}</div>
+      <div class="row"><span>Cabriadas/vigas</span><b>${c.techo.nCab} u</b></div>
+      <div class="row"><span>PGC cordones</span><b>${c.techo.mCab.toFixed(1)} m</b></div>
+      <div class="row"><span>Correas PGO</span><b>${c.techo.mPGO.toFixed(1)} m</b></div>
+      <div class="row"><span>Peso techo</span><b>${c.techo.kg.toFixed(0)} kg</b></div></div>`:''}
+    ${c.entrepiso?`<div class="cc"><div class="k">Entrepiso</div>
+      <div class="row"><span>Vigas PGC</span><b>${c.entrepiso.nV} u · ${c.entrepiso.mVig.toFixed(1)} m</b></div>
+      <div class="row"><span>Cenefas PGU</span><b>${c.entrepiso.mCen.toFixed(1)} m</b></div>
+      <div class="row"><span>Peso entrepiso</span><b>${c.entrepiso.kg.toFixed(0)} kg</b></div></div>`:''}
+    ${c.platea?`<div class="cc"><div class="k">Platea</div>
+      <div class="row"><span>Superficie</span><b>${c.platea.m2.toFixed(1)} m²</b></div>
+      <div class="row big"><span>Hormigón</span><b>${c.platea.m3.toFixed(2)} m³</b></div></div>`:''}
+   </div>
+   <p class="note">Perfiles según IRAM-IAS U 500-205 (Barbieri). La planta se ensambla en posición real y los muros compartidos entre habitaciones se fusionan en un solo paño (se computan una sola vez). Es una estimación de costos: el cálculo estructural, arriostramientos y anclajes los define un profesional habilitado.</p>`;
+
+  // ---- Lista de corte + optimizador + presupuesto ----
+  const cl=cutList(p);
+  const barLen=+(precios.barLen||6000);
+  const opt=optimizeCuts(cl.byProfile,barLen);
+  const pu=presupuesto(p,c,cl);
+  const perfilesUnicos=[...new Set(cl.groups.map(g=>g.perfil))];
+  const money=n=>"$ "+Math.round(n).toLocaleString('es-AR');
+
+  let ex=`<div class="divider2"><span>Lista de corte por pieza</span>
+    <button id="btnCSV" class="csvbtn">⬇ Exportar CSV</button></div>
+    <div class="cuttable"><table><thead><tr><th>Cód.</th><th>Elemento</th><th>Perfil</th><th>Largo</th><th>Cant.</th><th>Total</th></tr></thead><tbody>`;
+  cl.groups.forEach(g=>{ ex+=`<tr><td class="cd">${g.code}</td><td>${g.tipo}</td><td>${g.perfil}</td><td>${g.largo} mm</td><td>${g.cant}</td><td>${(g.cant*g.largo/1000).toFixed(2)} m</td></tr>`; });
+  ex+=`</tbody></table></div>`;
+
+  ex+=`<div class="divider2"><span>Optimización de corte</span>
+    <label class="barlen">Barra: <input type="number" id="barLen" value="${barLen}"> mm</label></div>
+    <div class="cuttable"><table><thead><tr><th>Perfil</th><th>Piezas</th><th>Barras a comprar</th><th>Desperdicio</th></tr></thead><tbody>`;
+  opt.forEach(o=>{ ex+=`<tr><td>${o.perfil}</td><td>${o.piezas}</td><td><b>${o.bars}</b></td><td>${o.waste.toFixed(1)}%${o.over?` <span class="warn">(${o.over} &gt; barra)</span>`:''}</td></tr>`; });
+  ex+=`</tbody></table></div>`;
+
+  ex+=`<div class="divider2"><span>Presupuesto</span></div>
+    <div class="preciogrid">`;
+  perfilesUnicos.forEach(pf=>{ ex+=`<div class="pf"><label>${pf} ($/m)</label><input type="number" data-perfil="${pf}" value="${precios.perfiles[pf]||''}"></div>`; });
+  ex+=`<div class="pf"><label>Placa ($/m²)</label><input type="number" id="pr_placa" value="${precios.placa||''}"></div>
+    <div class="pf"><label>Hormigón ($/m³)</label><input type="number" id="pr_horm" value="${precios.hormigon||''}"></div>
+    <div class="pf"><label>Tornillo ($/u)</label><input type="number" id="pr_torn" value="${precios.tornillo||''}"></div>
+    <div class="pf"><label>Margen (%)</label><input type="number" id="pr_margen" value="${precios.margen}"></div>
+    </div>
+    <div class="presu">
+      <div class="prow"><span>Perfilería / madera</span><b>${money(pu.costPerf)}</b></div>
+      <div class="prow"><span>Placas</span><b>${money(pu.costPlaca)}</b></div>
+      <div class="prow"><span>Hormigón</span><b>${money(pu.costHorm)}</b></div>
+      <div class="prow"><span>Tornillos</span><b>${money(pu.costTorn)}</b></div>
+      <div class="prow sub"><span>Subtotal</span><b>${money(pu.sub)}</b></div>
+      <div class="prow"><span>Margen ${precios.margen}%</span><b>${money(pu.total-pu.sub)}</b></div>
+      <div class="prow tot"><span>TOTAL</span><b>${money(pu.total)}</b></div>
+    </div>
+    <p class="note">Los precios se guardan en este navegador (localStorage). El optimizador usa First-Fit y asume corte sin merma de sierra.</p>`;
+
+  computoEl.insertAdjacentHTML('beforeend', ex);
+
+  document.getElementById('btnCSV').onclick=()=>exportCSV(p,c,cl);
+  const reprice=()=>{ savePrecios(precios); genCasa(); };
+  computoEl.querySelectorAll('[data-perfil]').forEach(el=>el.addEventListener('change',()=>{ precios.perfiles[el.dataset.perfil]=parseFloat(el.value)||0; reprice(); }));
+  const pi=(id,key)=>{const e=document.getElementById(id);e.addEventListener('change',()=>{precios[key]=parseFloat(e.value)||0;reprice();});};
+  pi('pr_placa','placa');pi('pr_horm','hormigon');pi('pr_torn','tornillo');pi('pr_margen','margen');
+  document.getElementById('barLen').addEventListener('change',e=>{precios.barLen=parseFloat(e.value)||6000;reprice();});
+}
+
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); current=t.dataset.mod; renderForm();
+}));
+document.getElementById('copy').addEventListener('click',async e=>{
+  try{ await navigator.clipboard.writeText(codeEl.textContent);}catch(_){
+    const r=document.createRange(); r.selectNode(codeEl);
+    getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand('copy');
+  }
+  const b=e.target; b.textContent="Copiado ✓"; b.classList.add('ok');
+  setTimeout(()=>{b.textContent="Copiar código"; b.classList.remove('ok')},1500);
+});
+renderForm();
+</script>
+</body>
+</html>
