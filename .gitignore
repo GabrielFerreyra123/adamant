@@ -1,5 +1,14 @@
 node_modules/
 tools/out/
+dist/
 *.log
 .DS_Store
 .vscode/
+.env
+.env.local
+.vercel
+
+# artefactos locales / bundle ya integrado
+adamant-cambios-pagos/
+adamant-ambiente-*.pdf
+.env*.local

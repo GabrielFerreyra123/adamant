@@ -87,7 +87,9 @@ opcional `xf` (para rotar/ubicar el muro en planta). Si `ETIQUETAS` está activo
   modulación (salteando vanos) y por cada vano: King, Jack, Dintel, Cripples, solera/durmiente de vano.
 - `_corner(we, x, y, sx, sy)` → poste de esquina multi-montante (L de 2 piezas), `sx/sy` = cuadrante interior.
 - `_brace(we, larg, xf, vanos)` → Cruz de San Andrés (fleje 30×0.5) en paños sin vano.
-- `_plate(we, larg, xf, lado, esp, mat)` → placa de revestimiento (`:ext`/`:int`) sobre la cara del muro.
+- `_plate(we, larg, xf, lado, esp, mat, vanos)` → revestimiento (`:ext`/`:int`) **teselado en cortes que
+  descuentan los vanos** (paños entre aberturas + placa sobre dintel + placa bajo antepecho); con
+  fijaciones activas siembra tornillos de placa en el perímetro y sobre las líneas de montante.
 
 **Convenciones de coordenadas**
 - Muro canónico: corre en X∈[0,larg], espesor en Y∈[0,a] (a = alma PGU steel / ancho de la pieza wood),
@@ -98,7 +100,19 @@ opcional `xf` (para rotar/ubicar el muro en planta). Si `ETIQUETAS` está activo
   montante desde `z=WOOD_ESP`.
 
 **Capas (tags)**: `Estructura-Soleras`, `Estructura-Montantes`, `Estructura-Vanos`,
-`Estructura-Techo`, `Estructura-Entrepiso`, `Estructura-Arriostres`, `Revestimientos`, `Hormigon`.
+`Estructura-Techo`, `Estructura-Entrepiso`, `Estructura-Arriostres`, `Revestimientos`, `Hormigon`,
+`Herrajes` (anclajes/hold-downs), `Fijaciones` (marcadores de tornillo).
+
+**Fijaciones/herrajes** (helpers en el script de Casa, prismas `add_face`+`pushpull`, gate global `HERRAJES`):
+`_hw` (prisma sólido sin rotular), `_oct(r)` (sección octogonal), `_screw(we,x,z,xf)` (marcador de unión
+atornillada sobre la cara del muro, coords locales + xf), `_anchor(we,x,y)` (bulón J embebido en la platea,
+con arandela+tuerca **apoyadas sobre la cara sup de la solera** en z=`zb`, coords absolutas de planta),
+`_holddown(we,x,y)` (**fleje STHD14**: strap embebido en hormigón z=−260…560 + clavos que lo fijan al montante
+de esquina), `_pscrew(we,x,z,xf,y)` (tornillo de placa sobre la cara expuesta del revestimiento). `_wall`
+marca **todas** las uniones perfil-perfil (montantes, jacks, cripples sup/inf, kings, apoyo de dintel);
+`_corner` y `_brace` marcan sus extremos; `_plate` siembra el perímetro + líneas de montante; `scriptCasa`
+emite anclajes (~cada 1200 mm, **salteando umbrales de puerta** donde la solera está cortada) y STHD14 en esquinas.
+Con fijaciones activas el modelo suma muchos marcadores (pesado pero manejable; se baja con el checkbox).
 
 ---
 
@@ -113,6 +127,32 @@ Todo dentro del `<script>` del HTML.
 - `scriptMuro(p)` — Muro/Tabique. Sensible al sistema (steel C/U simple · wood sólido + double top).
 - `scriptCielo(p)` — Cielorraso suspendido (sólo steel/aluminio; es la línea PVC de Gaby).
 - `scriptCasa(p)` — Casa completa. Es el módulo grande.
+- `scriptMueble(c)` — **Estructura de perfilería (free-form)**. El modelo es una **lista libre de perfiles**
+  `c.profiles=[{t:'m'|'s', a:[x,y,z], b:[x,y,z]}]` (montante gris / solera naranja) dibujados en el lienzo 3D;
+  `scriptMueble` emite **solo** `_beam(we,p0,p1,sec,mat,lay)` por cada perfil (sección `MC` montante / `SU` solera).
+  `computeMueble` es puramente por perfiles (metros montante/solera, peso, uniones→T1). Ya **no** hay modelo por
+  columnas/estantes/placa como driver (el editor 2D de frente y `_post`/`_shelf`/`_partition`/`_anc`/`_txt` quedan
+  como helpers heredados en el template pero no se llaman). `seedRopero()` convierte un ropero paramétrico
+  (`muebleSegs`) en perfiles editables (botón "Base ropero" / import IA). **Legacy (referencia, ya no driver):**
+  Perfilería Durlock (Montante/Solera **35 o 70**) + placa
+  (yeso/OSB/PVC/cementicia, o "Ninguno" = solo estructura galvanizada). Modelo por **columnas**: cada
+  columna tiene `estantes:[z]` y `barrales:[z]`. **Montantes** (gris, "Gray") verticales frente+fondo por
+  divisor (sección `MC`, alma de costado). **Cada estante = marco cerrado de 4 soleras DE CANTO** (naranja,
+  "Tomato"; secciones `SUV`/`SUVB` = `SU` girada, alma vertical mirando a la cara exterior) con **juntas a
+  tope** (frente/fondo a lo ancho, laterales calzando entre medio, sin superponerse). En modo con placa la
+  **placa envuelve la perfilería**: `_shelf` = marco de soleras + tabla del estante + canto frontal; `_partition`
+  = placa en **ambas caras** del divisor + canto. `c.soloPerf` (checkbox "Solo perfilería") fuerza estructura
+  sin placa en el script (el presupuesto igual computa placa). Otros helpers: `_post`
+  (montantes adelante+atrás, centrados en el divisor), `_rod` (barral), `_back` (respaldo), `_screw`, y `_anc`
+  (**anclaje** embebido en la superficie de apoyo). `c.apoyo={izq,der,techo,piso,fondo}` indica contra qué
+  pared/piso/techo apoya: ahí se **omite la placa exterior** y se siembran anclajes (`_anc` con dir
+  `:xneg/:xpos/:zneg/:zpos/:yneg`). `muebleCols(c)` normaliza los anchos de columna al `ancho` total.
+  Con `c.medidas` (checkbox "Medidas (cm)") rotula cada **nicho** con `alto×ancho×prof` en cm: en el gráfico
+  como `<text class="mbdim">` y en SketchUp con `_txt` (`entities.add_text`) en el frente de cada compartimiento.
+  **Perfiles dibujados a mano**: `c.profiles=[{t:'m'|'s', a:[x,y,z], b:[x,y,z]}]` (creados en el visor 3D) se
+  emiten con `_beam(we,p0,p1,sec,mat,lay)` (perfil recto entre 2 puntos, `Geom::Transformation.axes`, igual que
+  `_beam3d` de Casa). Se suman al cómputo (`computeMueble`) y presupuesto.
+  Primer módulo de **mueblería drywall**; la idea es sumar decks y otros muebles después.
 
 **Casa — pipeline de planta**:
 - `roomWalls(r, alma)` → 4 muros de una habitación con sus vanos en coords locales.
@@ -120,16 +160,40 @@ Todo dentro del `<script>` del HTML.
   compartidos colineales** (un solo paño, no doble). `planBBox(p)` → bounding box de la planta.
 - `computeCasa(p)` → cómputo (metros, peso, m², techo, entrepiso, platea, volumen madera). Wood-aware.
 - `techoRuby(p,bb)` → Ruby del techo por tipo: **Dos aguas / Una agua / Plano / Cuatro aguas**
-  (cabriadas + pendolón/webs + correas; cuatro aguas con cumbrera + 4 limatesas).
+  (cabriadas + pendolón/webs + correas; cuatro aguas con cumbrera + 4 limatesas). Dos aguas y una agua
+  **cierran los hastiales con montantes** (triángulo entre solera y cordón) y una agua **levanta el muro
+  alto** (lado BY2) hasta el faldón, para que el techo apoye sobre muro y no quede en el aire.
 - `entrepisoRuby(p,bb)` → cenefas PGU + vigas PGC + rigidizadores.
 - `cutList(p)` → lista de corte por pieza, agrupada por tipo+perfil+largo con código (M1, K1, D1…).
+- `codeMapRuby(p)` → hash Ruby `prefijo|largo → código` (de `cutList`) que se inyecta en el script de
+  Casa cuando etiquetas está activo, para rotular cada pieza `código · largo` en 3D.
+- `fastenerSchedule(p,c,cl)` → planilla de uniones/fijaciones (tipo de unión → fijación + cantidad); se
+  muestra en el panel y se agrega al CSV.
 - `optimizeCuts(byProfile, barLen)` → bin-packing First-Fit sobre barras comerciales (6 m).
 - `presupuesto(p,c,cl)` / `precios` (localStorage) / `exportCSV(p,c,cl)` → negocio.
 
 **UI**: `renderForm()` (Muro/Cielo, con selector de sistema en Muro), `renderCasaForm()`,
-`renderRooms()` (habitaciones + vanos), `genCasa()` (arma script + panel de cómputo/corte/presupuesto).
-`onImageUpload()` → sube un boceto/plano y llama a la API de Claude (visión) para inferir las
-habitaciones en JSON (modelo `claude-sonnet-4-6`; requiere sesión de Claude).
+`renderRooms()` (habitaciones + vanos), `renderPlan()` + `startPlanDrag()` (**mini-plano interactivo:
+arrastrar las habitaciones para distribuirlas en planta**, snap 50 mm, escribe posX/posY y regenera al soltar),
+`genCasa()` (arma script + panel de cómputo/corte/presupuesto).
+`renderMuebleForm()` + `renderCloset()` + `startDivDrag`/`startShelfDrag` (**editor de frente interactivo del
+mueble**: SVG del alzado con margen; arrastrar divisores dimensiona columnas, doble clic agrega estante,
+arrastrarlo lo mueve, ✕ lo quita, ⬒ activa/desactiva barral por columna, y tocar los **bordes TECHO/PISO/PARED**
+marca los apoyos (`closet.apoyo`) para omitir placa + anclar), `genMueble()` + `computeMueble()` (cómputo del mueble).
+**Tab CREAR** (`data-mod="mueble"`, label "CREAR"): `renderMuebleForm()` es **solo carga de referencia + IA**,
+sin editor interactivo. Inputs: varias **imágenes/bocetos** (`cr_imgs` multiple), **video archivo** (`cr_vid`),
+**link de YouTube** (`cr_yt`), **descripción** (`cr_desc`) y perfil 35/70. `crearInterpretar()` arma el `content`
+multimodal: imágenes → bloques base64; video → `extractFrames(file,6)` (seek + canvas → JPEG base64, ~6 cuadros);
+YouTube → se pasa como **texto de referencia** (Claude no reproduce el video, infiere por contexto); llama a la API
+(`claude-sonnet-5`, `max_tokens 6000`) con `crearPrompt()` que pide un JSON `{ancho,alto,prof,perfil,profiles:[{t,a,b}]}`.
+`applyCrear(p)` vuelca a `closet.profiles` (montante/solera con extremos [x,y,z] mm) y `genMueble()`.
+El lienzo 3D interactivo y el editor 2D de frente (`renderCloset3D`/`mb3d*`/`renderCloset`/`startDivDrag`…) quedaron
+como **código muerto** (no se llaman). `saveMueble`/`loadMueble` (`.json`) + `pdfMueble` (PDF vía `window.print`);
+precios editables en `precios.mueble` (localStorage, base easy.com.ar).
+`imgLoadHTML(title,hint)` → bloque UI de carga de imagen, presente en **los cuatro módulos**.
+`onImageUpload()` → sube boceto/foto en cualquier módulo y llama a la API de Claude (visión, modelo
+`claude-sonnet-5`) para completar el form (Muro/Cielo vía `setFields`/`applyMuro`/`applyCielo`), inferir
+habitaciones (Casa) o columnas/estantes/barrales (Mueble vía `applyMueble`). `imgPrompt(scope)` da el prompt por módulo. Requiere sesión de Claude.
 
 ---
 
@@ -144,9 +208,13 @@ habitaciones en JSON (modelo `claude-sonnet-4-6`; requiere sesión de Claude).
 - **Esquinas** multi-montante. **Cruz de San Andrés**. **Placas** de revestimiento (capa Revestimientos).
 - **Techo** 4 tipos + correas. **Entrepiso**. **Platea** de hormigón.
 - **Wood framing**: secciones sólidas (2x3…2x12), double top plate, dintel built-up, volumen m³, peso Douglas Fir.
-- **Boceto/plano → estructura** con IA (visión).
-- **Lista de corte** por pieza, **presupuestador** con precios en localStorage, **CSV**, **optimizador de corte**,
-  **etiquetado 3D** (M-01/K-01… + texto, piezas quedan como grupos nombrados).
+- **Fijaciones y herrajes** (checkbox, default ON): anclajes a la platea, hold-downs en esquinas y
+  marcadores de tornillo en **todas** las uniones perfil-perfil + **perímetro/líneas de las placas**
+  (capas `Herrajes`/`Fijaciones`) + **planilla de uniones**.
+- **Revestimiento teselado**: las placas se cortan alrededor de cada abertura (se aprecian todos los cortes).
+- **Boceto/foto → medidas/estructura** con IA (visión) en **los tres módulos** (Muro, Cielo, Casa).
+- **Lista de corte** por pieza, **presupuestador** con precios en localStorage, **CSV** (con planilla de
+  uniones), **optimizador de corte**, **etiquetado 3D** `código · largo` (CODE_MAP, grupos nombrados).
 
 ---
 
@@ -170,7 +238,8 @@ habitaciones en JSON (modelo `claude-sonnet-4-6`; requiere sesión de Claude).
 - Studs, king/jack studs, cripples, header (dintel built-up: 2 piezas o LVL), sill plate.
 - EWP: LVL (vigas/dinteles), PSL (columnas), LSL (dinteles/rim), Glulam (vigas/curvos), I-Joist (viguetas).
 - Sheathing OSB/plywood = muro de corte (shear wall), clavado perimetral. Load path continuo hasta fundación.
-- Conectores (Simpson): hold-downs, anchor bolts, straps — no modelados aún.
+- Conectores (Simpson): hold-downs, anchor bolts — modelados como herrajes de referencia + planilla
+  (estimación); straps y detalle exacto de cada conector, no.
 
 > Descargo: el cómputo es estimación de costos; el cálculo estructural, arriostres y anclajes los
 > define un profesional habilitado. Mantener este descargo en la UI.
@@ -180,14 +249,23 @@ habitaciones en JSON (modelo `claude-sonnet-4-6`; requiere sesión de Claude).
 ## Limitaciones conocidas / roadmap
 
 - Arcada = dintel recto (sin arco curvo real).
-- Etiquetado 3D matchea por **tipo/prefijo**, no 1:1 por fila de la lista de corte (para exacto: emparejar por largo).
+- Etiquetado 3D rotula cada pieza `código · largo` vía CODE_MAP (match por **prefijo de color + largo**);
+  las soleras SP/SV/SD comparten el prefijo `S`, así que a igual largo pueden colisionar en el código.
 - Optimizador de corte: no descuenta ancho de sierra ni resuelve empalmes de piezas > barra.
-- Placas de revestimiento: paño completo, no descuentan vanos.
-- Cuatro aguas: sin cabios secundarios (jack rafters) ni correas en faldones de las puntas.
+- Placas de revestimiento: teseladas en cortes que descuentan los vanos (se ve cada corte y las aberturas
+  libres); no descuentan el solape real entre placas ni la separación de juntas.
+- Cuatro aguas: sin cabios secundarios (jack rafters) ni correas en faldones de las puntas; **no lleva
+  hastial** (es a 4 aguas). El apoyo del techo (hastiales/muro alto) se resuelve en dos aguas y una agua.
 - Cruz de San Andrés: se omite en paños con vano.
-- Esquina: aproximación (no arma el poste de 3 montantes exacto de ConsulSteel).
-- Sin conectores/herrajes (hold-downs, anchor bolts).
-- Cielorraso todavía no tiene variante wood.
+- Esquina: aproximación de 2 montantes; con esquinas activas se saltea el montante de extremo del muro
+  para evitar solape con el poste (no arma el poste de 3 montantes exacto de ConsulSteel).
+- Fijaciones: los marcadores de tornillo se ponen en montantes/kings (no en cada tornillo de placa);
+  la planilla es estimación por tipo de unión. Los anclajes apoyan la tuerca sobre la solera y **se saltean
+  en umbrales de puerta**; el hold-down es un **fleje STHD14** (flat strap) dibujado en el plano X-Z (queda
+  de canto en los muros que corren en Y — es un marcador, no el conector exacto por dirección).
+- Plano de habitaciones: el mini-plano permite ubicar cada ambiente libremente (snap 50 mm); para que dos
+  muros se fusionen en uno hay que dejarlos alineados dentro de la tolerancia de `alma` (no auto-alinea).
+- Cielorraso todavía no tiene variante wood (la carga de imagen sí funciona en Cielo).
 - Herramientas externas sugeridas para el flujo (uso, no desarrollo): Profile Builder 4, OpenCutList.
 
 ---

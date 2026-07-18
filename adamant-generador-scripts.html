@@ -34,8 +34,7 @@
     background:var(--obsidian-2);color:var(--muted);cursor:pointer;transition:.15s}
   .tab.on{color:var(--obsidian);background:var(--teal);border-color:var(--teal)}
 
-  .grid{display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:22px;align-items:start}
-  @media(max-width:800px){.grid{grid-template-columns:1fr}}
+  .grid{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
 
   .card{background:var(--obsidian-2);border:1px solid var(--line);border-radius:14px;padding:20px}
   .card h2{font-family:'Barlow Condensed';font-weight:700;text-transform:uppercase;letter-spacing:.05em;
@@ -75,6 +74,35 @@
   .add{margin-top:6px;width:100%;background:transparent;border:1px dashed var(--teal-dim);color:var(--teal);
     border-radius:9px;padding:9px;cursor:pointer;font-family:'Barlow Condensed';font-weight:700;
     text-transform:uppercase;letter-spacing:.05em;font-size:14px}
+
+  /* editor de planta: arrastrar habitaciones */
+  .planwrap{border:1px solid var(--line);border-radius:11px;background:var(--panel);padding:10px;margin-bottom:12px}
+  .planhint{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4}
+  #planEditor{width:100%;touch-action:none}
+  #planEditor svg{display:block;width:100%;height:auto;border-radius:8px;background:#071319}
+  #planEditor .proom rect{fill:rgba(27,182,164,.16);stroke:var(--teal);stroke-width:1.5;cursor:grab}
+  #planEditor .proom.drag rect{fill:rgba(232,93,42,.22);stroke:var(--tangerine);cursor:grabbing}
+  #planEditor .proom text{fill:var(--paper);font-family:'Space Grotesk';font-size:11px;pointer-events:none;dominant-baseline:middle;text-anchor:middle}
+  #planEditor .planempty{color:var(--muted);font-size:12px;text-align:center;padding:30px 0}
+
+  /* editor de mueble (frente) */
+  .mbtools{display:flex;gap:8px;margin-bottom:10px}
+  #closetEditor{width:100%;touch-action:none}
+  #closetEditor svg,#closetEditor3D svg{display:block;width:100%;height:auto;border-radius:8px;background:#071319;user-select:none}
+  #closetEditor3D{width:100%;touch-action:none}
+  #closetEditor3D .mbnode{cursor:pointer}
+  .mb3dtool{cursor:pointer}
+  .imgload textarea{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--paper);border-radius:8px;padding:9px 11px;font:inherit;resize:vertical}
+  .crthumbs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .crthumb{width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+  #closetEditor .mbdiv{cursor:ew-resize}
+  #closetEditor .mbshelf line,#closetEditor .mbbarline line{cursor:ns-resize}
+  #closetEditor .mbrm,#closetEditor .mbbarrm,#closetEditor .mbbar,#closetEditor .mbedge{cursor:pointer}
+  table.mbcost{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.mbcost th,table.mbcost td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+  table.mbcost .num{text-align:right;white-space:nowrap}
+  table.mbcost input{width:78px;background:var(--panel);border:1px solid var(--line);color:var(--paper);border-radius:5px;padding:3px 5px;text-align:right}
+  table.mbcost tfoot td{border-top:2px solid var(--teal);border-bottom:none;font-size:15px;color:var(--teal)}
 
   /* vanos */
   .room-block{border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:11px;background:var(--panel)}
@@ -154,7 +182,6 @@
   <div class="tabs">
     <button class="tab on" data-mod="muro">Muro / Tabique</button>
     <button class="tab" data-mod="cielo">Cielorraso</button>
-    <button class="tab" data-mod="casa">Casa completa</button>
   </div>
 
   <div class="grid">
@@ -162,9 +189,12 @@
     <div class="out">
       <div class="outbar">
         <span class="t" id="fname">tabique.rb</span>
-        <button class="copy" id="copy">Copiar código</button>
+        <div style="display:flex;gap:8px">
+          <button class="copy" id="toggleCode" style="background:transparent;color:var(--muted);border:1px solid var(--line)">Ver código</button>
+          <button class="copy" id="copy">Copiar código</button>
+        </div>
       </div>
-      <pre id="code"></pre>
+      <pre id="code" style="display:none"></pre>
     </div>
   </div>
 
@@ -229,8 +259,9 @@ def _profile(parent, pts2d, mapper, dist, axis, origin, mat, tag, xf=nil)
   if defined?(ETIQUETAS) && ETIQUETAS
     pf = (mat.is_a?(String) ? (PIECE_PREF[mat]||"P") : "PL")
     $PCNT[pf] = ($PCNT[pf]||0)+1
-    g.name = sprintf("%s-%02d", pf, $PCNT[pf])
-    begin; t=parent.add_text(g.name, g.bounds.center); rescue; end
+    code = (defined?(CODE_MAP) && CODE_MAP["#{pf}|#{dist.round}"]) || sprintf("%s-%02d", pf, $PCNT[pf])
+    g.name = "#{code} · #{dist.round}mm"
+    begin; parent.add_text(g.name, g.bounds.center); rescue; end
   end
   g
 end
@@ -316,6 +347,153 @@ ceil.transform!(Geom::Transformation.new([0,0,ALT.mm]))
 ceil.explode
 model.commit_operation; model.active_view.zoom_extents
 puts "Cielorraso OK: #{n} perfiles portantes. Perfiles sueltos, cada uno es un grupo movible/editable sin explotar."`;
+}
+
+// ============ MÓDULO MUEBLE / ROPERO (drywall) ============
+// Perfilería Durlock (Montante/Solera 35 o 70) + placas de yeso/OSB/PVC.
+// Modelo: columnas verticales; cada columna con estantes (z) y barrales (z).
+function muebleCols(c){
+  const ancho=c.ancho||2400;
+  const raw=(c.cols&&c.cols.length?c.cols:[{w:ancho,estantes:[],barrales:[]}]);
+  const ws=raw.map(k=>Math.max(120,+k.w||120));
+  const sum=ws.reduce((a,b)=>a+b,0), scale=ancho/sum;
+  let xs=[0]; ws.forEach(w=>xs.push(Math.round(xs[xs.length-1]+w*scale)));
+  xs[xs.length-1]=ancho;
+  return {xs,raw};
+}
+// Segmentos 3D (líneas de eje) de la estructura paramétrica + perfiles dibujados a mano.
+// t: 'm' montante · 's' solera · 'b' barral. a/b = [x,y,z] en mm.
+function muebleSegs(c){
+  const {xs,raw}=muebleCols(c), prof=c.prof||600, alto=c.alto||2400, ap=c.apoyo||{};
+  const S=[];
+  xs.forEach((x,i)=>{ if((i===0&&ap.izq)||(i===xs.length-1&&ap.der)) return;
+    S.push({t:'m',a:[x,0,0],b:[x,0,alto]}); S.push({t:'m',a:[x,prof,0],b:[x,prof,alto]}); });
+  const frame=z=>{ raw.forEach((k,i)=>{ const xl=xs[i], xr=xs[i+1];
+    S.push({t:'s',a:[xl,0,z],b:[xr,0,z]}); S.push({t:'s',a:[xl,prof,z],b:[xr,prof,z]});
+    S.push({t:'s',a:[xl,0,z],b:[xl,prof,z]}); S.push({t:'s',a:[xr,0,z],b:[xr,prof,z]}); }); };
+  if(!ap.piso) frame(0); if(!ap.techo) frame(alto);
+  raw.forEach((k,i)=>{ const xl=xs[i], xr=xs[i+1];
+    (k.estantes||[]).forEach(z=>{ z=+z; if(z>60&&z<alto-60) frame(z); });
+    (k.barrales||[]).forEach(z=>{ z=+z; S.push({t:'b',a:[xl,prof/2,z],b:[xr,prof/2,z]}); }); });
+  (c.profiles||[]).forEach((p,idx)=>S.push({t:p.t,a:p.a,b:p.b,custom:idx}));
+  return S;
+}
+function scriptMueble(c){
+  const A=(+c.perfil===35)?35:70, EP=12, prof=c.prof||600, alto=c.alto||2400, ancho=c.ancho||2400;
+  const conPlaca=c.placa!=="Ninguno" && !c.soloPerf;
+  const placa=(REVEST[c.placa]!==undefined&&conPlaca)?c.placa:"solo estructura";
+  const ap=c.apoyo||{};
+  const {xs,raw}=muebleCols(c);
+  let calls="";
+  // cada perfil de la estructura (dibujado en el lienzo 3D) → perfil recto entre 2 puntos
+  (c.profiles||[]).forEach(p=>{ const sec=p.t==='m'?'MC':'SU', mat=p.t==='m'?'"Gray"':'"Tomato"', lay=p.t==='m'?'"Mueble-Montantes"':'"Mueble-Soleras"';
+    calls+=`_beam(we, [${p.a.map(Math.round).join(',')}], [${p.b.map(Math.round).join(',')}], ${sec}, ${mat}, ${lay})\n`; });
+  const anc="", dimc="";
+return `# ADAMANT · Estructura de perfilería | unidades en mm
+# Perfilería galvanizada Montante/Solera ${A}. ${(c.profiles||[]).length} perfiles.
+ANCHO=${ancho}; ALTO=${alto}; PROF=${prof}; A=${A}; EP=${EP}; FL=35.0; FIJA=${c.fijaOn?'true':'false'}; CONPLACA=${conPlaca?'true':'false'}
+_fl=35.0; _l=8.0; _t=0.9; _a2=A+2.0
+MC=[[_fl,_l],[_fl,0],[0,0],[0,A],[_fl,A],[_fl,A-_l],[_fl-_t,A-_l],[_fl-_t,A-_t],[_t,A-_t],[_t,_t],[_fl-_t,_t],[_fl-_t,_l]]
+SU=[[0,_fl],[0,0],[_a2,0],[_a2,_fl],[_a2-_t,_fl],[_a2-_t,_t],[_t,_t],[_t,_fl]]
+# Montante con el ALMA plana amurada a la pared (alma a lo ancho X, alas hacia la profundidad Y)
+SUV =SU.map{|p| [p[1], p[0]]}          # solera de canto, alma a la cara "baja" (frente / izquierda)
+SUVB=SU.map{|p| [_fl-p[1], p[0]]}      # solera de canto, alma a la cara "alta" (fondo / derecha)
+${HELPER}
+model=Sketchup.active_model; model.start_operation("Mueble drywall",true); root=model.active_entities
+["Mueble-Montantes","Mueble-Soleras","Mueble-Placas","Mueble-Barral","Mueble-Fijaciones","Mueble-Anclajes"].each{|n| model.layers.add(n)}
+mueble=root.add_group; mueble.name="Mueble drywall #{ANCHO.to_i}x#{ALTO.to_i}"; we=mueble.entities
+
+# Montantes verticales (adelante + atrás), centrados en el divisor x
+def _post(we, x)
+  tm=Sketchup.active_model.layers["Mueble-Montantes"]
+  xx=x-FL/2.0; xx=0.0 if xx<0; xx=ANCHO-FL if xx>ANCHO-FL
+  # montantes verticales (alma de costado, alas al frente y al fondo), adelante y atrás del divisor
+  _profile(we, MC, MAP_XY, ALTO, :z, [xx,0,0], "Gray", tm)
+  _profile(we, MC, MAP_XY, ALTO, :z, [xx,PROF-A,0], "Gray", tm)
+end
+# Estante = marco cerrado de soleras (perímetro: rieles frente, fondo, izq y der) + placa que lo envuelve
+def _shelf(we, xl, xr, z)
+  ts=Sketchup.active_model.layers["Mueble-Soleras"]; tp=Sketchup.active_model.layers["Mueble-Placas"]
+  w=xr-xl; return if w<20; h=A+2.0
+  # marco cerrado de soleras DE CANTO (alma vertical): rieles frente, fondo, izq y der
+  # marco cerrado con juntas a tope (sin superponer): frente/fondo a lo ancho, laterales entre medio
+  _profile(we, SUV,  MAP_YZ, w,           :x, [xl,0,z], "Tomato", ts)          # riel frente (a lo ancho)
+  _profile(we, SUVB, MAP_YZ, w,           :x, [xl,PROF-FL,z], "Tomato", ts)    # riel fondo (a lo ancho)
+  _profile(we, SUV,  MAP_XZ, PROF-2*FL,   :y, [xl,FL,z], "Tomato", ts)         # riel izquierdo (calza entre frente y fondo)
+  _profile(we, SUVB, MAP_XZ, PROF-2*FL,   :y, [xr-FL,FL,z], "Tomato", ts)      # riel derecho
+  if CONPLACA
+    rect=[[xl,0],[xr,0],[xr,PROF],[xl,PROF]]
+    _profile(we, rect, MAP_XY, EP, :z, [0,0,z+h], "Gainsboro", tp)            # tabla del estante (apoya sobre el marco)
+    _profile(we, [[xl,z-EP],[xr,z-EP],[xr,z+h+EP],[xl,z+h+EP]], MAP_XZ, EP, :y, [0,PROF,0], "Gainsboro", tp)  # canto frontal
+  end
+  if FIJA
+    _screw(we, xl+18, z+12, PROF-A/2.0); _screw(we, xr-18, z+12, PROF-A/2.0)
+    _screw(we, xl+18, z+12, A/2.0);      _screw(we, xr-18, z+12, A/2.0)
+  end
+end
+# Perfil recto entre dos puntos 3D (perfiles dibujados a mano en el visor)
+def _beam(we, p0, p1, sec, mat, layname)
+  lay=Sketchup.active_model.layers[layname]
+  dx=p1[0]-p0[0]; dy=p1[1]-p0[1]; dz=p1[2]-p0[2]
+  ln=Math.sqrt(dx*dx+dy*dy+dz*dz); return if ln<1
+  vx=Geom::Vector3d.new(dx,dy,dz); vx.normalize!
+  up=(vx.parallel?(Z_AXIS)) ? Geom::Vector3d.new(0,1,0) : Geom::Vector3d.new(0,0,1)
+  vy=up.cross(vx); vy.normalize!; vz=vx.cross(vy); vz.normalize!
+  org=Geom::Point3d.new(p0[0].mm,p0[1].mm,p0[2].mm)
+  t=Geom::Transformation.axes(org, vx, vy, vz)
+  _profile(we, sec, MAP_YZ, ln, :x, [0,0,0], mat, lay, t)
+end
+# Barral (tubo) horizontal en la columna
+def _rod(we, xl, xr, z)
+  tb=Sketchup.active_model.layers["Mueble-Barral"]
+  w=xr-xl; return if w<60; cy=PROF*0.55
+  pts=(0...12).map{|i| ang=i*Math::PI/6.0; [cy+15.0*Math.cos(ang), z+15.0*Math.sin(ang)]}
+  _profile(we, pts, MAP_YZ, w-40, :x, [xl+20,0,0], "DarkGray", tb)
+end
+# Partición vertical envuelta: placa en ambas caras (bl=-X, br=+X) + canto frontal → tapa los montantes
+def _partition(we, x, bl, br)
+  tp=Sketchup.active_model.layers["Mueble-Placas"]
+  x0=x-17.5; x0=0.0 if x0<0; x0=ANCHO-35.0 if x0>ANCHO-35.0
+  yz=[[0,0],[PROF,0],[PROF,ALTO],[0,ALTO]]
+  _profile(we, yz, MAP_YZ, EP, :x, [x0-EP,0,0], "WhiteSmoke", tp) if bl
+  _profile(we, yz, MAP_YZ, EP, :x, [x0+35.0,0,0], "WhiteSmoke", tp) if br
+  _profile(we, [[x0-EP,0],[x0+35+EP,0],[x0+35+EP,ALTO],[x0-EP,ALTO]], MAP_XZ, EP, :y, [0,PROF,0], "WhiteSmoke", tp)  # canto frontal
+end
+def _back(we)
+  tp=Sketchup.active_model.layers["Mueble-Placas"]
+  _profile(we, [[0,0],[ANCHO,0],[ANCHO,ALTO],[0,ALTO]], MAP_XZ, EP, :y, [0,0,0], "Gainsboro", tp)
+end
+# Marcador de tornillo (fija solera↔montante): x,z locales, y = profundidad
+def _screw(we, x, z, y)
+  tf=Sketchup.active_model.layers["Mueble-Fijaciones"]
+  pts=(0...8).map{|i| ang=i*Math::PI/4.0; [x+3.0*Math.cos(ang), z+3.0*Math.sin(ang)]}
+  _profile(we, pts, MAP_XZ, 6, :y, [0,y-3,0], "Goldenrod", tf)
+end
+# Anclaje a una superficie (pared/piso/techo/fondo): tarugo+tornillo embebido en el material de apoyo
+def _anc(we, x, y, z, dir)
+  ta=Sketchup.active_model.layers["Mueble-Anclajes"]; r=6.0; d=45.0
+  g=we.add_group
+  if dir==:zneg || dir==:zpos
+    pts=(0...8).map{|i| a=i*Math::PI/4.0; MAP_XY.call(x+r*Math.cos(a), y+r*Math.sin(a))}
+  elsif dir==:xneg || dir==:xpos
+    pts=(0...8).map{|i| a=i*Math::PI/4.0; MAP_YZ.call(y+r*Math.cos(a), z+r*Math.sin(a))}
+  else
+    pts=(0...8).map{|i| a=i*Math::PI/4.0; MAP_XZ.call(x+r*Math.cos(a), z+r*Math.sin(a))}
+  end
+  f=g.entities.add_face(pts)
+  f.pushpull(((dir==:zpos||dir==:xpos) ? d : -d).mm)
+  org = dir==:zpos ? [0,0,ALTO] : (dir==:xpos ? [ANCHO,0,0] : [0,0,0])
+  g.transform!(Geom::Transformation.new([org[0].mm,org[1].mm,org[2].mm])) unless org==[0,0,0]
+  g.material="Crimson"; g.layer=ta
+end
+# Rótulo de medida (texto 3D) en el frente de un nicho
+def _txt(we, x, y, z, str)
+  begin; we.add_text(str, Geom::Point3d.new(x.mm, y.mm, z.mm)); rescue; end
+end
+
+${calls}${anc}${dimc}mueble.explode
+model.commit_operation; model.active_view.zoom_extents
+puts "Mueble OK: ${xs.length} divisores, ${raw.reduce((n,k)=>n+(k.estantes||[]).length,0)+2} estantes, ${raw.reduce((n,k)=>n+(k.barrales||[]).length,0)} barral(es)${conPlaca?', perfilería recubierta':''}. Piezas sueltas y editables."`;
 }
 
 // ============ MÓDULO CASA COMPLETA ============
@@ -471,7 +649,7 @@ function vanosRuby(vanos){
 }
 
 function techoRuby(p,bb){
-  const pnd=(p.pendiente||30)/100;
+  const pnd=(Number.isFinite(p.pendiente)?p.pendiente:30)/100;   // 0 es válido (plano); ||30 lo rompía
   const tipo=p.techoTipo||"Dos aguas";
   const head=`
 # --- Techo: ${tipo} (pendiente ${p.pendiente}%) ---
@@ -504,6 +682,15 @@ while s<=D/2.0+1
   _beam3d(we,[BX1,BY2-s,z],[BX2,BY2-s,z],osec,"DarkGray",t_t)
   s+=600
 end
+# hastiales: montantes que cierran el triángulo → el techo apoya sobre muro, no queda en el aire
+[BX1, BX2-PGC_ALA].each do |gx|
+  yy=BY1+MODULO
+  while yy<BY2-1
+    hh=RISE*(1.0-((yy-MIDY).abs/(D/2.0)))
+    _profile(we,csec,MAP_XY,hh,:z,[0,0,0],"SteelBlue",t_t,_T(gx,yy,ZT)) if hh>80
+    yy+=MODULO
+  end
+end
 `;
   }
   if(tipo==="Una agua"){
@@ -527,21 +714,38 @@ while s<=D+1
   _beam3d(we,[BX1,BY1+s,z],[BX2,BY1+s,z],osec,"DarkGray",t_t)
   s+=600
 end
+# hastiales inclinados: montantes que cierran el triángulo bajo el faldón → apoyo real del techo
+[BX1, BX2-PGC_ALA].each do |gx|
+  yy=BY1+MODULO
+  while yy<BY2-1
+    hh=(yy-BY1)*PND
+    _profile(we,csec,MAP_XY,hh,:z,[0,0,0],"SteelBlue",t_t,_T(gx,yy,ZT)) if hh>80
+    yy+=MODULO
+  end
+end
+# muro alto (lado BY2): montantes de ZT hasta el faldón → el techo apoya, no flota
+hw2=D*PND
+if hw2>80
+  xg=BX1
+  while xg<BX2-1
+    _profile(we,csec,MAP_XY,hw2,:z,[0,0,0],"SteelBlue",t_t,_T(xg,BY2-PGC_ALA,ZT))
+    xg+=MODULO
+  end
+end
 `;
   }
   if(tipo==="Plano"){
     return head+`
-# techo plano: vigas PGC en Y con leve pendiente + correas
+# techo plano: vigas PGC horizontales en Y + correas (la pendiente de desagüe la da el contrapiso)
 xc=BX1; lastx=BX1
 vig=lambda do |xx|
-  _beam3d(we,[xx,BY1,ZT],[xx,BY2,ZT+D*PND],csec,"Brown",t_t)
+  _beam3d(we,[xx,BY1,ZT],[xx,BY2,ZT],csec,"Brown",t_t)
 end
 while xc<=BX2+1.0; lastx=[xc,BX2-PGC_ALA].min; vig.call(lastx); xc+=SEP; end
 vig.call(BX2-PGC_ALA) if (BX2-PGC_ALA)-lastx>50
 s=0.0
 while s<=D+1
-  z=ZT+s*PND+ca
-  _beam3d(we,[BX1,BY1+s,z],[BX2,BY1+s,z],osec,"DarkGray",t_t)
+  _beam3d(we,[BX1,BY1+s,ZT+ca],[BX2,BY1+s,ZT+ca],osec,"DarkGray",t_t)
   s+=600
 end
 `;
@@ -608,8 +812,8 @@ function scriptCasa(p){
                              :`_T(${(s.c+alma).toFixed(0)},${s.a1.toFixed(0)},0)*ROTZ90`;
     calls+=`_wall(we, ${larg.toFixed(0)}, ${xf}, ${vanosRuby(vv)})\n`;
     if(p.bracesOn) calls+=`_brace(we, ${larg.toFixed(0)}, ${xf}, ${vanosRuby(vv)})\n`;
-    if(p.placasOn&&placaExt) calls+=`_plate(we, ${larg.toFixed(0)}, ${xf}, :ext, 12.5, matPlaca)\n`;
-    if(p.placasOn&&placaInt) calls+=`_plate(we, ${larg.toFixed(0)}, ${xf}, :int, 12.5, matPlaca)\n`;
+    if(p.placasOn&&placaExt) calls+=`_plate(we, ${larg.toFixed(0)}, ${xf}, :ext, 12.5, matPlaca, ${vanosRuby(vv)})\n`;
+    if(p.placasOn&&placaInt) calls+=`_plate(we, ${larg.toFixed(0)}, ${xf}, :int, 12.5, matPlaca, ${vanosRuby(vv)})\n`;
   });
   // esquinas multi-montante (4 por habitación, dedupe)
   if(p.esquinasOn){
@@ -645,6 +849,30 @@ pl.material=Sketchup::Color.new(155,155,150); pl.layer=t_h
   if(p.techoOn&&bb){
     extra+=techoRuby(p,bb);
   }
+  if(p.herrajesOn){
+    let hw="\n# --- Fijaciones: anclajes (cada ~1200mm) y hold-downs en esquinas ---\n";
+    segs.forEach(s=>{
+      const larg=s.a2-s.a1; if(larg<=0)return;
+      const horiz=s.orient==='h', n=Math.max(1,Math.floor(larg/1200));
+      for(let i=0;i<=n;i++){
+        const d=Math.min(larg-50,Math.max(50,i*(larg/n)));
+        const posAbs=s.a1+d;
+        // saltear anclajes en umbrales de puerta: ahí la solera inferior está cortada, no habría qué fijar
+        if(s.vanos.some(v=>v.sill<=1 && posAbs>=v.x1-20 && posAbs<=v.x2+20)) continue;
+        const ax=horiz? posAbs : s.c+alma/2, ay=horiz? s.c+alma/2 : posAbs;
+        hw+=`_anchor(we, ${ax.toFixed(0)}, ${ay.toFixed(0)})\n`;
+      }
+    });
+    const seen=new Set();
+    p.rooms.forEach(r=>{ if(!(r.largo>0&&r.ancho>0))return;
+      const X=+r.posX||0,Y=+r.posY||0,L=r.largo,W=r.ancho;
+      [[X,Y],[X+L-alma,Y],[X,Y+W-alma],[X+L-alma,Y+W-alma]].forEach(([x,y])=>{
+        const k=Math.round(x/10)+"_"+Math.round(y/10);
+        if(!seen.has(k)){ seen.add(k); hw+=`_holddown(we, ${(x+alma/2).toFixed(0)}, ${(y+alma/2).toFixed(0)})\n`; }
+      });
+    });
+    extra+=hw;
+  }
   const c=computeCasa(p);
 return `# ============================================================
 # ADAMANT · Casa ${p.sistema==='wood'?'Wood Frame (madera)':'Steel Frame (acero)'} · planta real, muros fusionados
@@ -667,12 +895,14 @@ ${HELPER}
 model=Sketchup.active_model; model.start_operation("Casa ${p.sistema==='wood'?'Wood':'Steel'} Frame",true); root=model.active_entities
 model.layers.add("Estructura-Soleras"); model.layers.add("Estructura-Montantes"); model.layers.add("Estructura-Vanos")
 model.layers.add("Estructura-Techo"); model.layers.add("Estructura-Entrepiso"); model.layers.add("Estructura-Arriostres"); model.layers.add("Revestimientos")
+model.layers.add("Herrajes"); model.layers.add("Fijaciones")
 casa=root.add_group; casa.name="Casa ${p.sistema==='wood'?'wood':'steel'} frame"; we=casa.entities
 
 def _T(x,y,z); Geom::Transformation.new([x.mm, y.mm, z.mm]); end
 ROTZ90 = Geom::Transformation.rotation(ORIGIN, Z_AXIS, 90.degrees)
-ETIQUETAS=${p.etiquetasOn?'true':'false'}; $PCNT={}
+ETIQUETAS=${p.etiquetasOn?'true':'false'}; ESQUINAS=${p.esquinasOn?'true':'false'}; HERRAJES=${p.herrajesOn?'true':'false'}; $PCNT={}
 PIECE_PREF={"SteelBlue"=>"M","SaddleBrown"=>"M","Orange"=>"K","Cyan"=>"J","Gray"=>"D","Silver"=>"S","Brown"=>"CB","Sienna"=>"CB","Peru"=>"W","DarkGray"=>"CO","MediumTurquoise"=>"CE","DodgerBlue"=>"PE","Gold"=>"CSA"}
+${p.etiquetasOn?codeMapRuby(p)+'\n':''}
 
 # Dibuja un muro completo (soleras + montantes + vanos) corriendo en X local; xf lo ubica en planta.
 def _wall(we, larg, xf, vanos)
@@ -714,16 +944,27 @@ def _wall(we, larg, xf, vanos)
   pos.each do |pp|
     dx=pp-cf/2.0; dx=0.0 if dx<0; dx=larg-cf if dx>larg-cf
     next if inv.call(dx+cf/2.0)
+    next if ESQUINAS && (dx<1.0 || dx>larg-cf-1.0)   # extremo cubierto por poste de esquina
     _profile(we,c,MAP_XY,hmon,:z,[dx,0,zb],"SteelBlue",tm,xf)
+    (_screw(we,dx+cf/2.0,zb+40,xf); _screw(we,dx+cf/2.0,zb+hmon-40,xf)) if HERRAJES
   end
   vanos.each do |v|
     x1=v[:x1]; x2=v[:x2]; hv=v[:h]; sill=v[:sill]
     xd=x1+cf; wd=(x2-cf)-(x1+cf)
     _profile(we,c,MAP_XY,hmon,:z,[x1,0,zb],"Orange",tv,xf)        # king izq
     _profile(we,c,MAP_XY,hmon,:z,[x2-cf,0,zb],"Orange",tv,xf)     # king der
+    if HERRAJES
+      _screw(we,x1+cf/2.0,zb+40,xf); _screw(we,x1+cf/2.0,zb+hmon-40,xf)
+      _screw(we,x2-cf/2.0,zb+40,xf); _screw(we,x2-cf/2.0,zb+hmon-40,xf)
+    end
     hj=hv-zb
     _profile(we,c,MAP_XY,hj,:z,[x1+cf,0,zb],"Cyan",tv,xf)         # jack izq
     _profile(we,c,MAP_XY,hj,:z,[x2-2*cf,0,zb],"Cyan",tv,xf)       # jack der
+    if HERRAJES
+      _screw(we,x1+1.5*cf,zb+30,xf); _screw(we,x1+1.5*cf,hv-30,xf)     # jack izq (base + dintel)
+      _screw(we,x2-1.5*cf,zb+30,xf); _screw(we,x2-1.5*cf,hv-30,xf)     # jack der
+      _screw(we,x1+cf/2.0,hv-20,xf); _screw(we,x2-cf/2.0,hv-20,xf)     # apoyo dintel sobre kings
+    end
     if wd>10
       if SIS=="wood"
         _profile(we,c,MAP_YZ,wd,:x,[xd,0,hv],"Gray",tv,xf)            # dintel built-up 1
@@ -734,16 +975,23 @@ def _wall(we, larg, xf, vanos)
         _profile(we,ub,MAP_YZ,wd,:x,[xd,0,hv+headH],"Gray",tv,xf)    # dintel PGU
       end
     end
-    zc=hv+headH; hcs=ztopC-zc; cx=xd
+    zc=hv+headH; zc+=fl if SIS!="wood"   # en steel el dintel lleva un PGU encima
+    hcs=ztopC-zc; cx=xd
     while cx<x2-2*cf
-      _profile(we,c,MAP_XY,hcs,:z,[cx,0,zc],"SteelBlue",tv,xf) if hcs>10
+      if hcs>10
+        _profile(we,c,MAP_XY,hcs,:z,[cx,0,zc],"SteelBlue",tv,xf)
+        (_screw(we,cx+cf/2.0,zc+20,xf); _screw(we,cx+cf/2.0,ztopC-20,xf)) if HERRAJES   # cripple sup
+      end
       cx+=MODULO
     end
     if sill>zb+1
       _profile(we,ub,MAP_YZ,wd,:x,[xd,0,sill],"Silver",tv,xf) if wd>10   # solera/durmiente de vano
       hci=sill-zb; cx=xd
       while cx<x2-2*cf
-        _profile(we,c,MAP_XY,hci,:z,[cx,0,zb],"SteelBlue",tv,xf) if hci>10
+        if hci>10 && (cx-(x1+cf)).abs>1 && (cx-(x2-2*cf)).abs>1
+          _profile(we,c,MAP_XY,hci,:z,[cx,0,zb],"SteelBlue",tv,xf)
+          (_screw(we,cx+cf/2.0,zb+20,xf); _screw(we,cx+cf/2.0,sill-20,xf)) if HERRAJES   # cripple antepecho
+        end
         cx+=MODULO
       end
     end
@@ -787,6 +1035,7 @@ def _corner(we, x, y, sx, sy)
   base=_T(x,y,PGU_ESP)*sc
   g1=_profile(we,c,MAP_XY,h,:z,[0,0,0],"DodgerBlue",tm,base);          g1.name="Poste esquina"
   g2=_profile(we,c,MAP_XY,h,:z,[0,0,0],"DodgerBlue",tm,base*ROTZ90);   g2.name="Poste esquina"
+  (_screw(we,20,60,base); _screw(we,20,h-60,base)) if defined?(HERRAJES) && HERRAJES
 end
 
 # Cruz de San Andrés (fleje 30x0.5) sobre la cara exterior de un paño lleno
@@ -799,15 +1048,87 @@ def _brace(we, larg, xf, vanos)
     ux=dx/ln; uz=dz/ln; nx=-uz; nz=ux
     pts=[[a[0]+nx*w/2,a[1]+nz*w/2],[b[0]+nx*w/2,b[1]+nz*w/2],[b[0]-nx*w/2,b[1]-nz*w/2],[a[0]-nx*w/2,a[1]-nz*w/2]]
     g=_profile(we,pts,MAP_XZ,th,:y,[0,0,0],"Gold",tb,xf); g.name="Cruz San Andrés"
+    (_screw(we,a[0]+15,a[1],xf); _screw(we,b[0]-15,b[1],xf)) if defined?(HERRAJES) && HERRAJES
   end
 end
 
 # Placa de revestimiento sobre una cara del muro. lado: :ext (y<0) o :int (y>a)
-def _plate(we, larg, xf, lado, esp, mat)
+def _plate(we, larg, xf, lado, esp, mat, vanos=[])
   tp=Sketchup.active_model.layers["Revestimientos"]
-  oy = lado==:ext ? -esp : PGU_ALMA.to_f
-  pts=[[0.0,0.0],[larg,0.0],[larg,ALTURA.to_f],[0.0,ALTURA.to_f]]
-  g=_profile(we,pts,MAP_XZ,esp,:y,[0,oy,0],mat,tp,xf); g.name="Placa #{lado}"
+  depth = (SIS=="wood" ? WOOD_ANC : PGU_ALMA).to_f
+  oy = lado==:ext ? -esp : depth
+  yface = lado==:ext ? -esp : depth+esp          # cara expuesta de la placa (para tornillos)
+  h=ALTURA.to_f; ncut=0
+  rect=lambda do |x0,z0,x1r,z1r|
+    return if (x1r-x0)<5 || (z1r-z0)<5
+    pts=[[x0,z0],[x1r,z0],[x1r,z1r],[x0,z1r]]
+    g=_profile(we,pts,MAP_XZ,esp,:y,[0,oy,0],mat,tp,xf); ncut+=1; g.name="Placa #{lado} ##{ncut}"
+    if defined?(HERRAJES) && HERRAJES
+      # tornillos de placa: perímetro a ~300mm + líneas de montante
+      xx=x0; while xx<x1r-1; _pscrew(we,xx,z0,xf,yface); _pscrew(we,xx,z1r,xf,yface); xx+=300; end
+      _pscrew(we,x1r,z0,xf,yface); _pscrew(we,x1r,z1r,xf,yface)
+      zz=z0; while zz<z1r-1; _pscrew(we,x0,zz,xf,yface); _pscrew(we,x1r,zz,xf,yface); zz+=300; end
+      mx=(x0/MODULO).ceil*MODULO
+      while mx<x1r-1
+        zz=z0+300; while zz<z1r-1; _pscrew(we,mx,zz,xf,yface); zz+=400; end
+        mx+=MODULO
+      end
+    end
+  end
+  vs=vanos.sort_by{|v| v[:x1]}
+  prevx=0.0
+  vs.each do |v|
+    x1=v[:x1]; x2=v[:x2]; top=v[:h]; sill=v[:sill]
+    rect.call(prevx,0,x1,h) if x1>prevx     # paño lleno entre aberturas
+    rect.call(x1,top,x2,h)                  # placa sobre el dintel
+    rect.call(x1,0,x2,sill) if sill>5       # placa bajo el antepecho
+    prevx=x2
+  end
+  rect.call(prevx,0,larg,h) if prevx<larg   # (paño completo si no hay vanos)
+end
+
+# ---- Fijaciones y herrajes (prismas sólidos, capas Herrajes/Fijaciones) ----
+def _hw(we, pts, mapper, dist, axis, origin, mat, tag, xf=nil)
+  g=we.add_group
+  f=g.entities.add_face(pts.map{|u,v| mapper.call(u,v)})
+  f.pushpull(dist.mm)
+  b=g.bounds; mn = axis==:x ? b.min.x : (axis==:y ? b.min.y : b.min.z)
+  if mn < -0.01
+    v = axis==:x ? [dist.mm,0,0] : (axis==:y ? [0,dist.mm,0] : [0,0,dist.mm]); g.transform!(Geom::Transformation.new(v))
+  end
+  g.transform!(Geom::Transformation.new([origin[0].mm,origin[1].mm,origin[2].mm]))
+  g.transform!(xf) if xf
+  g.material=mat; g.layer=tag; g
+end
+def _oct(r); (0...8).map{|i| a=i*Math::PI/4.0; [r*Math.cos(a), r*Math.sin(a)]}; end
+# Marcador de unión atornillada: cabeza hex ~8mm sobre la cara del muro (x,z locales + xf)
+def _screw(we, x, z, xf)
+  tf=Sketchup.active_model.layers["Fijaciones"]
+  _hw(we, _oct(4.0).map{|u,v| [x+u, z+v]}, MAP_XZ, 4, :y, [0,-4,0], "Goldenrod", tf, xf)
+end
+# Tornillo de placa/sheathing sobre la cara expuesta de la placa (y = cara)
+def _pscrew(we, x, z, xf, y)
+  tf=Sketchup.active_model.layers["Fijaciones"]
+  _hw(we, _oct(3.0).map{|u,v| [x+u, z+v]}, MAP_XZ, 3, :y, [0,y,0], "Orange", tf, xf)
+end
+# Bulón de anclaje a la platea (x,y absolutas de planta): embebido en hormigón, tuerca APOYADA sobre la solera
+def _anchor(we, x, y)
+  th=Sketchup.active_model.layers["Herrajes"]
+  zb = (SIS=="wood" ? WOOD_ESP : PGU_ESP).to_f
+  _hw(we, _oct(5.0), MAP_XY, zb+170, :z, [x,y,-170], "DarkSlateGray", th)                  # bulón embebido, sube hasta la cara sup de la solera
+  _hw(we, [[-14,-14],[14,-14],[14,14],[-14,14]], MAP_XY, 3, :z, [x,y,zb], "Gray", th)      # arandela sobre la solera
+  _hw(we, _oct(9.0), MAP_XY, 9, :z, [x,y,zb+3], "Silver", th)                              # tuerca
+end
+# Hold-down STHD14 (Simpson): fleje embebido en la platea + clavado al montante de esquina
+def _holddown(we, x, y)
+  th=Sketchup.active_model.layers["Herrajes"]; tf=Sketchup.active_model.layers["Fijaciones"]
+  w=38.0; t=2.5; ztop=560.0; zemb=-260.0
+  g=_hw(we, [[x-w/2,zemb],[x+w/2,zemb],[x+w/2,ztop],[x-w/2,ztop]], MAP_XZ, t, :y, [0,y,0], "Silver", th); g.name="STHD14"
+  z=60.0
+  while z<ztop-20                                                                          # clavos que fijan el fleje al montante
+    _hw(we, _oct(2.2).map{|u,v| [x+u, z+v]}, MAP_XZ, t+4, :y, [0,y-2,0], "DarkSlateGray", tf)
+    z+=70
+  end
 end
 
 ${matPlaca}${calls}${extra}${p.etiquetasOn?'# etiquetado ON: piezas quedan como grupos nombrados (sin explotar)':'casa.explode'}
@@ -846,7 +1167,16 @@ let casaCfg={sistema:"steel",lumber:"2x6 (38×140)",pgc:"PGC 100x0.90",pgu:"PGU 
   techoOn:true,techoTipo:"Dos aguas",pendiente:30,sepCab:1200,alero:300,
   plateaOn:true,espesor:120,vuelo:200,
   entrepisoOn:false,nivelEnt:2700,sepViga:400,
-  esquinasOn:true,bracesOn:true,placasOn:false,etiquetasOn:false};
+  esquinasOn:true,bracesOn:true,placasOn:false,etiquetasOn:false,herrajesOn:true};
+
+let closet={ ancho:2400, alto:2400, prof:600, perfil:70, placa:"Durlock 12.5", respaldo:true, fijaOn:true, medidas:true,
+  apoyo:{ izq:false, der:false, techo:false, piso:true, fondo:true },
+  cols:[
+    { w:600, estantes:[], barrales:[1750] },
+    { w:600, estantes:[400,800,1200,1600,2000], barrales:[] },
+    { w:600, estantes:[1150], barrales:[1750] },
+    { w:600, estantes:[400,800,1200,1600,2000], barrales:[] },
+  ]};
 
 const formEl=document.getElementById('form');
 const codeEl=document.getElementById('code');
@@ -854,8 +1184,7 @@ const fnameEl=document.getElementById('fname');
 const computoEl=document.getElementById('computo');
 
 function renderForm(){
-  computoEl.style.display=(current==="casa")?"block":"none";
-  if(current==="casa"){ renderCasaForm(); fnameEl.textContent="casa.rb"; genCasa(); return; }
+  computoEl.style.display="none";
   const cfg=FORMS[current];
   let html=`<h2>${cfg.title}</h2><p class="sub">${cfg.sub}</p>`;
   if(current==="muro"){
@@ -887,15 +1216,417 @@ function gen(){
   codeEl.textContent=cfg.build(p);
 }
 
+// ============ UI ESTRUCTURA DE PERFILERÍA ============
+function seedRopero(){ closet.profiles=muebleSegs(Object.assign({},closet,{profiles:[]})).filter(s=>s.t!=='b').map(s=>({t:s.t,a:s.a.slice(),b:s.b.slice()})); }
+function renderMuebleForm(){
+  closet.profiles=closet.profiles||[];
+  let html=`<h2>Crear · estructura en seco</h2><p class="sub">Subí un boceto a mano, varias fotos de la misma estructura, un video de cómo se arma (archivo) o un link de YouTube, y agregá una descripción. La IA interpreta qué querés construir —aunque no tengas las medidas exactas de la perfilería— y genera el script para SketchUp + el cómputo.</p>`;
+  html+=`<div class="imgload">
+    <div class="imgload-head"><span>Material de referencia</span><span id="crear-status"></span></div>
+    <div class="fieldrow"><div class="f full"><label>API key de Anthropic (sk-ant-…) — se guarda solo en este navegador</label>
+      <input type="password" id="cr_key" placeholder="sk-ant-..." value="${localStorage.getItem('adamant_api_key')||''}"></div></div>
+    <div class="fieldrow">
+      <div class="f"><label>Imágenes / bocetos (varias)</label><input type="file" id="cr_imgs" accept="image/*" multiple></div>
+      <div class="f"><label>Video (archivo)</label><input type="file" id="cr_vid" accept="video/*"></div>
+      <div class="f"><label>Link de YouTube</label><input type="text" id="cr_yt" placeholder="https://youtu.be/..."></div>
+      <div class="f"><label>Perfil (mm)</label><select id="mb_pe"><option ${closet.perfil==35?'selected':''}>35</option><option ${closet.perfil==70?'selected':''}>70</option></select></div>
+    </div>
+    <div class="fieldrow"><div class="f full"><label>Descripción — qué querés armar (y medidas si las tenés)</label>
+      <textarea id="cr_desc" rows="3" placeholder="Ej: ropero de 2,40 x 2,40 m, 60 cm de fondo. Lado izquierdo para colgar con barral; el resto estantes cada 40 cm..."></textarea></div></div>
+    <div id="cr_thumbs" class="crthumbs"></div>
+    <button class="add" id="cr_go" style="width:auto;padding:10px 20px">✨ Interpretar con IA</button>
+    <div class="imghint">Podés combinar varias imágenes de la misma estructura. En video, subí el archivo y se analizan cuadros clave; los links de YouTube se toman como referencia (la IA no reproduce el video, interpreta por contexto y técnicas típicas de drywall). Requiere estar logueado en Claude.</div>
+  </div>`;
+  html+=`<div class="mbtools">
+    <button class="add" id="mb_save" style="width:auto;padding:8px 14px">💾 Guardar</button>
+    <button class="add" id="mb_load" style="width:auto;padding:8px 14px">📂 Cargar</button>
+    <button class="add" id="mb_pdf" style="width:auto;padding:8px 14px;border-color:var(--tangerine);color:var(--tangerine)">🧾 PDF presupuesto</button>
+    <input type="file" id="mb_file" accept="application/json,.json" style="display:none"></div>`;
+  formEl.innerHTML=html;
+  document.getElementById('mb_pe').addEventListener('change',e=>{closet.perfil=+e.target.value;genMueble();});
+  document.getElementById('cr_key').addEventListener('change',e=>{ localStorage.setItem('adamant_api_key',e.target.value.trim()); });
+  document.getElementById('cr_go').onclick=crearInterpretar;
+  document.getElementById('cr_imgs').addEventListener('change',crearThumbs);
+  document.getElementById('mb_save').onclick=saveMueble;
+  document.getElementById('mb_pdf').onclick=pdfMueble;
+  document.getElementById('mb_load').onclick=()=>document.getElementById('mb_file').click();
+  document.getElementById('mb_file').addEventListener('change',loadMueble);
+}
+function crearThumbs(e){ const box=document.getElementById('cr_thumbs'); if(!box) return; box.innerHTML="";
+  [...(e.target.files||[])].forEach(f=>{ const im=document.createElement('img'); im.className="crthumb"; im.src=URL.createObjectURL(f); box.appendChild(im); }); }
+function fileB64(f){ return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=()=>rej(new Error('read'));r.readAsDataURL(f);}); }
+async function extractFrames(file,n){
+  const url=URL.createObjectURL(file); const v=document.createElement('video'); v.muted=true; v.preload="auto"; v.src=url;
+  try{ await new Promise((res,rej)=>{ v.onloadeddata=res; v.onerror=()=>rej(new Error('video')); setTimeout(res,4000); });
+    const dur=v.duration&&isFinite(v.duration)?v.duration:0, cv=document.createElement('canvas'), W=768, frames=[];
+    for(let i=0;i<n;i++){ const t=dur>0?dur*(i+0.5)/n:0;
+      await new Promise(res=>{ v.onseeked=res; setTimeout(res,1500); v.currentTime=Math.min(t,Math.max(0,dur-0.05)); });
+      const sc=W/(v.videoWidth||W); cv.width=W; cv.height=Math.round((v.videoHeight||432)*sc);
+      cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
+      try{ frames.push(cv.toDataURL('image/jpeg',0.8).split(',')[1]); }catch(_){}
+    }
+    return frames;
+  } finally { URL.revokeObjectURL(url); }
+}
+function crearPrompt(){
+  return `Sos un experto en construcción en seco (drywall / steel frame liviano tipo Durlock). A partir de las imágenes, cuadros de video y la descripción, interpretá QUÉ ESTRUCTURA DE PERFILERÍA se quiere construir (ropero, estantería, mueble, tabique, nicho, deck, etc.) y devolvé SOLO un JSON válido (sin markdown, sin texto extra):
+{"ancho":number,"alto":number,"prof":number,"perfil":35|70,"profiles":[{"t":"m"|"s","a":[x,y,z],"b":[x,y,z]}]}
+Reglas:
+- Medidas en milímetros. Ejes: X=ancho (izq→der), Y=profundidad (frente→fondo, y=0 es el frente), Z=alto (piso→arriba).
+- "profiles" = lista de TODOS los perfiles rectos de la estructura. "t":"m"=montante (parante vertical, da rigidez), "s"=solera (perfil horizontal: perímetro, base, techo y cada estante como marco cerrado de 4 lados). "a" y "b" son los dos extremos [x,y,z].
+- Armá una estructura constructivamente coherente: montantes verticales en las esquinas y en cada división (adelante y atrás), soleras cerrando el perímetro superior e inferior, y cada estante/nicho como un marco horizontal.
+- Si NO hay medidas precisas, ESTIMÁ dimensiones y proporciones estándar de drywall (perfil 35 o 70; profundidad de ropero ~500-600mm; estantes cada ~350-450mm; módulos 400-600mm). Priorizá que quede realista y armable.
+- Devolvé SOLO el JSON, con todos los perfiles necesarios.`;
+}
+async function callClaude(content, maxTokens){
+  const key=(localStorage.getItem('adamant_api_key')||'').trim();
+  if(!key) throw new Error("Falta la API key de Anthropic (cargala arriba, campo 'API key').");
+  let resp;
+  try{
+    resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-sonnet-5",max_tokens:maxTokens||2000,messages:[{role:"user",content}]})});
+  }catch(net){ throw new Error("No se pudo conectar a la API. Si abriste el archivo directo (file://), corré 'npm run serve' y abrí http://localhost."); }
+  const data=await resp.json().catch(()=>({}));
+  if(!resp.ok || data.error) throw new Error((data.error&&data.error.message)||("HTTP "+resp.status));
+  return (data.content||[]).filter(x=>x.type==="text").map(x=>x.text).join("\n");
+}
+async function crearInterpretar(){
+  const status=document.getElementById('crear-status'), btn=document.getElementById('cr_go');
+  status.textContent="Preparando…"; btn.disabled=true;
+  try{
+    const content=[];
+    for(const f of (document.getElementById('cr_imgs').files||[])){ content.push({type:"image",source:{type:"base64",media_type:f.type||"image/jpeg",data:await fileB64(f)}}); }
+    const vf=document.getElementById('cr_vid').files&&document.getElementById('cr_vid').files[0];
+    if(vf){ status.textContent="Extrayendo cuadros del video…"; try{ (await extractFrames(vf,6)).forEach(b=>content.push({type:"image",source:{type:"base64",media_type:"image/jpeg",data:b}})); }catch(_){} }
+    const yt=(document.getElementById('cr_yt').value||"").trim(), desc=(document.getElementById('cr_desc').value||"").trim();
+    if(!content.length && !yt && !desc){ status.textContent="Subí al menos una imagen, video o descripción"; btn.disabled=false; return; }
+    let txt=crearPrompt()+`\nPerfil preferido: ${closet.perfil} mm.`;
+    if(desc) txt+=`\nDescripción del usuario: ${desc}`;
+    if(yt)  txt+=`\nVideo de referencia (YouTube, NO reproducible; usá tu conocimiento de técnicas típicas de drywall para inferir): ${yt}`;
+    content.push({type:"text",text:txt});
+    status.textContent="Interpretando con IA…";
+    let out=await callClaude(content,6000);
+    out=out.replace(/```json/gi,"").replace(/```/g,"").trim(); const m=out.match(/\{[\s\S]*\}/); if(m) out=m[0];
+    applyCrear(JSON.parse(out));
+    status.textContent=`✓ ${(closet.profiles||[]).length} perfiles interpretados`;
+  }catch(e){ status.textContent="No se pudo: "+(e.message||e); console.error(e); }
+  finally{ btn.disabled=false; }
+}
+function applyCrear(p){
+  if(+p.ancho>100) closet.ancho=Math.round(+p.ancho);
+  if(+p.alto>100)  closet.alto=Math.round(+p.alto);
+  if(+p.prof>50)   closet.prof=Math.round(+p.prof);
+  if(+p.perfil===35||+p.perfil===70) closet.perfil=+p.perfil;
+  if(Array.isArray(p.profiles)){
+    closet.profiles=p.profiles.filter(q=>Array.isArray(q.a)&&Array.isArray(q.b)&&q.a.length===3&&q.b.length===3)
+      .map(q=>({t:q.t==='m'?'m':'s',a:q.a.map(Number),b:q.b.map(Number)}));
+  }
+  genMueble();
+}
+let _mbGeo=null;
+function renderCloset(){
+  const box=document.getElementById('closetEditor'); if(!box) return;
+  const M=26, W=box.clientWidth||620;
+  const H=Math.max(240,Math.min(480, (W-2*M)*(closet.alto/Math.max(600,closet.ancho))+2*M));
+  const WI=W-2*M, HI=H-2*M;
+  const {xs,raw}=muebleCols(closet);
+  const XP=x=>M+x/closet.ancho*WI, ZP=z=>M+HI-(z/closet.alto*HI);
+  _mbGeo={W,H,M,WI,HI,xs};
+  const ap=closet.apoyo||{};
+  const edge=(x,y,w,h,side,label,vert)=>{
+    const on=ap[side], cx=x+w/2, cy=y+h/2;
+    const t=on?`<text x="${cx}" y="${cy+3}" font-size="9" fill="#fff" text-anchor="middle" pointer-events="none"${vert?` transform="rotate(-90 ${cx} ${cy})"`:''}>${label}</text>`:'';
+    return `<g class="mbedge" data-s="${side}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${on?'var(--tangerine)':'#122631'}" opacity="${on?0.92:0.55}"/>${t}</g>`;
+  };
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
+  s+=edge(M,1,WI,M-4,'techo','TECHO ▲',false);
+  s+=edge(M,H-M+3,WI,M-4,'piso','PISO ▼',false);
+  s+=edge(1,M,M-4,HI,'izq','◀ PARED',true);
+  s+=edge(W-M+3,M,M-4,HI,'der','PARED ▶',true);
+  s+=`<rect x="${M}" y="${M}" width="${WI}" height="${HI}" fill="none" stroke="var(--teal)" stroke-width="2.5"/>`;
+  raw.forEach((k,i)=>{
+    const xl=XP(xs[i]), xr=XP(xs[i+1]);
+    (k.estantes||[]).forEach((z,j)=>{
+      const y=ZP(+z);
+      s+=`<g class="mbshelf" data-i="${i}" data-j="${j}"><line x1="${(xl+3).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(xr-3).toFixed(1)}" y2="${y.toFixed(1)}" stroke="#cdd8dc" stroke-width="5"/><circle class="mbrm" cx="${(xl+11).toFixed(1)}" cy="${y.toFixed(1)}" r="6.5" fill="var(--tangerine)"/><text x="${(xl+11).toFixed(1)}" y="${(y+3).toFixed(1)}" font-size="9" fill="#fff" text-anchor="middle" pointer-events="none">✕</text></g>`;
+    });
+    (k.barrales||[]).forEach((z,j)=>{ const y=ZP(+z); s+=`<g class="mbbarline" data-i="${i}" data-j="${j}"><line x1="${(xl+9).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(xr-9).toFixed(1)}" y2="${y.toFixed(1)}" stroke="#8a97a0" stroke-width="4" stroke-dasharray="7 4"/><circle class="mbbarrm" cx="${(xr-11).toFixed(1)}" cy="${y.toFixed(1)}" r="6.5" fill="var(--tangerine)"/><text x="${(xr-11).toFixed(1)}" y="${(y+3).toFixed(1)}" font-size="9" fill="#fff" text-anchor="middle" pointer-events="none">✕</text></g>`; });
+    const on=(k.barrales||[]).length>0, cxm=((xl+xr)/2).toFixed(1);
+    s+=`<g class="mbbar" data-i="${i}"><circle cx="${cxm}" cy="${M+11}" r="9" fill="${on?'var(--tangerine)':'#20343d'}" stroke="var(--teal)" stroke-width="1.5"/><text x="${cxm}" y="${M+15}" font-size="11" fill="#fff" text-anchor="middle" pointer-events="none">＋</text></g>`;
+  });
+  xs.slice(1,-1).forEach((x,idx)=>{ const px=XP(x).toFixed(1); s+=`<line class="mbdiv" data-d="${idx+1}" x1="${px}" y1="${M}" x2="${px}" y2="${H-M}" stroke="var(--teal)" stroke-width="7" opacity="0.45"/>`; });
+  // rótulos de medida por nicho: alto × ancho × prof (cm)
+  if(closet.medidas!==false){
+    const P=Math.round(closet.prof/10);
+    raw.forEach((k,i)=>{
+      const cx=(XP(xs[i])+XP(xs[i+1]))/2, W=Math.round((xs[i+1]-xs[i])/10);
+      const bnds=[0].concat((k.estantes||[]).map(Number).filter(z=>z>60&&z<closet.alto-60).sort((a,b)=>a-b)).concat([closet.alto]);
+      for(let b=0;b<bnds.length-1;b++){
+        const z0=bnds[b], z1=bnds[b+1];
+        if(z1-z0>150){ const H=Math.round((z1-z0)/10), yc=ZP((z0+z1)/2);
+          s+=`<text class="mbdim" x="${cx.toFixed(1)}" y="${(yc+3).toFixed(1)}" text-anchor="middle" font-size="9.5" fill="#7fd9cc" pointer-events="none">${H}×${W}×${P}</text>`; }
+      }
+    });
+  }
+  s+=`</svg>`;
+  box.innerHTML=s;
+  renderCloset3D();
+  box.querySelectorAll('.mbdiv').forEach(el=>el.addEventListener('pointerdown',startDivDrag));
+  box.querySelectorAll('.mbshelf line').forEach(el=>el.addEventListener('pointerdown',startShelfDrag));
+  box.querySelectorAll('.mbrm').forEach(el=>el.addEventListener('click',ev=>{ev.stopPropagation();const g=ev.target.closest('.mbshelf');closet.cols[+g.dataset.i].estantes.splice(+g.dataset.j,1);renderCloset();genMueble();}));
+  box.querySelectorAll('.mbbar').forEach(el=>el.addEventListener('click',ev=>{const i=+ev.currentTarget.dataset.i;const b=closet.cols[i].barrales||(closet.cols[i].barrales=[]);let z=Math.round(closet.alto*0.72);while(b.some(v=>Math.abs(v-z)<80))z-=200;z=Math.max(90,z);b.push(z);b.sort((a,b)=>a-b);renderCloset();genMueble();}));
+  box.querySelectorAll('.mbbarline line').forEach(el=>el.addEventListener('pointerdown',startBarDrag));
+  box.querySelectorAll('.mbbarrm').forEach(el=>el.addEventListener('click',ev=>{ev.stopPropagation();const g=ev.target.closest('.mbbarline');closet.cols[+g.dataset.i].barrales.splice(+g.dataset.j,1);renderCloset();genMueble();}));
+  box.querySelectorAll('.mbedge').forEach(el=>el.addEventListener('click',ev=>{const sd=ev.currentTarget.dataset.s;closet.apoyo=closet.apoyo||{};closet.apoyo[sd]=!closet.apoyo[sd];renderCloset();genMueble();}));
+  const sv=box.querySelector('svg');
+  if(sv) sv.addEventListener('dblclick',ev=>{
+    if(ev.target.closest('.mbbar,.mbbarline,.mbdiv,.mbshelf,.mbedge')) return;
+    const r=sv.getBoundingClientRect(), px=ev.clientX-r.left, py=ev.clientY-r.top;
+    if(px<_mbGeo.M||px>_mbGeo.W-_mbGeo.M||py<_mbGeo.M||py>_mbGeo.H-_mbGeo.M) return;
+    const xmm=(px-_mbGeo.M)/_mbGeo.WI*closet.ancho, zmm=Math.round((_mbGeo.M+_mbGeo.HI-py)/_mbGeo.HI*closet.alto/10)*10;
+    let ci=0; for(let i=0;i<_mbGeo.xs.length-1;i++){ if(xmm>=_mbGeo.xs[i]&&xmm<_mbGeo.xs[i+1]){ci=i;break;} }
+    if(zmm>60&&zmm<closet.alto-60){ closet.cols[ci].estantes.push(zmm); closet.cols[ci].estantes.sort((a,b)=>a-b); renderCloset(); genMueble(); }
+  });
+}
+// ---- Visor / editor 3D axonométrico ----
+let _mb3d=null;
+function mb3dProj(x,y,z,g){
+  const az=g.az*Math.PI/180, el=g.el*Math.PI/180;
+  const X=x-g.cx, Y=y-g.cy, Z=z-g.cz;
+  const x1=X*Math.cos(az)-Y*Math.sin(az);
+  const y1=X*Math.sin(az)+Y*Math.cos(az);
+  return { sx:g.ox+x1*g.s, sy:g.oy+(y1*Math.sin(el)-Z*Math.cos(el))*g.s, depth:y1*Math.cos(el)+Z*Math.sin(el) };
+}
+function mb3dGrid(c){
+  const paso=Math.max(20,c.paso||100), ancho=c.ancho||2400, alto=c.alto||2400, prof=c.prof||600, pl=c.plane||'front';
+  const rng=max=>{ const a=[]; for(let v=0;v<max-1;v+=paso) a.push(v); a.push(max); return a; };
+  const XS=rng(ancho), ZS=rng(alto), YS=rng(prof), nodes=[];
+  if(pl==='floor'){ XS.forEach(x=>YS.forEach(y=>nodes.push([x,y,0]))); }
+  else{ const y=pl==='back'?prof:(pl==='mid'?Math.round(prof/2):0); XS.forEach(x=>ZS.forEach(z=>nodes.push([x,y,z]))); }
+  return nodes;
+}
+function mb3dEnds(c,skip){ const m=new Map(); (c.profiles||[]).forEach((p,i)=>{ if(skip&&skip.has(i))return; [p.a,p.b].forEach(q=>m.set(q.join(','),q)); }); return [...m.values()]; }
+function mb3dNearest(mx,my,g,nodes){ let best=null,bd=1e9; nodes.forEach(n=>{ const q=mb3dProj(n[0],n[1],n[2],g); const d=Math.hypot(mx-q.sx,my-q.sy); if(d<bd){bd=d;best=n;} }); return best; }
+function segDist(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1,L=dx*dx+dy*dy||1; let t=((px-x1)*dx+(py-y1)*dy)/L; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-(x1+t*dx),py-(y1+t*dy)); }
+function renderCloset3D(){
+  const box=document.getElementById('closetEditor3D'); if(!box) return;
+  closet.view=closet.view||{az:38,el:18}; closet.profiles=closet.profiles||[]; closet.tool=closet.tool||'rot';
+  const W=box.clientWidth||620, H=420, ancho=closet.ancho||2400, alto=closet.alto||2400, prof=closet.prof||600;
+  const R=0.5*Math.sqrt(ancho*ancho+alto*alto+prof*prof)||1;
+  const g={az:closet.view.az,el:closet.view.el,cx:ancho/2,cy:prof/2,cz:alto/2,ox:W/2,oy:H/2+12,s:Math.min(W,H)*0.40/R};
+  _mb3d=g; const P=(p)=>mb3dProj(p[0],p[1],p[2],g);
+  const col={m:'#9aa4ac',s:'#E85D2A'}, wdt={m:6,s:7}, drawing=closet.tool!=='rot';
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="touch-action:none">`;
+  const bx=[[0,0,0],[ancho,0,0],[ancho,prof,0],[0,prof,0],[0,0,alto],[ancho,0,alto],[ancho,prof,alto],[0,prof,alto]].map(P);
+  s+=`<polygon points="${[0,1,2,3].map(i=>bx[i].sx.toFixed(1)+','+bx[i].sy.toFixed(1)).join(' ')}" fill="#0c1e25" stroke="#1d3742" stroke-width="1"/>`;
+  [[0,4],[1,5],[2,6],[3,7],[4,5],[5,6],[6,7],[7,4]].forEach(e=>{ const a=bx[e[0]],b=bx[e[1]]; s+=`<line x1="${a.sx.toFixed(1)}" y1="${a.sy.toFixed(1)}" x2="${b.sx.toFixed(1)}" y2="${b.sy.toFixed(1)}" stroke="#16313b" stroke-width="1"/>`; });
+  const draw=(closet.profiles||[]).map((p,i)=>{ const a=P(p.a),b=P(p.b); return {a,b,t:p.t,d:(a.depth+b.depth)/2}; }).sort((p,q)=>p.d-q.d);
+  const ds=draw.map(p=>p.d), dmin=Math.min(...ds,0), dmax=Math.max(...ds,1);
+  draw.forEach(p=>{ const t=(p.d-dmin)/((dmax-dmin)||1), op=(0.5+0.5*t).toFixed(2);
+    s+=`<line x1="${p.a.sx.toFixed(1)}" y1="${p.a.sy.toFixed(1)}" x2="${p.b.sx.toFixed(1)}" y2="${p.b.sy.toFixed(1)}" stroke="${col[p.t]||'#999'}" stroke-width="${wdt[p.t]||5}" stroke-linecap="round" opacity="${op}"/>`; });
+  if(drawing){
+    mb3dGrid(closet).forEach(n=>{ const q=P(n); s+=`<circle class="mbnode" data-x="${n[0]}" data-y="${n[1]}" data-z="${n[2]}" cx="${q.sx.toFixed(1)}" cy="${q.sy.toFixed(1)}" r="3.4" fill="#0A1A22" stroke="#2f6f66" stroke-width="1.1"/>`; });
+    mb3dEnds(closet).forEach(n=>{ const q=P(n); s+=`<circle class="mbend" data-x="${n[0]}" data-y="${n[1]}" data-z="${n[2]}" cx="${q.sx.toFixed(1)}" cy="${q.sy.toFixed(1)}" r="5" fill="var(--teal)" stroke="#04141a" stroke-width="1"/>`; });
+    if(closet.draft){ const q=P(closet.draft); s+=`<circle cx="${q.sx.toFixed(1)}" cy="${q.sy.toFixed(1)}" r="7.5" fill="none" stroke="var(--tangerine)" stroke-width="2.5"/>`; }
+  }
+  s+=`</svg>`; box.innerHTML=s;
+  const sv=box.querySelector('svg');
+  const useNode=n=>{ if(closet.tool==='montante'||closet.tool==='solera'){
+      if(!closet.draft){ closet.draft=n; renderCloset3D(); }
+      else{ if(closet.draft.join()!==n.join()) closet.profiles.push({t:closet.tool==='montante'?'m':'s',a:closet.draft.slice(),b:n.slice()}); closet.draft=null; renderCloset3D(); genMueble(); } } };
+  box.querySelectorAll('.mbnode').forEach(el=>el.addEventListener('pointerdown',ev=>{ ev.stopPropagation(); useNode([+el.dataset.x,+el.dataset.y,+el.dataset.z]); }));
+  box.querySelectorAll('.mbend').forEach(el=>el.addEventListener('pointerdown',ev=>{ ev.stopPropagation();
+    const n=[+el.dataset.x,+el.dataset.y,+el.dataset.z];
+    if(closet.tool==='mover') mb3dStartMove(n,sv); else useNode(n); }));
+  if(sv) sv.addEventListener('pointerdown',ev=>{
+    if(ev.target.classList.contains('mbnode')||ev.target.classList.contains('mbend')) return;
+    if(closet.tool==='borrar'){ const r=sv.getBoundingClientRect(), mx=ev.clientX-r.left, my=ev.clientY-r.top;
+      let best=-1,bd=14; (closet.profiles||[]).forEach((p,i)=>{ const a=P(p.a),b=P(p.b); const d=segDist(mx,my,a.sx,a.sy,b.sx,b.sy); if(d<bd){bd=d;best=i;} });
+      if(best>=0){ closet.profiles.splice(best,1); renderCloset3D(); genMueble(); } return; }
+    if(closet.draft){ closet.draft=null; renderCloset3D(); return; }
+    const sx=ev.clientX, sy=ev.clientY, az0=closet.view.az, el0=closet.view.el;
+    const mv=e=>{ closet.view.az=az0+(e.clientX-sx)*0.5; closet.view.el=Math.max(2,Math.min(82,el0+(e.clientY-sy)*0.4)); renderCloset3D(); };
+    const up=()=>{ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); };
+    window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up);
+  });
+}
+function mb3dStartMove(node,sv){
+  const key=node.join(','), grab=[], gi=new Set();
+  (closet.profiles||[]).forEach((p,i)=>{ if(p.a.join(',')===key){grab.push([i,'a']);gi.add(i);} if(p.b.join(',')===key){grab.push([i,'b']);gi.add(i);} });
+  if(!grab.length) return;
+  const rect=sv.getBoundingClientRect();
+  const mv=e=>{ const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const nodes=mb3dGrid(closet).concat(mb3dEnds(closet,gi));
+    const n=mb3dNearest(mx,my,_mb3d,nodes); if(!n) return;
+    grab.forEach(([i,end])=>closet.profiles[i][end]=n.slice()); renderCloset3D(); };
+  const up=()=>{ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); genMueble(); };
+  window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up);
+}
+function mb3dSetTool(t){ closet.tool=t; closet.draft=null;
+  document.querySelectorAll('.mb3dtool').forEach(b=>{ const on=b.dataset.t===t; b.style.background=on?'var(--teal)':''; b.style.color=on?'#04141a':''; b.style.borderColor=on?'var(--teal)':''; });
+  renderCloset3D();
+}
+function startDivDrag(e){
+  e.preventDefault(); const d=+e.currentTarget.dataset.d;
+  const sv=document.getElementById('closetEditor').querySelector('svg'); const rect=sv.getBoundingClientRect();
+  const xs=_mbGeo.xs.slice(), M=_mbGeo.M, WI=_mbGeo.WI;
+  const move=ev=>{
+    let xmm=Math.round((ev.clientX-rect.left-M)/WI*closet.ancho/10)*10;
+    xmm=Math.max(xs[d-1]+120, Math.min(xs[d+1]-120, xmm));
+    xs[d]=xmm;
+    for(let i=0;i<closet.cols.length;i++) closet.cols[i].w=xs[i+1]-xs[i];
+    renderCloset();
+  };
+  const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); genMueble(); };
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+}
+function startShelfDrag(e){
+  e.preventDefault(); const g=e.target.closest('.mbshelf'); const i=+g.dataset.i, j=+g.dataset.j;
+  const sv=document.getElementById('closetEditor').querySelector('svg'); const rect=sv.getBoundingClientRect();
+  const move=ev=>{
+    let zmm=Math.round((_mbGeo.M+_mbGeo.HI-(ev.clientY-rect.top))/_mbGeo.HI*closet.alto/10)*10;
+    zmm=Math.max(70,Math.min(closet.alto-70,zmm));
+    closet.cols[i].estantes[j]=zmm; renderCloset();
+  };
+  const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); closet.cols[i].estantes.sort((a,b)=>a-b); genMueble(); };
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+}
+function startBarDrag(e){
+  e.preventDefault(); const g=e.target.closest('.mbbarline'); const i=+g.dataset.i, j=+g.dataset.j;
+  const sv=document.getElementById('closetEditor').querySelector('svg'); const rect=sv.getBoundingClientRect();
+  const move=ev=>{
+    let zmm=Math.round((_mbGeo.M+_mbGeo.HI-(ev.clientY-rect.top))/_mbGeo.HI*closet.alto/10)*10;
+    zmm=Math.max(70,Math.min(closet.alto-70,zmm));
+    closet.cols[i].barrales[j]=zmm; renderCloset();
+  };
+  const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); closet.cols[i].barrales.sort((a,b)=>a-b); genMueble(); };
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+}
+function computeMueble(c){
+  // cómputo de la estructura libre: cada perfil dibujado suma a montante o solera
+  let nMont=0,mMont=0,nSolP=0,mSol=0, joints=new Set();
+  (c.profiles||[]).forEach(p=>{ const L=Math.hypot(p.b[0]-p.a[0],p.b[1]-p.a[1],p.b[2]-p.a[2])/1000;
+    if(p.t==='m'){ nMont++; mMont+=L; } else { nSolP++; mSol+=L; }
+    joints.add(p.a.join(',')); joints.add(p.b.join(',')); });
+  const kgM=c.perfil==70?0.72:0.45, kg=(mMont+mSol)*kgM;
+  const nT1=c.fijaOn?Math.round((c.profiles||[]).length*4):0;   // ~2 tornillos por extremo (uniones perfil-perfil)
+  // campos de placa/terminación no aplican a la estructura libre → 0
+  const m2=0,nBar=0,mBar=0,kgPl=0,nAnc=0,nEst=0,nPlacas=0,nT2=0,kgMas=0,mCinta=0,mGuarda=0,nTor=nT1;
+  return {mMont,mSol,m2,nEst,nBar,mBar,kg,kgPl,nTor,nAnc,nPlacas,nT1,nT2,kgMas,mCinta,mGuarda,nMont,nSolP,nJoints:joints.size};
+}
+function precioMueble(c){
+  const q=computeMueble(c), pr=precios.mueble, sfx=c.perfil==70?'70':'35';
+  const L=(lbl,qty,ud,key,qd)=>({lbl,qty,ud,key,qd,pu:pr[key]||0,tot:qty*(pr[key]||0)});
+  const items=[
+    L('Placas 1,20×2,40 m', q.nPlacas, 'u', 'placa'+sfx),
+    L('Montante '+c.perfil, q.mMont, 'm', 'montante'+sfx, `${q.nMont} u · ${q.mMont.toFixed(1)} m`),
+    L('Solera '+c.perfil, q.mSol, 'm', 'solera'+sfx, `${q.nSolP} u · ${q.mSol.toFixed(1)} m`),
+    L('Tornillos T1 (perfil)', q.nT1, 'u', 't1'),
+    L('Tornillos T2 (placa)', q.nT2, 'u', 't2'),
+    L('Anclajes 8 mm + tarugo', q.nAnc, 'u', 'anclaje'),
+    L('Masilla', q.kgMas, 'kg', 'masilla'),
+    L('Cinta de juntas', q.mCinta, 'm', 'cinta'),
+    L('Guardacantos chapa galv.', q.mGuarda, 'm', 'guarda'),
+    L('Barral', q.mBar, 'm', 'barral'),
+  ].filter(it=>it.qty>0.001);
+  return {items, total:items.reduce((s,it)=>s+it.tot,0)};
+}
+function genMueble(){
+  codeEl.textContent=scriptMueble(closet);
+  const c=computeMueble(closet);
+  computoEl.innerHTML=`<h2>Cómputo de la estructura</h2><div class="ccards">
+    <div class="cc"><div class="k">Montantes ${closet.perfil}</div>
+      <div class="row"><span>Cantidad</span><b>${c.nMont} u</b></div>
+      <div class="row big"><span>Total</span><b>${c.mMont.toFixed(1)} m</b></div></div>
+    <div class="cc"><div class="k">Soleras ${closet.perfil}</div>
+      <div class="row"><span>Cantidad</span><b>${c.nSolP} u</b></div>
+      <div class="row big"><span>Total</span><b>${c.mSol.toFixed(1)} m</b></div></div>
+    <div class="cc"><div class="k">Perfilería</div>
+      <div class="row"><span>Perfiles</span><b>${c.nMont+c.nSolP} u</b></div>
+      <div class="row"><span>Peso total</span><b>${c.kg.toFixed(1)} kg</b></div>
+      <div class="row"><span>Uniones</span><b>${c.nJoints} · ${c.nT1} torn.</b></div></div>
+  </div>${presupMuebleHTML()}`;
+  computoEl.querySelectorAll('[data-mbpr]').forEach(el=>el.addEventListener('change',()=>{ precios.mueble[el.dataset.mbpr]=parseFloat(el.value)||0; savePrecios(precios); genMueble(); }));
+}
+function presupMuebleHTML(){
+  const money=n=>"$ "+Math.round(n).toLocaleString('es-AR');
+  const {items,total}=precioMueble(closet);
+  let rows=items.map(it=>`<tr><td>${it.lbl}</td><td class="num">${it.qd||(it.qty.toFixed(it.ud=='u'?0:1)+' '+it.ud)}</td><td class="num"><input type="number" data-mbpr="${it.key}" value="${it.pu}"> $/${it.ud}</td><td class="num">${money(it.tot)}</td></tr>`).join('');
+  return `<h2 style="margin-top:16px">Presupuesto de materiales</h2>
+    <table class="mbcost"><thead><tr><th>Material</th><th class="num">Cantidad</th><th class="num">Precio unit.</th><th class="num">Subtotal</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="3" class="num"><b>TOTAL materiales</b></td><td class="num"><b>${money(total)}</b></td></tr></tfoot></table>
+    <p class="sub" style="margin-top:8px">Precios de referencia easy.com.ar (editables; se guardan en este navegador). Sólo materiales, sin mano de obra. Ajustá los valores a tu factura real.</p>`;
+}
+function saveMueble(){
+  const data={ tipo:"adamant-mueble", v:1, fecha:new Date().toISOString(), closet, precios:precios.mueble };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=(closet.nombre||"mueble-adamant")+".json"; a.click(); URL.revokeObjectURL(a.href);
+}
+function loadMueble(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ const d=JSON.parse(r.result);
+    if(d.closet){ closet=d.closet; if(d.precios) precios.mueble=Object.assign(precios.mueble,d.precios);
+      renderMuebleForm(); genMueble(); }
+    else alert("Archivo no válido.");
+  }catch(err){ alert("No se pudo leer el proyecto."); } };
+  r.readAsText(f); e.target.value="";
+}
+function pdfMueble(){
+  const money=n=>"$ "+Math.round(n).toLocaleString('es-AR');
+  const c=computeMueble(closet), {items,total}=precioMueble(closet);
+  const fecha=new Date().toLocaleDateString('es-AR');
+  const rows=items.map(it=>`<tr><td>${it.lbl}</td><td class="n">${it.qd||(it.qty.toFixed(it.ud=='u'?0:1)+' '+it.ud)}</td><td class="n">${money(it.pu)}/${it.ud}</td><td class="n">${money(it.tot)}</td></tr>`).join('');
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Presupuesto Adamant</title>
+    <style>
+      *{font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}
+      body{margin:34px;color:#0A1A22}
+      h1{color:#0A1A22;margin:0;font-size:24px}
+      h1 span{color:#E85D2A}
+      .sub{color:#1BB6A4;font-size:13px;margin:2px 0 18px;letter-spacing:1px;text-transform:uppercase}
+      .meta{font-size:12px;color:#555;margin-bottom:18px}
+      .meta b{color:#0A1A22}
+      table{width:100%;border-collapse:collapse;font-size:13px}
+      th,td{padding:7px 9px;border-bottom:1px solid #ddd;text-align:left}
+      th{background:#0d222b;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+      .n{text-align:right;white-space:nowrap}
+      tfoot td{border-top:2px solid #1BB6A4;font-size:16px;font-weight:bold;color:#0A1A22}
+      .foot{margin-top:22px;font-size:11px;color:#777;border-top:1px solid #eee;padding-top:10px}
+    </style></head><body>
+    <h1>Adamant · <span>Presupuesto</span></h1>
+    <div class="sub">Estructura de perfilería</div>
+    <div class="meta"><b>Fecha:</b> ${fecha} &nbsp;·&nbsp; <b>Espacio:</b> ${closet.ancho}×${closet.alto}×${closet.prof} mm
+      &nbsp;·&nbsp; <b>Perfil:</b> ${closet.perfil} &nbsp;·&nbsp; <b>Perfiles:</b> ${(closet.profiles||[]).length}
+      &nbsp;·&nbsp; <b>Peso:</b> ${c.kg.toFixed(1)} kg</div>
+    <table><thead><tr><th>Material</th><th class="n">Cantidad</th><th class="n">Precio unit.</th><th class="n">Subtotal</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="3" class="n">TOTAL MATERIALES</td><td class="n">${money(total)}</td></tr></tfoot></table>
+    <div class="foot">Precios de referencia easy.com.ar. Sólo materiales, sin mano de obra. El cómputo es estimativo; el cálculo estructural lo define un profesional habilitado. — Adamant construcción en seco.</div>
+    <script>window.onload=function(){window.print();}<\/script>
+    </body></html>`);
+  w.document.close();
+}
+function applyMueble(p){
+  if(+p.ancho>200) closet.ancho=Math.round(+p.ancho);
+  if(+p.alto>200) closet.alto=Math.round(+p.alto);
+  if(+p.prof>100) closet.prof=Math.round(+p.prof);
+  if(+p.perfil===35||+p.perfil===70) closet.perfil=+p.perfil;
+  if(Array.isArray(p.cols)&&p.cols.length){
+    closet.cols=p.cols.map(k=>({w:Math.max(120,Math.round(+k.w||600)),
+      estantes:(k.estantes||[]).map(Number).filter(z=>z>60),
+      barrales:(k.barrales||[]).map(Number).filter(z=>z>60)}));
+    seedRopero();   // convierte las columnas interpretadas por la IA en perfiles editables
+  }
+  renderMuebleForm(); genMueble();
+}
+
 function renderCasaForm(){
   let html=`<h2>Casa completa</h2><p class="sub">Cargá las habitaciones o subí un boceto/plano y la IA lo resuelve. Genera la estructura 3D y el cómputo.</p>`;
-  html+=`<div class="imgload">
-    <div class="imgload-head"><span>Boceto o plano → estructura</span><span id="img-status"></span></div>
-    <label class="imgbtn" id="img-label">📐 Subir imagen (boceto a mano / plano con medidas)
-      <input type="file" id="c_img" accept="image/*" style="display:none">
-    </label>
-    <div class="imghint">La IA interpreta ambientes, medidas y aberturas, y arma las habitaciones. Requiere estar logueado en Claude.</div>
-  </div>`;
+  html+=imgLoadHTML("Boceto o plano → estructura","La IA interpreta ambientes, medidas y aberturas, y arma las habitaciones. Requiere estar logueado en Claude.");
   const wood=casaCfg.sistema==="wood";
   html+=`<div class="fieldrow">
     <div class="f"><label>Sistema constructivo</label><select id="c_sis"><option value="steel" ${!wood?'selected':''}>Steel Frame (acero)</option><option value="wood" ${wood?'selected':''}>Wood Frame (madera)</option></select></div>
@@ -912,8 +1643,10 @@ function renderCasaForm(){
     <div class="f"><label><input type="checkbox" id="c_brace" ${casaCfg.bracesOn?'checked':''}> Cruz de San Andrés</label></div>
     <div class="f"><label><input type="checkbox" id="c_placas" ${casaCfg.placasOn?'checked':''}> Dibujar placas (capa Revestimientos)</label></div>
     <div class="f"><label><input type="checkbox" id="c_etiq" ${casaCfg.etiquetasOn?'checked':''}> Etiquetar piezas en 3D (M-01, K-01…)</label></div>
+    <div class="f"><label><input type="checkbox" id="c_herr" ${casaCfg.herrajesOn?'checked':''}> Fijaciones y herrajes (anclajes, hold-downs, tornillos)</label></div>
   </div>`;
   html+=`<div class="divider"><span>Habitaciones</span></div>`;
+  html+=`<div class="planwrap"><div class="planhint">Arrastrá cada habitación para distribuirla en la planta (X→derecha, Y→abajo). Se ajusta a una grilla de 50 mm; los muros que quedan alineados se fusionan en uno solo.</div><div id="planEditor"></div></div>`;
   html+=`<div class="roomhead"><span>Nombre</span><span>Largo</span><span>Ancho</span><span>Pos X</span><span>Pos Y</span><span></span></div><div id="rooms"></div>`;
   html+=`<button class="add" id="addRoom">＋ Habitación</button>`;
   html+=`<div class="divider"><span>Techo</span></div><div class="fieldrow">
@@ -942,8 +1675,9 @@ function renderCasaForm(){
   bind('c_niv','nivelEnt',1);bind('c_sepv','sepViga',1);bind('c_esp','espesor',1);bind('c_vuelo','vuelo',1);
   const chk=(id,key)=>{const e=document.getElementById(id);e.addEventListener('change',()=>{casaCfg[key]=e.checked;genCasa();});};
   chk('c_techo','techoOn');chk('c_platea','plateaOn');chk('c_entre','entrepisoOn');
-  chk('c_esq','esquinasOn');chk('c_brace','bracesOn');chk('c_placas','placasOn');chk('c_etiq','etiquetasOn');
+  chk('c_esq','esquinasOn');chk('c_brace','bracesOn');chk('c_placas','placasOn');chk('c_etiq','etiquetasOn');chk('c_herr','herrajesOn');
   document.getElementById('c_img').addEventListener('change',onImageUpload);
+  const _k2=document.getElementById('c_key'); if(_k2) _k2.addEventListener('change',e=>localStorage.setItem('adamant_api_key',e.target.value.trim()));
   document.getElementById('addRoom').onclick=()=>{
     const alma=wallThk(casaCfg), last=rooms[rooms.length-1];
     const px=last?((+last.posX||0)+last.largo-alma):0, py=last?(+last.posY||0):0;
@@ -981,7 +1715,9 @@ function renderRooms(){
   });
   // habitación: nombre/largo/ancho
   box.querySelectorAll('.room input').forEach(el=>el.addEventListener('input',()=>{
-    const i=+el.dataset.i,f=el.dataset.f; rooms[i][f]=(f==="nombre")?el.value:(parseFloat(el.value)||0); genCasa();
+    const i=+el.dataset.i,f=el.dataset.f;
+    if(f==="nombre"){ rooms[i].nombre=el.value; return; }   // el nombre no afecta el Ruby: no regenera
+    rooms[i][f]=parseFloat(el.value)||0; genCasa();
   }));
   box.querySelectorAll('.rmr').forEach(b=>b.onclick=()=>{rooms.splice(+b.dataset.i,1);renderRooms();genCasa();});
   // vanos: campos
@@ -995,7 +1731,103 @@ function renderRooms(){
     const d=VANO_TIPOS["Ventana"]; rooms[+b.dataset.i].vanos.push({lado:"frente",tipo:"Ventana",pos:500,ancho:d.ancho,alto:d.alto,sill:d.sill});
     renderRooms(); genCasa();
   });
+  renderPlan();
 }
+// Mini-plano interactivo: dibuja las habitaciones y permite arrastrarlas para distribuirlas (escribe posX/posY).
+let _planGeo=null;
+function renderPlan(){
+  const box=document.getElementById('planEditor'); if(!box) return;
+  const rs=rooms.filter(r=>r.largo>0&&r.ancho>0);
+  if(!rs.length){ box.innerHTML='<div class="planempty">Agregá una habitación para distribuirla</div>'; _planGeo=null; return; }
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  rs.forEach(r=>{const X=+r.posX||0,Y=+r.posY||0;minX=Math.min(minX,X);minY=Math.min(minY,Y);maxX=Math.max(maxX,X+r.largo);maxY=Math.max(maxY,Y+r.ancho);});
+  const mar=600; minX-=mar;minY-=mar;maxX+=mar;maxY+=mar;
+  const spanX=maxX-minX, spanY=maxY-minY;
+  const VW=box.clientWidth||620, VH=Math.max(200,Math.min(360,VW*spanY/spanX));
+  const sc=Math.min(VW/spanX, VH/spanY);
+  const W=Math.round(spanX*sc), H=Math.round(spanY*sc);
+  _planGeo={sc,minX,minY};
+  let g='';
+  for(let gx=Math.ceil(minX/1000)*1000; gx<maxX; gx+=1000){ const px=((gx-minX)*sc).toFixed(1); g+=`<line x1="${px}" y1="0" x2="${px}" y2="${H}" stroke="#12303a" stroke-width="1"/>`; }
+  for(let gy=Math.ceil(minY/1000)*1000; gy<maxY; gy+=1000){ const py=((gy-minY)*sc).toFixed(1); g+=`<line x1="0" y1="${py}" x2="${W}" y2="${py}" stroke="#12303a" stroke-width="1"/>`; }
+  let rects='';
+  rooms.forEach((r,i)=>{ if(!(r.largo>0&&r.ancho>0))return;
+    const x=((+r.posX||0)-minX)*sc, y=((+r.posY||0)-minY)*sc, w=r.largo*sc, h=r.ancho*sc;
+    const nm=(r.nombre||'').replace(/[<>&]/g,'');
+    rects+=`<g class="proom" data-i="${i}"><rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2"/><text x="${(x+w/2).toFixed(1)}" y="${(y+h/2).toFixed(1)}">${nm}</text></g>`;
+  });
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${g}${rects}</svg>`;
+  box.querySelectorAll('.proom').forEach(el=>el.addEventListener('pointerdown',startPlanDrag));
+}
+function startPlanDrag(e){
+  if(!_planGeo) return;
+  e.preventDefault();
+  const g=e.currentTarget, i=+g.dataset.i, r=rooms[i];
+  const sc=_planGeo.sc, minX=_planGeo.minX, minY=_planGeo.minY;
+  const startX=+r.posX||0, startY=+r.posY||0, cx0=e.clientX, cy0=e.clientY;
+  const rect=g.querySelector('rect'), txt=g.querySelector('text'), w=r.largo*sc, h=r.ancho*sc;
+  g.classList.add('drag');
+  const snap=v=>Math.round(v/50)*50;
+  const move=ev=>{
+    r.posX=snap(startX+(ev.clientX-cx0)/sc);
+    r.posY=snap(startY+(ev.clientY-cy0)/sc);
+    const x=(r.posX-minX)*sc, y=(r.posY-minY)*sc;                       // geo fija durante el arrastre: sin saltos
+    if(rect){ rect.setAttribute('x',x.toFixed(1)); rect.setAttribute('y',y.toFixed(1)); }
+    if(txt){ txt.setAttribute('x',(x+w/2).toFixed(1)); txt.setAttribute('y',(y+h/2).toFixed(1)); }
+    const px=document.querySelector(`#rooms input[data-i="${i}"][data-f="posX"]`); if(px) px.value=r.posX;
+    const py=document.querySelector(`#rooms input[data-i="${i}"][data-f="posY"]`); if(py) py.value=r.posY;
+  };
+  const up=()=>{ window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',up); renderPlan(); genCasa(); };
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',up);
+}
+// Bloque UI de carga de imagen (reutilizado en Muro, Cielo y Casa). Ids compartidos: sólo un form activo a la vez.
+function imgLoadHTML(title,hint){
+  return `<div class="imgload">
+    <div class="imgload-head"><span>${title}</span><span id="img-status"></span></div>
+    <div class="fieldrow"><div class="f full"><label>API key de Anthropic (sk-ant-…) — se guarda solo en este navegador</label>
+      <input type="password" id="c_key" placeholder="sk-ant-..." value="${localStorage.getItem('adamant_api_key')||''}"></div></div>
+    <label class="imgbtn" id="img-label">📐 Subir imagen
+      <input type="file" id="c_img" accept="image/*" style="display:none">
+    </label>
+    <div class="imghint">${hint}</div>
+  </div>`;
+}
+// Prompt de visión por módulo
+function imgPrompt(scope){
+  if(scope==="muro"){
+    return `Analizá este boceto o foto de un muro/tabique y devolvé SOLO un JSON válido (sin markdown, sin texto extra):
+{"sistema":"steel"|"wood","largo":number,"altura":number,"modulo":400|600,"lumber":"2x6 (38×140)","pgcAlma":number}
+Medidas en milímetros. "largo"=longitud del muro, "altura"=alto. "modulo"=separación entre montantes (400 o 600). Si es de madera poné "sistema":"wood" y elegí "lumber" (2x4 (38×89), 2x6 (38×140), 2x8 (38×184), 2x10 (38×235), 2x12 (38×286)); si es de acero poné "sistema":"steel" y estimá "pgcAlma" (90, 100 o 140). Si el boceto trae cotas usalas; si no, estimá valores razonables. Devolvé solo el JSON.`;
+  }
+  if(scope==="cielo"){
+    return `Analizá este boceto o foto de un cielorraso y devolvé SOLO un JSON válido (sin markdown, sin texto extra):
+{"largo":number,"ancho":number,"alt":number,"modulo":400|600}
+Medidas en milímetros. "largo" y "ancho"=dimensiones del ambiente, "alt"=altura del cielorraso desde el piso. "modulo"=separación de perfiles portantes (400 o 600). Si hay cotas usalas; si no, estimá. Devolvé solo el JSON.`;
+  }
+  if(scope==="mueble"){
+    return `Analizá este boceto o foto de un mueble/ropero/estantería de drywall y devolvé SOLO un JSON válido (sin markdown, sin texto extra):
+{"ancho":number,"alto":number,"prof":number,"perfil":35|70,"cols":[{"w":number,"estantes":[number],"barrales":[number]}]}
+Medidas en milímetros. "ancho/alto/prof"=dimensiones totales del mueble. "cols"=columnas de izquierda a derecha; "w"=ancho de cada columna; "estantes"=lista de alturas (mm desde el piso) de los estantes de esa columna; "barrales"=alturas de los tubos para colgar ropa. Si una columna es placard para colgar, poné 1 o 2 barrales y pocos estantes; si es de estantes/nichos, distribuí varios estantes parejos. Contá las columnas y estantes que ves en la imagen. Si hay cotas usalas; si no, estimá proporciones razonables. Devolvé solo el JSON.`;
+  }
+  return `Sos un experto en steel frame. Analizá este boceto/plano de una vivienda y devolvé SOLO un JSON válido (sin markdown, sin texto extra) con esta forma exacta:
+{"rooms":[{"nombre":string,"largo":number,"ancho":number,"posX":number,"posY":number,"vanos":[{"lado":"frente"|"fondo"|"izq"|"der","tipo":"Puerta"|"Puerta balcón"|"Ventana"|"Abertura"|"Arcada","pos":number,"ancho":number,"alto":number,"sill":number}]}]}
+Reglas: todas las medidas en milímetros. "largo" corre en X, "ancho" en Y. posX/posY = esquina inferior-izquierda de cada ambiente en la planta, ubicá los ambientes adyacentes compartiendo muros (si comparten un muro, hacé coincidir sus bordes; el espesor de muro es ~102mm, restalo al compartir). "lado" indica en qué muro va la abertura; "pos" = distancia desde el inicio de ese muro; "sill" = alféizar (0 para puertas, ~900 ventanas). Si el plano trae cotas usalas; si no, estimá proporciones razonables. Devolvé solo el JSON.`;
+}
+// Vuelca valores JSON a los inputs [data-k] del form activo
+function setFields(vals){
+  formEl.querySelectorAll('[data-k]').forEach(el=>{
+    const v=vals[el.dataset.k];
+    if(v!==undefined && v!==null && v!=='') el.value=v;
+  });
+}
+function applyMuro(p){
+  if(p.sistema==="wood"||p.sistema==="steel") muroSys.sistema=p.sistema;
+  if(p.lumber && LUMBER[p.lumber]) muroSys.lumber=p.lumber;
+  renderForm();            // reconstruye campos según sistema
+  setFields(p); gen();
+}
+function applyCielo(p){ setFields(p); gen(); }
+
 async function onImageUpload(ev){
   const file=ev.target.files&&ev.target.files[0]; if(!file) return;
   const status=document.getElementById('img-status');
@@ -1004,31 +1836,31 @@ async function onImageUpload(ev){
   try{
     const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=()=>rej(new Error('read'));r.readAsDataURL(file);});
     const media=file.type||"image/jpeg";
-    const prompt=`Sos un experto en steel frame. Analizá este boceto/plano de una vivienda y devolvé SOLO un JSON válido (sin markdown, sin texto extra) con esta forma exacta:
-{"rooms":[{"nombre":string,"largo":number,"ancho":number,"posX":number,"posY":number,"vanos":[{"lado":"frente"|"fondo"|"izq"|"der","tipo":"Puerta"|"Puerta balcón"|"Ventana"|"Abertura"|"Arcada","pos":number,"ancho":number,"alto":number,"sill":number}]}]}
-Reglas: todas las medidas en milímetros. "largo" corre en X, "ancho" en Y. posX/posY = esquina inferior-izquierda de cada ambiente en la planta, ubicá los ambientes adyacentes compartiendo muros (si comparten un muro, hacé coincidir sus bordes; el espesor de muro es ~102mm, restalo al compartir). "lado" indica en qué muro va la abertura; "pos" = distancia desde el inicio de ese muro; "sill" = alféizar (0 para puertas, ~900 ventanas). Si el plano trae cotas usalas; si no, estimá proporciones razonables. Devolvé solo el JSON.`;
-    const resp=await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:2000,
-        messages:[{role:"user",content:[
-          {type:"image",source:{type:"base64",media_type:media,data:b64}},
-          {type:"text",text:prompt}
-        ]}]})
-    });
-    const data=await resp.json();
-    let txt=(data.content||[]).filter(x=>x.type==="text").map(x=>x.text).join("\n");
+    let txt=await callClaude([
+      {type:"image",source:{type:"base64",media_type:media,data:b64}},
+      {type:"text",text:imgPrompt(current)}
+    ],2000);
     txt=txt.replace(/```json/gi,"").replace(/```/g,"").trim();
     const m=txt.match(/\{[\s\S]*\}/); if(m) txt=m[0];
     const parsed=JSON.parse(txt);
-    if(!parsed.rooms||!parsed.rooms.length) throw new Error("sin ambientes");
-    rooms=parsed.rooms.map(r=>({nombre:r.nombre||"Ambiente",largo:+r.largo||3000,ancho:+r.ancho||3000,
-      posX:+r.posX||0,posY:+r.posY||0,
-      vanos:(r.vanos||[]).map(v=>({lado:["frente","fondo","izq","der"].includes(v.lado)?v.lado:"frente",
-        tipo:VANO_TIPOS[v.tipo]?v.tipo:"Ventana",pos:+v.pos||500,ancho:+v.ancho||1000,alto:+v.alto||2000,sill:+v.sill||0}))}));
-    renderRooms(); genCasa();
-    status.textContent=`✓ ${rooms.length} ambiente(s)`;
+    if(current==="muro"){
+      applyMuro(parsed);
+      const st=document.getElementById('img-status'); if(st) st.textContent="✓ medidas cargadas";
+    } else if(current==="cielo"){
+      applyCielo(parsed); status.textContent="✓ medidas cargadas";
+    } else if(current==="mueble"){
+      applyMueble(parsed); status.textContent="✓ mueble cargado";
+    } else {
+      if(!parsed.rooms||!parsed.rooms.length) throw new Error("sin ambientes");
+      rooms=parsed.rooms.map(r=>({nombre:r.nombre||"Ambiente",largo:+r.largo||3000,ancho:+r.ancho||3000,
+        posX:+r.posX||0,posY:+r.posY||0,
+        vanos:(r.vanos||[]).map(v=>({lado:["frente","fondo","izq","der"].includes(v.lado)?v.lado:"frente",
+          tipo:VANO_TIPOS[v.tipo]?v.tipo:"Ventana",pos:+v.pos||500,ancho:+v.ancho||1000,alto:+v.alto||2000,sill:+v.sill||0}))}));
+      renderRooms(); genCasa();
+      status.textContent=`✓ ${rooms.length} ambiente(s)`;
+    }
   }catch(e){
-    status.textContent="No se pudo interpretar";
+    status.textContent="No se pudo: "+(e.message||e);
     console.error(e);
   }finally{ label.classList.remove('busy'); ev.target.value=""; }
 }
@@ -1091,6 +1923,42 @@ function cutList(p){
   return {groups, byProfile};
 }
 
+// Mapa Ruby prefijo|largo -> código de lista de corte, para rotular cada pieza 1:1 (aprox por tipo+largo).
+const CUT2PREF={MONTANTE:"M",CRIPPLE:"M",KING:"K",JACK:"J",DINTEL:"D","SOL.PANEL":"S","SOL.VANO":"S","SOL.DINTEL":"S"};
+function codeMapRuby(p){
+  const cl=cutList(p), m={};
+  cl.groups.forEach(g=>{ const pf=CUT2PREF[g.tipo]; if(!pf) return; const k=pf+"|"+Math.round(g.largo); if(!(k in m)) m[k]=g.code; });
+  return `CODE_MAP={${Object.keys(m).map(k=>`"${k}"=>"${m[k]}"`).join(",")}}`;
+}
+
+// Planilla de uniones y fijaciones (estimación por tipo de unión)
+function fastenerSchedule(p,c,cl){
+  const wood=p.sistema==="wood", alma=wallThk(p), {segs}=planWalls(p);
+  let nAnc=0; segs.forEach(s=>{const larg=s.a2-s.a1; if(larg>0) nAnc+=Math.floor(larg/1200)+1;});
+  const seen=new Set();
+  p.rooms.forEach(r=>{ if(!(r.largo>0&&r.ancho>0))return; const X=+r.posX||0,Y=+r.posY||0,L=r.largo,W=r.ancho;
+    [[X,Y],[X+L-alma,Y],[X,Y+W-alma],[X+L-alma,Y+W-alma]].forEach(([x,y])=>seen.add(Math.round(x/10)+"_"+Math.round(y/10)));});
+  const nHD=seen.size, rows=[];
+  const add=(u,f,cant)=>{ if(cant>0) rows.push({union:u,fijacion:f,cant:Math.round(cant)}); };
+  if(wood){
+    add("Montante ↔ solera","Clavo 3½ (2 por extremo)", c.nMont*4);
+    add("Solera superior doble","Clavo 3 @300mm", (c.mPGU/3)*3.3);
+    add("Vano (king/jack/dintel)","Clavo 3½", c.nVanos*24);
+    add("Anclaje a fundación","Bulón/tarugo J ½", nAnc);
+    add("Hold-down esquina","Hold-down + perno", nHD);
+    add("Placa / sheathing","Clavo/tornillo T2", c.t2);
+  } else {
+    add("Montante ↔ solera (PGC-PGU)","T1 hexagonal (2 por unión)", c.nMont*4);
+    add("Vano: king/jack","T1 hexagonal", c.nVanos*12);
+    add("Vano: dintel (2 PGC + PGU)","T1 hexagonal", c.nVanos*6);
+    add("Cruz de San Andrés","T1 hexagonal (extremos)", p.bracesOn? c.nMuros*4 : 0);
+    add("Anclaje a platea","Bulón de anclaje ½", nAnc);
+    add("Hold-down esquina","Hold-down + perno", nHD);
+    add("Revestimiento / placa","T2 punta mecha", c.t2);
+  }
+  return rows;
+}
+
 // Optimizador de corte (First-Fit Decreasing) sobre barras comerciales
 function optimizeCuts(byProfile, barLen){
   const out=[];
@@ -1113,6 +1981,10 @@ function savePrecios(pr){ try{localStorage.setItem('adamant_precios',JSON.string
 let precios=loadPrecios();
 if(precios.margen===undefined) precios.margen=35;
 if(!precios.perfiles) precios.perfiles={};
+// Precios de referencia easy.com.ar (ARS, editables). placa=$/u · montante/solera/cinta/guarda/barral=$/m · masilla=$/kg · resto=$/u
+const MB_PREC_DEF={ placa35:14500, placa70:14500, montante35:1450, montante70:2150, solera35:1400, solera70:2050, t1:16, t2:11, anclaje:135, masilla:950, cinta:42, guarda:980, barral:3400 };
+if(!precios.mueble) precios.mueble={};
+for(const k in MB_PREC_DEF) if(precios.mueble[k]===undefined) precios.mueble[k]=MB_PREC_DEF[k];
 
 function presupuesto(p,c,cl){
   const pr=precios;
@@ -1134,6 +2006,8 @@ function exportCSV(p,c,cl){
   cl.groups.forEach(g=>{ s+=`${g.code},${g.tipo},${g.perfil},${g.largo},${g.cant},${(g.cant*g.largo/1000).toFixed(2)}\n`; });
   s+="\nOPTIMIZACION DE CORTE (barra "+(precios.barLen||6000)+" mm)\nPerfil,Piezas,Barras,Desperdicio(%)\n";
   opt.forEach(o=>{ s+=`${o.perfil},${o.piezas},${o.bars},${o.waste.toFixed(1)}\n`; });
+  s+="\nPLANILLA DE UNIONES Y FIJACIONES\nUnion,Fijacion,Cantidad\n";
+  fastenerSchedule(p,c,cl).forEach(f=>{ s+=`${f.union},${f.fijacion},${f.cant}\n`; });
   const pu=presupuesto(p,c,cl);
   s+="\nPRESUPUESTO\nItem,Costo\n";
   s+=`Perfileria/Madera,${pu.costPerf.toFixed(0)}\nPlacas,${pu.costPlaca.toFixed(0)}\nHormigon,${pu.costHorm.toFixed(0)}\nTornillos,${pu.costTorn.toFixed(0)}\nSubtotal,${pu.sub.toFixed(0)}\nMargen ${precios.margen}%,${(pu.total-pu.sub).toFixed(0)}\nTOTAL,${pu.total.toFixed(0)}\n`;
@@ -1193,6 +2067,13 @@ function genCasa(){
   cl.groups.forEach(g=>{ ex+=`<tr><td class="cd">${g.code}</td><td>${g.tipo}</td><td>${g.perfil}</td><td>${g.largo} mm</td><td>${g.cant}</td><td>${(g.cant*g.largo/1000).toFixed(2)} m</td></tr>`; });
   ex+=`</tbody></table></div>`;
 
+  const fsch=fastenerSchedule(p,c,cl);
+  ex+=`<div class="divider2"><span>Planilla de uniones y fijaciones</span></div>
+    <div class="cuttable"><table><thead><tr><th>Unión</th><th>Fijación</th><th>Cantidad</th></tr></thead><tbody>`;
+  fsch.forEach(f=>{ ex+=`<tr><td>${f.union}</td><td>${f.fijacion}</td><td>${f.cant} u</td></tr>`; });
+  ex+=`</tbody></table></div>
+    <p class="note">Cantidades estimadas de tornillería, clavos y herrajes por tipo de unión (no cuenta cada tornillo de placa individual). Anclajes y hold-downs los define el cálculo estructural.</p>`;
+
   ex+=`<div class="divider2"><span>Optimización de corte</span>
     <label class="barlen">Barra: <input type="number" id="barLen" value="${barLen}"> mm</label></div>
     <div class="cuttable"><table><thead><tr><th>Perfil</th><th>Piezas</th><th>Barras a comprar</th><th>Desperdicio</th></tr></thead><tbody>`;
@@ -1239,6 +2120,11 @@ document.getElementById('copy').addEventListener('click',async e=>{
   }
   const b=e.target; b.textContent="Copiado ✓"; b.classList.add('ok');
   setTimeout(()=>{b.textContent="Copiar código"; b.classList.remove('ok')},1500);
+});
+document.getElementById('toggleCode').addEventListener('click',e=>{
+  const on=codeEl.style.display!=='none';
+  codeEl.style.display=on?'none':'block';
+  e.target.textContent=on?'Ver código':'Ocultar código';
 });
 renderForm();
 </script>
