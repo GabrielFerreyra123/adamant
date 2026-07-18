@@ -147,6 +147,11 @@ select, input[type=number]{ background:var(--panel); border:1px solid var(--line
 .capas label{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--paper); cursor:pointer; }
 .capas label i{ width:11px; height:11px; border-radius:3px; display:inline-block; }
 .capas input{ accent-color:var(--teal); margin:0; }
+/* fallback sin WebGL */
+.nowebgl{ position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; gap:10px; padding:24px; text-align:center; overflow-y:auto; }
+.nowebgl b{ font-size:16px; color:var(--paper); } .nowebgl p{ color:var(--muted); font-size:13px; margin:0; line-height:1.5; }
+.nowebgl .how{ font-size:12px; } .nowebgl code{ background:var(--panel2); border:1px solid var(--line); border-radius:5px; padding:1px 5px; }
+.nowebgl .btn{ align-self:center; margin-top:6px; }
 .hint{ position:absolute; bottom:8px; left:0; right:0; margin:0; text-align:center; color:var(--muted); font-size:11px; pointer-events:none; }
 .info:not(.hidden) ~ .hint{ display:none; }
 

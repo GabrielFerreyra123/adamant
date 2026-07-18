@@ -327,24 +327,38 @@ function renderTab(){
       ? `<div class="capas" id="capaspanel"><b>Capas</b>${capas.map(c => `<label><input type="checkbox" data-capa="${c.id}" ${state.capas[c.id]?'checked':''}><i style="background:${colorHex(c.tipo)}"></i>${c.l}</label>`).join("")}</div>` : "";
     body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${selector}${partesel}${capasPanel}<div class="legend" id="legend3d"></div><div class="info hidden" id="info3d"></div>
       <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · tocá una pieza</p></div>`;
-    viewer = new Viewer(document.getElementById("viewer3d"), { onSelect: showInfo3d });
-    const mostrar = () => (partes && state.parte3d !== "todo") ? piezas.filter(p => p.parte === state.parte3d) : piezas;
-    const aplicarCapas = () => capas.forEach(c => { if (state.capas[c.id]) viewer.setLayerVisible(c.id, true); });
-    viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
-    document.getElementById("legend3d").innerHTML = [...new Set(piezas.map(p => p.tipo))].map(t => `<span class="chip"><i style="background:${colorHex(t)}"></i>${TIPO_LABEL[t]||t}</span>`).join("");
-    const vs = document.getElementById("viewsel");
-    if (vs) vs.querySelectorAll("button").forEach(b => b.onclick = () => {
-      state.vista3d = b.dataset.v; vs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); viewer.setView(state.vista3d);
-    });
-    const ps = document.getElementById("partesel");
-    if (ps) ps.querySelectorAll("button").forEach(b => b.onclick = () => {
-      state.parte3d = b.dataset.p; ps.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    try {
+      viewer = new Viewer(document.getElementById("viewer3d"), { onSelect: showInfo3d });
+      const mostrar = () => (partes && state.parte3d !== "todo") ? piezas.filter(p => p.parte === state.parte3d) : piezas;
+      const aplicarCapas = () => capas.forEach(c => { if (state.capas[c.id]) viewer.setLayerVisible(c.id, true); });
       viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
-    });
-    const cp = document.getElementById("capaspanel");
-    if (cp) cp.querySelectorAll("input[data-capa]").forEach(chk => chk.onchange = () => {
-      state.capas[chk.dataset.capa] = chk.checked; viewer.setLayerVisible(chk.dataset.capa, chk.checked);
-    });
+      document.getElementById("legend3d").innerHTML = [...new Set(piezas.map(p => p.tipo))].map(t => `<span class="chip"><i style="background:${colorHex(t)}"></i>${TIPO_LABEL[t]||t}</span>`).join("");
+      const vs = document.getElementById("viewsel");
+      if (vs) vs.querySelectorAll("button").forEach(b => b.onclick = () => {
+        state.vista3d = b.dataset.v; vs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); viewer.setView(state.vista3d);
+      });
+      const ps = document.getElementById("partesel");
+      if (ps) ps.querySelectorAll("button").forEach(b => b.onclick = () => {
+        state.parte3d = b.dataset.p; ps.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+        viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
+      });
+      const cp = document.getElementById("capaspanel");
+      if (cp) cp.querySelectorAll("input[data-capa]").forEach(chk => chk.onchange = () => {
+        state.capas[chk.dataset.capa] = chk.checked; viewer.setLayerVisible(chk.dataset.capa, chk.checked);
+      });
+    } catch (e) {
+      // Sin WebGL / aceleración por hardware: no romper la app, avisar y dejar el resto funcionando.
+      if (viewer){ try { viewer.dispose(); } catch {} viewer = null; }
+      console.warn("Visor 3D no disponible (WebGL):", e && e.message);
+      body.innerHTML = `<div class="nowebgl">
+        <b>No se pudo iniciar el visor 3D</b>
+        <p>Tu navegador no tiene <b>WebGL / aceleración por hardware</b> activada. El resto de la app
+        (Materiales, Cortes y PDF) funciona igual — el PDF incluye el esquema acotado.</p>
+        <p class="how">Para ver el 3D: activá <i>Aceleración por hardware</i> en la configuración del navegador
+        y reinicialo, o probá en otra ventana/navegador. Verificá en <code>chrome://gpu</code>.</p>
+        <button class="btn ghost sm" id="retry3d">Reintentar</button></div>`;
+      const r = document.getElementById("retry3d"); if (r) r.onclick = () => renderTab();
+    }
   } else if (state.tab === "mat"){ renderMateriales(body); }
   else if (state.tab === "cut"){ renderCortes(body); }
   else { renderExport(body); }
