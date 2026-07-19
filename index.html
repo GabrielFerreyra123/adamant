@@ -1,13 +1,341 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-AR">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Adamant · Autoconstrucción en seco</title>
-  <link rel="stylesheet" href="/src/styles.css">
+  <title>Adamant · Diseñá tu estructura en seco, gratis y en 3D</title>
+  <meta name="description" content="Diseñá paredes con aberturas, pisos, cielorrasos y ambientes completos en steel frame o wood frame. Gratis, en 3D, con lista de materiales al instante. No hace falta saber usar programas de diseño.">
+  <meta name="theme-color" content="#0A1A22">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Adamant · Diseñá tu estructura en seco, gratis y en 3D">
+  <meta property="og:description" content="Paredes con aberturas, pisos, cielorrasos y ambientes completos. Con lista de materiales al instante.">
+  <meta property="og:locale" content="es_AR">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/landing/landing.css">
+  <!-- Marca que hay JS: sin esto el contenido con .reveal nunca se oculta (a prueba de fallos). -->
+  <script>document.documentElement.classList.add("js");</script>
 </head>
 <body>
-  <div id="app"></div>
-  <script type="module" src="/src/main.js"></script>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <b>ADAMANT</b>
+      <span>Autoconstrucción en seco</span>
+    </a>
+    <a class="btn btn-primary" href="/app/">Empezar gratis</a>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ hero ============ -->
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">Steel frame · Wood frame</p>
+          <h1>Diseñá tu estructura de steel frame o wood frame. <em>Gratis, en 3D, sin saber usar programas de diseño.</em></h1>
+          <p class="hero-sub">
+            Paredes con aberturas, pisos, cielorrasos y ambientes completos,
+            con lista de materiales al instante.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="/app/">Empezar gratis</a>
+            <a class="btn btn-ghost" href="#como-funciona">Ver cómo funciona</a>
+          </div>
+          <p class="hero-note">
+            Sin instalar nada y sin cuenta. <b>Diseñar y ver el 3D no se paga.</b>
+          </p>
+        </div>
+
+        <div class="browser reveal">
+          <div class="browser-bar">
+            <div class="browser-dots"><i></i><i></i><i></i></div>
+            <div class="browser-url">adamant.app/app/</div>
+          </div>
+          <!-- Marcador de posición: reemplazar por la captura real del visor 3D (1200 × 750). -->
+          <img class="browser-shot" src="/hero-app.svg" width="1200" height="750"
+               alt="Visor 3D de Adamant mostrando la estructura de un muro con sus montantes, soleras y una abertura.">
+        </div>
+      </div>
+
+      <div class="stats reveal" style="margin-top:var(--sp-9)">
+        <div class="stat"><b>4</b><span>tipos de estructura</span></div>
+        <div class="stat"><b>2</b><span>sistemas: steel y wood</span></div>
+        <div class="stat"><b>3D</b><span>armado pieza por pieza</span></div>
+        <div class="stat"><b>$0</b><span>para diseñar y calcular</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ cómo funciona ============ -->
+  <section class="section" id="como-funciona">
+    <div class="wrap">
+      <p class="eyebrow">Cómo funciona</p>
+      <h2 class="section-title">Tres pasos y ya tenés qué comprar</h2>
+      <p class="section-sub">
+        No hay que dibujar nada. Elegís qué vas a construir, cargás las medidas
+        y la app arma la estructura sola.
+      </p>
+
+      <div class="steps">
+        <article class="step reveal">
+          <h3>Elegí qué construir</h3>
+          <p>Muro, piso, cielorraso o ambiente completo. Steel o madera.</p>
+        </article>
+        <article class="step reveal">
+          <h3>Ajustá medidas y aberturas</h3>
+          <p>Puertas, ventanas, modulación 400 o 600. Lo ves en 3D al instante.</p>
+        </article>
+        <article class="step reveal">
+          <h3>Llevate el plano de armado</h3>
+          <p>Lista de materiales gratis; cortes optimizados, PDF y export a SketchUp con el desbloqueo del proyecto.</p>
+        </article>
+      </div>
+
+      <div class="credib reveal">
+        <p class="credib-norma">Basado en norma <b>IRAM-IAS U 500-205</b> y práctica real de obra.</p>
+        <p class="credib-nota">El cálculo estructural definitivo lo hace un profesional habilitado.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ módulos ============ -->
+  <section class="section" id="modulos">
+    <div class="wrap">
+      <p class="eyebrow">Qué podés diseñar</p>
+      <h2 class="section-title">Cuatro tipos de estructura</h2>
+      <p class="section-sub">Cada uno con su cómputo, su despiece y su modelo 3D.</p>
+
+      <div class="mods">
+        <article class="mod reveal">
+          <span class="ico" aria-hidden="true">🧱</span>
+          <h3>Muro</h3>
+          <p>Paredes y tabiques con puertas, ventanas y arcadas. Montantes, soleras, dinteles y refuerzos resueltos.</p>
+        </article>
+        <article class="mod reveal">
+          <span class="ico" aria-hidden="true">🪵</span>
+          <h3>Piso</h3>
+          <p>Entramado de plataforma: vigas, cenefa perimetral, vigas dobles de borde y arriostres a mitad de luz.</p>
+        </article>
+        <article class="mod reveal">
+          <span class="ico" aria-hidden="true">📐</span>
+          <h3>Cielorraso</h3>
+          <p>Suspendido de dos niveles: velas, vigas maestras, montantes y soleras perimetrales, con su altura libre.</p>
+        </article>
+        <article class="mod reveal">
+          <span class="ico" aria-hidden="true">🏠</span>
+          <h3>Ambiente completo</h3>
+          <p>Piso más cuatro paredes armados y ubicados en su lugar, con las aberturas de cada pared.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ qué te llevás ============ -->
+  <section class="section" id="entrega">
+    <div class="wrap">
+      <div class="entrega">
+        <div>
+          <p class="eyebrow">Qué te llevás</p>
+          <h2 class="section-title">De la idea a la lista de compras</h2>
+          <p class="section-sub" style="margin-bottom:0">
+            Todo sale de la misma estructura que ves en pantalla: si cambiás una medida,
+            cambia el cómputo.
+          </p>
+        </div>
+
+        <ul class="lista reveal">
+          <li>
+            <span class="mark" aria-hidden="true">✓</span>
+            <div><b>Lista de materiales</b><span>Cuántos perfiles, de qué tipo y cuántos metros. Con tus precios, el total se calcula solo.</span></div>
+          </li>
+          <li>
+            <span class="mark" aria-hidden="true">✓</span>
+            <div><b>Cortes optimizados</b><span>Cómo cortar cada barra para desperdiciar lo menos posible, con el porcentaje de sobrante a la vista.</span></div>
+          </li>
+          <li>
+            <span class="mark" aria-hidden="true">✓</span>
+            <div><b>PDF para la obra</b><span>Resumen, vista 3D, esquema acotado y las planillas, listo para imprimir o mandar por mensaje.</span></div>
+          </li>
+          <li>
+            <span class="mark" aria-hidden="true">✓</span>
+            <div><b>Modelo para SketchUp</b><span>Un script que arma la estructura entera adentro de SketchUp, pieza por pieza.</span></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ para quién es ============ -->
+  <section class="section" id="para-quien">
+    <div class="wrap">
+      <p class="eyebrow">Para quién es</p>
+      <h2 class="section-title">Dos formas de usarla</h2>
+      <p class="section-sub">La misma herramienta, según de qué lado del proyecto estés.</p>
+
+      <div class="quienes">
+        <article class="quien reveal">
+          <span class="ico" aria-hidden="true">🔨</span>
+          <h3>Autoconstructores</h3>
+          <p>Armá tu propio proyecto sin depender de un técnico para el anteproyecto.</p>
+        </article>
+        <article class="quien reveal">
+          <span class="ico" aria-hidden="true">📏</span>
+          <h3>Profesionales del rubro</h3>
+          <p>Cotizá y computá materiales en minutos, exportá a SketchUp.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ precios ============ -->
+  <section class="section" id="precios">
+    <div class="wrap">
+      <p class="eyebrow">Precios</p>
+      <h2 class="section-title">Diseñá gratis. Pagás sólo si te lo llevás</h2>
+      <p class="section-sub">Sin suscripción y sin tarjeta para empezar.</p>
+
+      <div class="planes">
+
+        <article class="plan-card plan-free reveal">
+          <header class="plan-head">
+            <h3>Gratis</h3>
+            <p class="plan-lead">Todo el diseño, sin límite y sin dar datos.</p>
+          </header>
+          <ul class="plan-lista">
+            <li>Diseño ilimitado de muros, pisos, cielorrasos y ambientes</li>
+            <li>Visor 3D completo</li>
+            <li>Lista de materiales al instante</li>
+            <li>Sin registro, sin tarjeta</li>
+          </ul>
+          <a class="btn btn-ghost plan-cta" href="/app/">Empezar gratis</a>
+        </article>
+
+        <article class="plan-card plan-pro reveal">
+          <header class="plan-head">
+            <span class="plan-badge">Pago único por proyecto</span>
+            <h3>Proyecto desbloqueado</h3>
+            <!-- TODO precio: si algún día querés mostrar el monto, va acá.
+                 Ojo: el precio real vive en la variable de entorno PRECIO_PROYECTO (backend), así que
+                 al hardcodearlo hay que acordarse de tocar los dos lados o la landing va a mentir. -->
+            <p class="plan-lead">Pagás una sola vez, solo el proyecto que querés construir.</p>
+          </header>
+          <ul class="plan-lista">
+            <li class="plan-todo">Todo lo gratis, más:</li>
+            <li>Optimización de cortes por barra comercial (menos desperdicio)</li>
+            <li>PDF de armado con listado de corte pieza por pieza</li>
+            <li>Export a SketchUp (script Ruby)</li>
+          </ul>
+          <p class="plan-destacado">
+            El desbloqueo es <b>por proyecto, no una suscripción</b>: no hay nada que dar de baja
+            ni que se te siga cobrando todos los meses.
+          </p>
+          <a class="btn btn-primary plan-cta" href="/app/">Desbloquear mi proyecto</a>
+        </article>
+
+      </div>
+
+      <p class="planes-nota reveal">
+        Probá todo el diseño antes de pagar. Solo pagás cuando querés los planos para cortar.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ preguntas frecuentes ============ -->
+  <section class="section" id="faq">
+    <div class="wrap">
+      <p class="eyebrow">Preguntas frecuentes</p>
+      <h2 class="section-title">Lo que suelen preguntar</h2>
+      <p class="section-sub">Si algo no está acá, escribinos y lo agregamos.</p>
+
+      <div class="faq reveal">
+        <details>
+          <summary>¿Necesito saber usar SketchUp?</summary>
+          <div class="faq-cuerpo">
+            <p>No. Toda la app funciona en el navegador: diseñás, mirás el 3D y sacás la lista de
+            materiales sin instalar nada. SketchUp es opcional, sólo si querés llevarte el modelo
+            para seguir trabajándolo ahí.</p>
+          </div>
+        </details>
+        <details>
+          <summary>¿Qué es exactamente lo gratis?</summary>
+          <div class="faq-cuerpo">
+            <p>Diseñar, ver el 3D completo y la lista de materiales, sin límite de proyectos y sin
+            registrarte. Podés cambiar medidas y aberturas todas las veces que quieras.</p>
+          </div>
+        </details>
+        <details>
+          <summary>¿Qué desbloqueo al pagar?</summary>
+          <div class="faq-cuerpo">
+            <p>Los cortes optimizados por barra comercial, el PDF de armado con el listado de corte
+            pieza por pieza y el export a SketchUp. Todo de <b>ese</b> proyecto.</p>
+          </div>
+        </details>
+        <details>
+          <summary>¿Es una suscripción?</summary>
+          <div class="faq-cuerpo">
+            <p>No. Es un pago único por proyecto: no hay nada que dar de baja ni que se te siga
+            cobrando todos los meses. Si después arrancás otro proyecto, ese se desbloquea aparte.</p>
+          </div>
+        </details>
+        <details>
+          <summary>¿Sirve para presentar en la municipalidad?</summary>
+          <div class="faq-cuerpo">
+            <p>No. Lo que entrega Adamant es un anteproyecto y un cómputo de materiales, pensado
+            para entender qué vas a construir y cuánto sale. La documentación que se presenta ante
+            un organismo la firma un profesional habilitado.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ cierre ============ -->
+  <section class="cierre">
+    <div class="wrap">
+      <h2>Tu próximo proyecto empieza con un muro.</h2>
+      <a class="btn btn-cierre" href="/app/">Abrir la app</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="wrap">
+    <div class="pie-top">
+      <div class="pie-marca">
+        <b>ADAMANT</b>
+        <span>Autoconstrucción en seco</span>
+        <span>Bahía Blanca, Argentina</span>
+      </div>
+      <nav class="pie-links" aria-label="Enlaces del pie">
+        <a href="/app/">Abrir la app</a>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#precios">Precios</a>
+        <a href="#faq">Preguntas frecuentes</a>
+      </nav>
+    </div>
+
+    <p class="descargo">
+      Adamant entrega un anteproyecto y un cómputo estimado de materiales con fines orientativos.
+      No reemplaza el proyecto ni la dirección de obra. El cálculo estructural, el dimensionado de
+      perfiles y escuadrías, los arriostres, los anclajes y las fundaciones los define y firma un
+      profesional habilitado, que también es quien evalúa las condiciones del terreno, las cargas
+      reales y la normativa vigente en tu localidad. Los precios de materiales son los que vos
+      cargás y pueden diferir de los del mercado al momento de comprar. Verificá siempre las
+      medidas en obra antes de cortar.
+    </p>
+
+    <p class="pie-copy">© <span id="anio">2026</span> Adamant · Bahía Blanca, Argentina</p>
+  </div>
+</footer>
+
+<script type="module" src="/src/landing/landing.js"></script>
 </body>
 </html>

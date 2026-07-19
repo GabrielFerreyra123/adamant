@@ -6,7 +6,7 @@ import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
-import { getLicencia, diasRestantes, iniciarPago, generar, canjearSiVuelve } from "./licencia.js";
+import { getLicencia, diasRestantes, iniciarPago, generar, canjearSiVuelve, nuevoProyecto } from "./licencia.js";
 
 const VANO_DEFAULTS = {
   puerta:  { ancho:800,  alto:2050, sill:0   },
@@ -452,7 +452,8 @@ function renderExport(body){
       lista de compra con tus precios y lista de cortes optimizada) + el export a SketchUp.
       Ediciones libres por 30 días — rehacé el PDF las veces que quieras.</p>
       <button class="btn" id="pagar">Desbloquear con Mercado Pago</button>
-      <p class="expnote">Pago único por proyecto. Al volver del pago, esta pestaña queda desbloqueada en este navegador.</p>
+      <p class="expnote">Pago único <b>por proyecto</b>: desbloquea el que estás armando y lo podés seguir
+      editando 30 días. Empezar otro proyecto requiere un pago nuevo. La licencia queda en este navegador.</p>
       <p class="expmsg" id="expmsg"></p></div>`;
     const msg = document.getElementById("expmsg");
     document.getElementById("pagar").onclick = () => {
@@ -468,9 +469,19 @@ function renderExport(body){
     <button class="btn" id="cprb">📋 Copiar script Ruby</button>
     <button class="btn ghost" id="dlrb">⬇ Descargar .rb</button>
     <p class="expnote">Pegá el script en <b>Ventana → Consola de Ruby</b> de SketchUp y Enter. Si descargás el .rb, cargalo con <code>load "C:/ruta/al/archivo.rb"</code>.</p>
+    <div class="expsep">Otro proyecto</div>
+    <button class="btn ghost" id="nuevoproy">✚ Empezar un proyecto nuevo</button>
+    <p class="expnote">El desbloqueo vale para <b>este</b> proyecto. Empezar uno nuevo requiere otro pago.</p>
     <p class="expmsg" id="expmsg"></p></div>`;
   const msg = document.getElementById("expmsg");
   const fallo = e => { msg.textContent = "Error: " + (e.message || e); console.error(e); };
+  document.getElementById("nuevoproy").onclick = () => {
+    if (!confirm("Vas a empezar un proyecto nuevo, que hay que desbloquear con otro pago.\n\nEl proyecto actual queda cerrado: si querés volver a bajar su PDF, hacelo ahora.\n\n¿Seguir?")) return;
+    nuevoProyecto();
+    state.kind = null; state.step = 0; state.params = null;
+    state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tab = "3d";
+    render();
+  };
   document.getElementById("dlpdf").onclick = async () => {
     msg.textContent = "Generando PDF…";
     try {
