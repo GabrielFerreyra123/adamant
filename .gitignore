@@ -12,3 +12,6 @@ dist/
 adamant-cambios-pagos/
 adamant-ambiente-*.pdf
 .env*.local
+
+# Referencias de diseño (no van al build ni al repo)
+design-ref/

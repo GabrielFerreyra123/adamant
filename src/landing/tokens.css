@@ -1,0 +1,95 @@
+/* ADAMANT · Sistema visual del rediseño (extraído de design-ref/landing.html + app.html, diseños
+   de Google Stitch). Tokens CSS propios — NADA de Tailwind. Estos son los valores EXACTOS del
+   reference (paleta Material 3 tonal sobre teal). La landing y, más adelante, la app consumen esto.
+
+   Nota de marca: el reference deriva la marca a Material 3 dark. El teal vive en dos tonos
+   (--primary claro para texto/acento · --primary-container saturado para rellenos sólidos) y el
+   naranja tangerine aparece atenuado a un salmón/durazno (--secondary / --tertiary) para legibilidad
+   en fondo oscuro; el naranja saturado queda como --tertiary-container. Marca base sin derivar:
+   teal #1BB6A4, tangerine #E85D2A. */
+
+:root{
+  /* ---------- superficies (del más oscuro al más claro) ---------- */
+  --bg:                       #05151d;  /* background / surface */
+  --surface:                  #05151d;
+  --surface-container-lowest: #021018;
+  --surface-container-low:    #0e1d25;
+  --surface-container:        #12212a;
+  --surface-container-high:   #1d2c34;
+  --surface-container-highest:#27373f;
+  --surface-bright:           #2c3b44;
+  --surface-variant:          #27373f;
+  --panel-glass:              rgba(13, 33, 43, 0.8);  /* glass-card: + blur(8px) */
+  --card-hover-bg:            #0d212b;                /* card-industrial:hover / card-active */
+
+  /* ---------- acentos ---------- */
+  --primary:            #54dbc8;  /* teal claro — texto/acento, foco de inputs, líneas de plano */
+  --primary-container:  #1bb6a4;  /* teal marca — rellenos sólidos, glow, borde activo */
+  --on-primary:         #003731;  /* texto sobre --primary */
+  --on-primary-container:#004139; /* texto sobre --primary-container */
+
+  --secondary:          #ffb59d;  /* salmón (tangerine tonal) — 2º acento, bordes, texto cálido */
+  --tertiary:           #ffb59d;
+  --tertiary-container: #f08663;  /* naranja más saturado */
+  --on-secondary:       #5d1800;  /* texto sobre relleno salmón */
+  --on-tertiary:        #5d1800;
+
+  --error:              #ffb4ab;
+
+  /* ---------- texto ---------- */
+  --on-surface:         #d4e5f0;  /* texto principal (blanco azulado) */
+  --on-background:      #d4e5f0;
+  --on-surface-variant: #bbcac5;  /* texto atenuado */
+  --outline:            #869490;  /* bordes marcados / texto muy tenue */
+  --outline-variant:    #3c4946;  /* bordes sutiles, divisores */
+
+  /* ---------- líneas de plano (blueprint) ---------- */
+  --grid-line:   rgba(27, 182, 164, 0.05);  /* grilla de fondo del body */
+  --grid-dot:    rgba(27, 182, 164, 0.05);  /* variante en puntos (app) */
+  --hair-teal:   rgba(27, 182, 164, 0.15);  /* industrial-border en reposo */
+  --hair-teal-30:rgba(27, 182, 164, 0.30);  /* líneas de estructura tenues */
+  --glow-teal:   rgba(27, 182, 164, 0.40);  /* sombra/resplandor del teal */
+  --shadow-offset:rgba(27, 182, 164, 0.20); /* card-active: sombra dura 4px 4px */
+
+  /* ---------- radios (industriales, chicos) ---------- */
+  --r-default: 2px;   /* 0.125rem */
+  --r-lg:      4px;   /* 0.25rem */
+  --r-xl:      8px;   /* 0.5rem */
+  --r-full:    12px;  /* 0.75rem (el "full" del reference NO es pill) */
+  --r-pill:    999px;
+
+  /* ---------- espaciado (nombres del reference) ---------- */
+  --xs:   4px;
+  --base: 8px;
+  --sm:   12px;
+  --md:   24px;
+  --gutter:24px;
+  --lg:   48px;
+  --xl:   80px;
+  --margin-mobile:  16px;
+  --margin-desktop: 64px;
+  --maxw: 1440px;
+
+  /* ---------- tipografías ---------- */
+  --font-title: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;  /* display/headline */
+  --font-body:  "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;  /* labels/datos */
+
+  /* ---------- escala tipográfica (fija del reference; se fluidifica en landing.css) ----------
+     display-lg  72 / 1.1  / -0.02em / 700  (Barlow)
+     headline-lg 48 / 1.2  /         / 700  (Barlow)
+     headline-md 32 / 1.2  /         / 600  (Barlow)
+     headline-sm 24 / 1.3  /         / 600  (Barlow)
+     body-lg     18 / 1.6  /         / 400  (Space Grotesk)
+     body-md     16 / 1.5  /         / 400  (Space Grotesk)
+     label-caps  12 / 1    / 0.1em   / 700  (JetBrains Mono, UPPER)
+     data-mono   14 / 1.4  / 0.05em  / 500  (JetBrains Mono) */
+  --fs-display: 72px;  --lh-display: 1.1;  --ls-display: -0.02em;
+  --fs-h-lg:    48px;  --lh-h-lg:    1.2;
+  --fs-h-md:    32px;  --lh-h-md:    1.2;
+  --fs-h-sm:    24px;  --lh-h-sm:    1.3;
+  --fs-body-lg: 18px;  --lh-body-lg: 1.6;
+  --fs-body-md: 16px;  --lh-body-md: 1.5;
+  --fs-label:   12px;  --ls-label:   0.1em;
+  --fs-data:    14px;  --ls-data:    0.05em;
+}

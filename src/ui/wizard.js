@@ -77,7 +77,13 @@ function toEngineInput(){
 export function startWizard(el){
   root = el;
   root.innerHTML =
-    `<header class="topbar"><b>ADAMANT</b><span>Autoconstrucción en seco</span></header>
+    `<header class="topbar">
+       <div class="tb-brand"><b>ADAMANT</b><span>Autoconstrucción en seco</span></div>
+       <nav class="tb-nav" id="tbnav">
+         <a data-phase="0">Elegir</a><a data-phase="1">Medidas</a><a data-phase="2">Plano</a><a data-phase="3">Exportar</a>
+       </nav>
+       <a class="tb-cta" href="/">Empezar gratis</a>
+     </header>
      <div class="progress" id="progress"></div>
      <section class="content" id="content"></section>
      <nav class="wnav" id="wnav"></nav>`;
@@ -107,6 +113,15 @@ function renderProgress(){
   const labels = state.kind ? ["Tipo", ...pasosOf().map(p => p.titulo), "Resultado"] : ["Tipo"];
   document.getElementById("progress").innerHTML = labels.map((s, i) =>
     `<div class="pstep ${i===state.step?'on':''} ${i<state.step?'done':''}"><i>${i+1}</i><span>${s}</span></div>`).join("");
+  // Fase activa en la barra superior (Elegir / Medidas / Plano / Exportar).
+  const nav = document.getElementById("tbnav");
+  if (nav){
+    const nPasos = state.kind ? pasosOf().length : 0;
+    const enResultado = state.kind && state.step === nPasos + 1;
+    const compo = state.step >= 1 && state.step <= nPasos ? pasosOf()[state.step - 1].componente : null;
+    const fase = state.step === 0 ? 0 : enResultado ? 3 : (compo === "vanos" || compo === "murosPlanta") ? 2 : 1;
+    nav.querySelectorAll("a").forEach(a => a.classList.toggle("on", +a.dataset.phase === fase));
+  }
 }
 
 function renderNav(){
@@ -114,21 +129,36 @@ function renderNav(){
   const enResultado = state.kind && state.step === nPasos + 1;
   const enPaso = state.step >= 1 && state.step <= nPasos;
   const blocked = enPaso && !pasoValido(pasosOf()[state.step - 1]);
-  const prev = state.step > 0 ? `<button class="btn ghost" id="prev">Atrás</button>` : `<span></span>`;
+  const prev = state.step > 0 ? `<button class="btn ghost" id="prev">← Atrás</button>` : `<span></span>`;
   let right = `<span></span>`;
-  if (enPaso) right = `<button class="btn" id="next" ${blocked?"disabled":""}>${state.step===nPasos?"Ver resultado":"Siguiente"}</button>`;
+  if (enPaso) right = `<button class="btn" id="next" ${blocked?"disabled":""}>${state.step===nPasos?"Ver resultado":"Siguiente"} →</button>`;
   else if (enResultado) right = `<button class="btn ghost" id="edit">Editar</button>`;
-  document.getElementById("wnav").innerHTML = prev + right;
+  const total = nPasos + 1, frac = total ? Math.min(1, state.step / total) : 0;
+  const mid = `<div class="wprog"><span>Progreso del proyecto</span><div class="segbar" style="--p:${Math.round(frac*100)}%"></div></div>`;
+  document.getElementById("wnav").innerHTML = prev + mid + right;
   const p = document.getElementById("prev"); if (p) p.onclick = () => { state.step--; state.muroSel = null; render(); };
   const n = document.getElementById("next"); if (n) n.onclick = () => { state.step++; state.muroSel = null; render(); };
   const e = document.getElementById("edit"); if (e) e.onclick = () => { state.step = 1; state.muroSel = null; render(); };
 }
 
 // ---------- paso 0: grilla de módulos ----------
+// Etiqueta técnica + ícono de línea del pie de cada card (solo visual, estilo design-ref). Aditivo:
+// el ícono SVG reemplaza al emoji sólo en esta grilla; el m.icono del registro no se toca.
+const MOD_TAG = { muro:"STEEL FRAME / PGC", piso:"ESTRUCTURA PORTANTE", cielo:"CONSTRUCCIÓN EN SECO", combinado:"SOLUCIÓN INTEGRAL" };
+const svg = p => `<svg class="modicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const MOD_ICON = {
+  muro:  svg('<rect x="4" y="3" width="4" height="18" rx="1"/><rect x="10" y="3" width="4" height="18" rx="1"/><rect x="16" y="3" width="4" height="18" rx="1"/>'),
+  piso:  svg('<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>'),
+  cielo: svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+  combinado: svg('<path d="M3 10 12 3l9 7"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/>')
+};
 function stepGrid(){
-  return `<h2>¿Qué vas a construir?</h2>
+  return `<header class="gridhead"><h2>¿Qué vas a construir?</h2>
+    <p class="sub">Elegí el módulo estructural para iniciar el cálculo de materiales y planos de montaje.</p></header>
     <div class="modgrid">${listModules().map(m => `<button class="modcard ${state.kind===m.id?'on':''}" data-id="${m.id}">
-      <span class="modicon">${m.icono}</span><b>${m.nombre}</b><span class="moddesc">${m.descripcion}</span></button>`).join("")}</div>`;
+      <span class="modtop">${MOD_ICON[m.id] || `<span class="modicon">${m.icono}</span>`}</span>
+      <b>${m.nombre}</b><span class="moddesc">${m.descripcion}</span>
+      <span class="modfoot"><span class="modtag">${MOD_TAG[m.id]||""}</span><span class="modarrow">→</span></span></button>`).join("")}</div>`;
 }
 function wireGrid(){
   document.querySelectorAll(".modcard").forEach(b => b.onclick = () => {
