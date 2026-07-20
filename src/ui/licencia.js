@@ -17,6 +17,7 @@ export function getProyId(){
     return p;
   } catch { return "sinstorage"; }
 }
+const setProyId = p => { try { localStorage.setItem(PKEY, p); } catch {} };
 // Empieza un proyecto nuevo (requiere pagarlo de nuevo). → nuevo id
 export function nuevoProyecto(){
   const p = nuevoId();
@@ -64,7 +65,10 @@ export async function canjearSiVuelve(){
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Canje rechazado");
     setLicencia(d.proy, { token: d.token, exp: d.exp });
-    return d.proy === getProyId();
+    // El proyecto que se acaba de pagar pasa a ser el activo: así getLicencia() lo encuentra aunque
+    // el id del navegador se hubiera desincronizado, y restaurarProyecto() repone SUS datos.
+    setProyId(d.proy);
+    return true;
   } catch (e) {
     console.warn("[licencia] canje falló:", e.message);
     alert("El pago no pudo verificarse: " + e.message + "\nSi el dinero se debitó, escribinos con tu número de operación.");

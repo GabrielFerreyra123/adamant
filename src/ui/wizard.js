@@ -6,7 +6,7 @@ import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
-import { getLicencia, diasRestantes, iniciarPago, generar, canjearSiVuelve, nuevoProyecto } from "./licencia.js";
+import { getLicencia, diasRestantes, iniciarPago, generar, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
 
 const VANO_DEFAULTS = {
   puerta:  { ancho:800,  alto:2050, sill:0   },
@@ -32,6 +32,24 @@ function capasDe(piezas){
   return CAPA_ORDEN.filter(id => ids.has(id)).map(id => ({ id, ...CAPA_INFO[id] }));
 }
 let root, viewer = null;
+
+// El proyecto en curso vive sólo en memoria (state); al ir a pagar, la vuelta desde Mercado Pago
+// recarga la página y lo borraría. Lo persistimos en localStorage atado al id de proyecto, así al
+// volver del checkout el proyecto sigue cargado. "Empezar un proyecto nuevo" usa otro id → no arrastra.
+const WKEY = "adamant_wizard";
+function guardarProyecto(){
+  if (!state.kind) return;
+  try {
+    const { kind, step, params, adv, tab, vista3d, parte3d, capas, muroSel } = state;
+    localStorage.setItem(WKEY, JSON.stringify({ proy: getProyId(), st: { kind, step, params, adv, tab, vista3d, parte3d, capas, muroSel } }));
+  } catch {}
+}
+function restaurarProyecto(){
+  try {
+    const g = JSON.parse(localStorage.getItem(WKEY));
+    if (g?.proy === getProyId() && g.st?.kind && getModule(g.st.kind)) Object.assign(state, g.st);
+  } catch {}
+}
 
 const pasosOf = () => getModule(state.kind).schema.pasos;
 const getVal = c => c.opt ? state.params.opciones[c.k] : state.params[c.k];
@@ -60,12 +78,16 @@ export function startWizard(el){
      <div class="progress" id="progress"></div>
      <section class="content" id="content"></section>
      <nav class="wnav" id="wnav"></nav>`;
+  restaurarProyecto(); // si volvemos del pago (o recarga), recuperar el proyecto en curso
   render();
   // Si venimos del checkout de Mercado Pago, canjear el pago por la licencia y refrescar la UI.
-  canjearSiVuelve().then(activada => { if (activada) render(); });
+  // El canje puede adoptar el proyecto pagado como activo, así que restauramos otra vez por si el
+  // id se había desincronizado (recién ahí coinciden proyecto y licencia).
+  canjearSiVuelve().then(activada => { if (activada){ restaurarProyecto(); render(); } });
 }
 
 function render(){
+  guardarProyecto();
   const nPasos = state.kind ? pasosOf().length : 0;
   const enResultado = state.kind && state.step === nPasos + 1;
   if (viewer && !enResultado){ viewer.dispose(); viewer = null; }
