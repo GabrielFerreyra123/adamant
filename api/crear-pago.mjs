@@ -20,20 +20,21 @@ export default async function handler(req, res){
     const base = (req.headers.origin || (host ? `${proto}://${host}` : process.env.APP_URL || "")).replace(/\/+$/, "");
     // La app vive en /app/ (la raíz es la landing); ahí corre canjearSiVuelve().
     const app = `${base}/app/`;
-    const pref = await mpFetch("/checkout/preferences", {
-      method: "POST",
-      body: JSON.stringify({
-        items: [{
-          title: "Adamant — Proyecto desbloqueado (PDF + cortes + SketchUp)",
-          description: "PDF completo, lista de cortes optimizada y export a SketchUp. Ediciones libres por 30 días.",
-          quantity: 1, currency_id: "ARS", unit_price: precio
-        }],
-        external_reference: proy,
-        back_urls: { success: app, pending: app, failure: app },
-        auto_return: "approved",
-        statement_descriptor: "ADAMANT"
-      })
-    });
+    // auto_return sólo con URL pública https: MP rechaza http/localhost ("back_url.success must be
+    // defined"). En local se omite (no se puede probar el redirect igual); en prod se activa.
+    const publica = /^https:\/\//.test(base) && !/localhost|127\.0\.0\.1/.test(base);
+    const body = {
+      items: [{
+        title: "Adamant — Proyecto desbloqueado (PDF + cortes + SketchUp)",
+        description: "PDF completo, lista de cortes optimizada y export a SketchUp. Ediciones libres por 30 días.",
+        quantity: 1, currency_id: "ARS", unit_price: precio
+      }],
+      external_reference: proy,
+      back_urls: { success: app, pending: app, failure: app },
+      statement_descriptor: "ADAMANT"
+    };
+    if (publica) body.auto_return = "approved";
+    const pref = await mpFetch("/checkout/preferences", { method: "POST", body: JSON.stringify(body) });
     json(res, 200, { init_point: pref.init_point, precio });
   } catch (e) {
     json(res, 500, { error: e.message });
