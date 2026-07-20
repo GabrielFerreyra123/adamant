@@ -16,6 +16,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/landing/landing.css">
+  <!-- Retorno de Mercado Pago: MP vuelve a la raíz; si trae los params del pago, reenviamos a /app/
+       (mismo origen) para que la app los canjee. Va antes de pintar nada para no mostrar la landing. -->
+  <script>
+    (function(){
+      var q = location.search;
+      if (/[?&](payment_id|collection_id|preference_id)=/.test(q)){ location.replace("/app/" + q); }
+    })();
+  </script>
   <!-- Marca que hay JS: sin esto el contenido con .reveal nunca se oculta (a prueba de fallos). -->
   <script>document.documentElement.classList.add("js");</script>
 </head>

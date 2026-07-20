@@ -18,8 +18,10 @@ export default async function handler(req, res){
     const proto = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers["x-forwarded-host"] || req.headers.host;
     const base = (req.headers.origin || (host ? `${proto}://${host}` : process.env.APP_URL || "")).replace(/\/+$/, "");
-    // La app vive en /app/ (la raíz es la landing); ahí corre canjearSiVuelve().
-    const app = `${base}/app/`;
+    // MP vuelve a la RAÍZ (Vercel la sirve siempre, sin el redirect de trailing-slash que /app/ puede
+    // tener y que rompe auto_return). La landing reenvía a /app/ con los params del pago, donde corre
+    // canjearSiVuelve(). Mismo origen → mismo localStorage, así el proyecto se restaura.
+    const app = `${base}/`;
     // auto_return sólo con URL pública https: MP rechaza http/localhost ("back_url.success must be
     // defined"). En local se omite (no se puede probar el redirect igual); en prod se activa.
     const publica = /^https:\/\//.test(base) && !/localhost|127\.0\.0\.1/.test(base);
