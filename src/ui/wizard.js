@@ -34,22 +34,25 @@ function capasDe(piezas){
 let root, viewer = null;
 
 // El proyecto en curso vive sólo en memoria (state); al ir a pagar, la vuelta desde Mercado Pago
-// recarga la página y lo borraría. Lo persistimos en localStorage atado al id de proyecto, así al
-// volver del checkout el proyecto sigue cargado. "Empezar un proyecto nuevo" usa otro id → no arrastra.
+// recarga la página y lo borraría. Lo persistimos en localStorage y lo reponemos al cargar, así al
+// volver del checkout (o tras cualquier recarga) el proyecto sigue cargado. Se limpia SÓLO al
+// empezar un proyecto nuevo (borrarProyectoGuardado), para no arrastrar lo anterior.
 const WKEY = "adamant_wizard";
+const KINDS = new Set(listModules().map(m => m.id));
 function guardarProyecto(){
   if (!state.kind) return;
   try {
     const { kind, step, params, adv, tab, vista3d, parte3d, capas, muroSel } = state;
-    localStorage.setItem(WKEY, JSON.stringify({ proy: getProyId(), st: { kind, step, params, adv, tab, vista3d, parte3d, capas, muroSel } }));
+    localStorage.setItem(WKEY, JSON.stringify({ kind, step, params, adv, tab, vista3d, parte3d, capas, muroSel }));
   } catch {}
 }
 function restaurarProyecto(){
   try {
-    const g = JSON.parse(localStorage.getItem(WKEY));
-    if (g?.proy === getProyId() && g.st?.kind && getModule(g.st.kind)) Object.assign(state, g.st);
+    const st = JSON.parse(localStorage.getItem(WKEY));
+    if (st && KINDS.has(st.kind) && st.params) Object.assign(state, st);
   } catch {}
 }
+export function borrarProyectoGuardado(){ try { localStorage.removeItem(WKEY); } catch {} }
 
 const pasosOf = () => getModule(state.kind).schema.pasos;
 const getVal = c => c.opt ? state.params.opciones[c.k] : state.params[c.k];
@@ -449,7 +452,7 @@ function renderCortes(body){
   body.innerHTML = `<div class="pane ${gate ? "gated" : ""}">${secciones || `<p class="sub">Sin piezas.</p>`}
     <p class="sub">Cada etiqueta es <b>código·largo(mm)</b>. Optimización First-Fit, sin descontar merma de sierra.</p>
     ${gate ? `<div class="gateoverlay"><p>La lista de cortes optimizada viene con el proyecto desbloqueado.</p><button class="btn" id="gate-pagar">Desbloquear proyecto</button></div>` : ""}</div>`;
-  if (gate) document.getElementById("gate-pagar").onclick = () => iniciarPago().catch(e => alert(e.message));
+  if (gate) document.getElementById("gate-pagar").onclick = () => { guardarProyecto(); iniciarPago().catch(e => alert(e.message)); };
 }
 
 // ---------- export ----------
@@ -480,6 +483,7 @@ function renderExport(body){
     const msg = document.getElementById("expmsg");
     document.getElementById("pagar").onclick = () => {
       msg.textContent = "Abriendo Mercado Pago…";
+      guardarProyecto(); // asegurar el proyecto en storage antes de irnos al checkout
       iniciarPago().catch(e => { msg.textContent = "Error: " + e.message; });
     };
     return;
@@ -500,6 +504,7 @@ function renderExport(body){
   document.getElementById("nuevoproy").onclick = () => {
     if (!confirm("Vas a empezar un proyecto nuevo, que hay que desbloquear con otro pago.\n\nEl proyecto actual queda cerrado: si querés volver a bajar su PDF, hacelo ahora.\n\n¿Seguir?")) return;
     nuevoProyecto();
+    borrarProyectoGuardado();
     state.kind = null; state.step = 0; state.params = null;
     state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tab = "3d";
     render();

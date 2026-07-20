@@ -10,9 +10,15 @@ export default async function handler(req, res){
   if (!proy) return json(res, 400, { error: "proy requerido" });
   try {
     const precio = Number(process.env.PRECIO_PROYECTO || 20000);
-    // La app vive en /app/ (la raíz es la landing): el retorno de MP tiene que caer ahí, que es
-    // donde corre canjearSiVuelve(). Si cae en la raíz, el pago no se canjea nunca.
-    const base = (process.env.APP_URL || `https://${req.headers.host}`).replace(/\/+$/, "");
+    // El retorno de MP tiene que caer en el MISMO origen desde el que se abrió el checkout: la
+    // licencia y el proyecto viven en el localStorage de ese origen. Si volviéramos a otro host
+    // (p.ej. un APP_URL fijo distinto al alias que está usando el usuario), el canje andaría pero
+    // el proyecto no se restauraría (otro localStorage). Por eso priorizamos el origen real del
+    // pedido (Origin del navegador, o proto+host reenviados por Vercel) sobre APP_URL.
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const host = req.headers["x-forwarded-host"] || req.headers.host;
+    const base = (req.headers.origin || (host ? `${proto}://${host}` : process.env.APP_URL || "")).replace(/\/+$/, "");
+    // La app vive en /app/ (la raíz es la landing); ahí corre canjearSiVuelve().
     const app = `${base}/app/`;
     const pref = await mpFetch("/checkout/preferences", {
       method: "POST",
