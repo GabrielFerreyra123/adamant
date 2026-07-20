@@ -33,7 +33,9 @@ export function exportRuby(input){
   const metadatos = gen.metadatos;
   // Los revestimientos son capas VISUALES "a definir" → no se exportan a SketchUp (la placa de piso sí).
   const piezas = gen.piezas.filter(p => p.capa !== "rev-ext" && p.capa !== "rev-int");
-  const LARGO = Math.round(+input.largo || Math.max(1, ...piezas.map(p => p.pos[0] + p.largo)));
+  // Fallback de largo desde la geometría sólo si no vino input.largo: algunas piezas (combinado
+  // reubicado) llevan `box` y no `pos`, así que se descartan para no romper.
+  const LARGO = Math.round(+input.largo || Math.max(1, ...piezas.filter(p => Array.isArray(p.pos)).map(p => p.pos[0] + p.largo)));
   const ALTURA = Math.round(+input.alto || 1);
 
   // --- secciones (idénticas a scriptMuro/_wall) ---
