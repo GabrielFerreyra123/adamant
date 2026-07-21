@@ -3,6 +3,7 @@
 // Agregar un tipo nuevo NO toca este archivo si usa sólo campos simples (sistema/medida/seg/cards/perfil).
 import { computeProject, cutPlan, cutOpts, listModules, getModule } from "../engine/index.mjs";
 import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
+import { validarVanoPiso } from "../engine/modules/piso.mjs";
 import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
@@ -59,7 +60,11 @@ const getVal = c => c.opt ? state.params.opciones[c.k] : state.params[c.k];
 function parseNum(s){ s = String(s).trim(); if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); const n = parseFloat(s.replace(/[^\d.]/g, "")); return isFinite(n) ? n : 0; }
 function findCampo(paso, k){ return [...(paso.campos||[]), ...(paso.avanzado||[])].find(c => c.k === k); }
 function errCampo(c){ if (!c || c.tipo !== "medida" || !c.rango) return null; const v = getVal(c); return (v < c.rango[0] || v > c.rango[1]) ? `Entre ${c.rango[0]/1000} y ${c.rango[1]/1000} m` : null; }
-function pasoValido(paso){ return [...(paso.campos||[]), ...(paso.avanzado||[])].every(c => c.tipo !== "medida" || !errCampo(c)); }
+function pasoValido(paso){
+  // El vano de piso fuera de margen es un error BLOQUEANTE: no se avanza (ni se genera geometría inválida).
+  if (paso.componente === "vanoPiso" && validarVanoPiso(toEngineInput()).errores.length) return false;
+  return [...(paso.campos||[]), ...(paso.avanzado||[])].every(c => c.tipo !== "medida" || !errCampo(c));
+}
 
 // Vanos del wizard {tipo,ancho,alto,sill,pos} → formato del motor {tipo,x1,x2,h,sill}.
 const mapVanos = arr => (arr || []).map(v => ({ tipo:v.tipo, x1:Math.round(v.pos - v.ancho/2), x2:Math.round(v.pos + v.ancho/2), h:v.sill + v.alto, sill:v.sill }));
@@ -170,6 +175,7 @@ function stepPaso(paso){
   let html = `<h2>${paso.titulo}</h2>`;
   if (paso.componente === "vanos") return html + vanosHTML();
   if (paso.componente === "murosPlanta") return html + murosPlantaHTML();
+  if (paso.componente === "vanoPiso") return html + vanoPisoHTML();
   html += (paso.campos || []).map(campoHTML).join("");
   if (paso.avanzado){
     html += `<button class="adv-toggle" id="advt">${state.adv?"▾":"▸"} Opciones avanzadas</button>
@@ -200,6 +206,7 @@ function campoHTML(c){
 function wirePaso(paso){
   if (paso.componente === "vanos"){ wireVanos(); return; }
   if (paso.componente === "murosPlanta"){ wireMurosPlanta(); return; }
+  if (paso.componente === "vanoPiso"){ wireVanoPiso(); return; }
   document.querySelectorAll("[data-seg]").forEach(seg => seg.querySelectorAll("button").forEach(b => b.onclick = () => {
     const key = seg.dataset.seg, raw = b.dataset.v;
     const val = raw === "true" ? true : raw === "false" ? false : (isNaN(+raw) ? raw : +raw);
@@ -317,6 +324,97 @@ function renderVanoList(){
     else v.pos = val;
     v.pos = clampPos(v, arr, L); drawSchem();
   });
+}
+
+// ---------- componente custom: vano de escalera/trampa del piso (planta) ----------
+// El vano se declara en coords DEL ENTRAMADO: X = corrida (lado mayor), Y = luz (lado menor), igual
+// que la planta que reporta el módulo. Por eso se dibuja con corrida en horizontal.
+const PRESETS_VANO = [{ l: "Trampa 600×600", ancho: 600, largo: 600 }, { l: "Escalera recta 1000×3000", ancho: 1000, largo: 3000 }];
+function pisoPlanta(){
+  const p = state.params, L = +p.largo, W = +p.ancho;
+  return { corrida: Math.max(L, W), luz: Math.min(L, W), sep: +p.separacion || 400 };
+}
+function vanoPisoHTML(){
+  const v = state.params.vano;
+  const { corrida, luz, sep } = pisoPlanta();
+  if (!v) return `<p class="sub">Un hueco para escalera o trampa de acceso. Se enmarca solo: trimmers a los
+      lados, cabezales arriba y abajo, y las vigas cortadas pasan a vigas cola.</p>
+    <div class="addrow"><button class="btn sm" id="vpAdd">＋ Agregar vano</button></div>
+    <p class="sub">Entramado ${corrida}×${luz} mm · modulación ${sep} mm.</p>`;
+  const { errores, avisos } = validarVanoPiso(toEngineInput());
+  return `<p class="sub">Arrastrá el hueco sobre la planta (snap a la modulación de ${sep} mm) o cargá las medidas.</p>
+    <div class="addrow">${PRESETS_VANO.map((q, i) => `<button class="btn sm" data-preset="${i}">${q.l}</button>`).join("")}
+      <button class="btn sm" id="vpDel">✕ Quitar</button></div>
+    <div class="planta4" id="vpPlanta"></div>
+    ${errores.length ? `<div class="errores"><b>⛔ No se puede generar</b>${errores.map(e => `<span>${e}</span>`).join("")}</div>` : ""}
+    ${avisos.length ? `<div class="avisos"><b>⚠ Vano</b>${avisos.map(a => `<span>${a}</span>`).join("")}</div>` : ""}
+    <div class="vgrid">
+      <label>Posición X (corrida)<input type="number" data-vp="x" value="${v.x}"><i>mm</i></label>
+      <label>Posición Y (luz)<input type="number" data-vp="y" value="${v.y}"><i>mm</i></label>
+      <label>Ancho (⊥ vigas)<input type="number" data-vp="ancho" value="${v.ancho}"><i>mm</i></label>
+      <label>Largo (∥ vigas)<input type="number" data-vp="largo" value="${v.largo}"><i>mm</i></label>
+    </div>`;
+}
+function drawVanoPlanta(){
+  const box = document.getElementById("vpPlanta"); if (!box) return;
+  const v = state.params.vano; if (!v) return;
+  const { corrida, luz } = pisoPlanta();
+  const Wd = box.clientWidth || 340, pad = 12;
+  const iw = Wd - 2*pad, ih = Math.max(90, Math.min(230, iw * luz / corrida));
+  const H = ih + 2*pad, sx = iw / corrida, sy = ih / luz;
+  // Y del motor crece hacia "arriba"; en el SVG se invierte para que la planta se lea natural.
+  const X = x => pad + x * sx, Y = y => pad + ih - y * sy;
+  const nV = Math.floor(corrida / (+state.params.separacion || 400));
+  let lineas = "";
+  for (let i = 1; i <= nV; i++){ const x = X(i * (+state.params.separacion || 400)); lineas += `<line x1="${x.toFixed(1)}" y1="${pad}" x2="${x.toFixed(1)}" y2="${(pad+ih).toFixed(1)}" class="vpvig"/>`; }
+  box.innerHTML = `<svg viewBox="0 0 ${Wd} ${H}" width="${Wd}" height="${H}" class="plantasvg">
+    <rect x="${pad}" y="${pad}" width="${iw}" height="${ih}" class="room"/>${lineas}
+    <g class="vphole" id="vphole"><rect x="${X(v.x).toFixed(1)}" y="${Y(v.y + v.largo).toFixed(1)}"
+      width="${(v.ancho*sx).toFixed(1)}" height="${(v.largo*sy).toFixed(1)}" rx="2"/>
+      <text x="${X(v.x + v.ancho/2).toFixed(1)}" y="${(Y(v.y + v.largo/2) + 4).toFixed(1)}" text-anchor="middle">${v.ancho}×${v.largo}</text></g></svg>`;
+  box._geo = { pad, sx, sy, ih };
+  box.querySelector("#vphole").addEventListener("pointerdown", startVanoPisoDrag);
+}
+function startVanoPisoDrag(e){
+  e.preventDefault();
+  const box = document.getElementById("vpPlanta"), { pad, sx, sy, ih } = box._geo;
+  const v = state.params.vano, { corrida, luz, sep } = pisoPlanta();
+  const rect = box.querySelector("svg").getBoundingClientRect();
+  const snap = n => Math.round(n / sep) * sep;
+  const move = ev => {
+    // el puntero toma el CENTRO del hueco; se snapea a la modulación y se clampea al entramado
+    const cx = (ev.clientX - rect.left - pad) / sx, cy = (ih - (ev.clientY - rect.top - pad)) / sy;
+    v.x = Math.max(0, Math.min(corrida - v.ancho, snap(cx - v.ancho/2)));
+    v.y = Math.max(0, Math.min(luz - v.largo,     snap(cy - v.largo/2)));
+    drawVanoPlanta();
+  };
+  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); render(); };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+}
+function wireVanoPiso(){
+  const add = document.getElementById("vpAdd");
+  if (add){
+    add.onclick = () => { // centrado y dentro del margen mínimo
+      const { corrida, luz, sep } = pisoPlanta();
+      const ancho = Math.min(600, Math.max(200, corrida - 2*sep)), largo = Math.min(600, Math.max(200, luz - 2*sep));
+      state.params.vano = { x: Math.round((corrida - ancho)/2), y: Math.round((luz - largo)/2), ancho, largo };
+      render();
+    };
+    return;
+  }
+  const del = document.getElementById("vpDel"); if (del) del.onclick = () => { state.params.vano = null; render(); };
+  document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => {
+    const q = PRESETS_VANO[+b.dataset.preset], { corrida, luz } = pisoPlanta();
+    const v = state.params.vano;
+    v.ancho = q.ancho; v.largo = q.largo;
+    v.x = Math.max(0, Math.round((corrida - q.ancho)/2)); v.y = Math.max(0, Math.round((luz - q.largo)/2));
+    render();
+  });
+  document.querySelectorAll("[data-vp]").forEach(inp => inp.oninput = () => {
+    state.params.vano[inp.dataset.vp] = Math.round(parseFloat(inp.value) || 0);
+    drawVanoPlanta(); renderNav();
+  });
+  drawVanoPlanta();
 }
 
 // ---------- combinado: aberturas por muro (esquema en planta) ----------

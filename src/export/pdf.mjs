@@ -95,6 +95,17 @@ function drawPlanta(doc, metadatos, piezas, x0, y0, maxW, maxH){
     doc.setFillColor(242, 128, 61);
     velas.forEach(p => doc.circle(x + (p.pos[0] + 15) * sc, y + (p.pos[1] + 15) * sc, 0.7, "F"));
   }
+  // VANO de escalera/trampa: hueco libre (en blanco, borde naranja) + cota de su tamaño. La Y del motor
+  // crece hacia arriba, así que en el papel se dibuja invertida.
+  const V = metadatos.vano;
+  if (V){
+    const vx = x + V.x0 * sc, vw = (V.x1 - V.x0) * sc;
+    const vh = (V.y1 - V.y0) * sc, vy = y + ph - V.y1 * sc;
+    doc.setFillColor(255,255,255); doc.setDrawColor(...TANG); doc.setLineWidth(0.6);
+    safeRect(doc, vx, vy, vw, vh, "FD", "vano piso"); doc.setLineWidth(0.2);
+    doc.setTextColor(...TANG); doc.setFontSize(6.5);
+    doc.text(`${Math.round(V.x1-V.x0)}×${Math.round(V.y1-V.y0)}`, vx + vw/2, vy + vh/2 + 1.5, { align: "center" });
+  }
   // marco perimetral (borde grueso)
   doc.setDrawColor(155, 109, 214); doc.setLineWidth(0.7); doc.rect(x, y, pw, ph); doc.setLineWidth(0.2);
   // cotas: X (abajo), Y (izquierda) y separación de montantes/vigas

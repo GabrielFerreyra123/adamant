@@ -17,7 +17,8 @@ export function secDims(perfil){
 
 // Piezas DE CANTO (alma vertical, en Z) también cuando corren en X: dintel del muro y todo el
 // entramado de piso / grilla de cielorraso (viga, viga doble, cenefa, blocking, solera, montante, maestra).
-const CANTO = new Set(["DINTEL", "VIGA", "VIGA_DOBLE", "CENEFA", "BLOCKING", "SOLERA", "MONTANTE", "MAESTRA"]);
+const CANTO = new Set(["DINTEL", "VIGA", "VIGA_DOBLE", "CENEFA", "BLOCKING", "SOLERA", "MONTANTE", "MAESTRA",
+  "TRIMMER", "CABEZAL", "VIGA_COLA"]); // enmarcado del vano de piso: mismo armado que la viga
 
 // Caja de una pieza en coordenadas del motor (mm). size y center en [x, y, z].
 export function pieceBoxEngine(p){

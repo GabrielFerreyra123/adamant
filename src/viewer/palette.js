@@ -13,6 +13,10 @@ export const TIPO_COLOR = {
   VIGA_DOBLE:  0x4e8f3a, // verde oscuro
   CENEFA:      0x9b6dd6, // violeta
   BLOCKING:    0xd86a9e, // magenta
+  // enmarcado del vano de escalera/trampa
+  TRIMMER:     0x2f7d2f, // verde oscuro (viga doble de borde de vano)
+  CABEZAL:     0xe8b53a, // ámbar (header perpendicular)
+  VIGA_COLA:   0xa8d18a, // verde claro (tramo corto de viga interrumpida)
   // cielorraso (Montante reutiliza el teal de MONTANTE del muro)
   SOLERA:      0xe8b53a, // ámbar (solera perimetral PGU)
   MAESTRA:     0x3d9970, // verde azulado (viga maestra, nivel superior)
@@ -28,6 +32,7 @@ export const TIPO_LABEL = {
   MONTANTE:"Montante", KING:"King", JACK:"Jack", DINTEL:"Dintel", CRIPPLE:"Cripple",
   "SOL.PANEL":"Solera panel", "SOL.VANO":"Solera de vano", "SOL.DINTEL":"Solera de dintel",
   VIGA:"Viga", VIGA_DOBLE:"Viga doble", CENEFA:"Cenefa", BLOCKING:"Blocking",
+  TRIMMER:"Trimmer (borde de vano)", CABEZAL:"Cabezal", VIGA_COLA:"Viga cola",
   SOLERA:"Solera", MONTANTE:"Montante", MAESTRA:"Viga maestra", VELA:"Vela", PLACA:"Placa de piso",
   FLEJE:"Fleje (Cruz de San Andrés)",
   "REV.EXT":"Revestimiento exterior — a definir", "REV.INT":"Revestimiento interior — a definir"

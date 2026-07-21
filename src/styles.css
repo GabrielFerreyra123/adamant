@@ -199,6 +199,16 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
   background:rgba(232,93,42,.08); }
 .avisos b{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--tangerine); }
 .avisos span{ font-size:12.5px; line-height:1.45; color:var(--paper); }
+/* error BLOQUEANTE (vano de piso fuera de margen): rojo, y el paso no deja avanzar */
+.errores{ display:flex; flex-direction:column; gap:5px; margin-bottom:14px; padding:12px 14px;
+  border:1px solid #ff6b5e; border-left-width:3px; border-radius:var(--r-lg,4px); background:rgba(255,107,94,.1); }
+.errores b{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#ff8a80; }
+.errores span{ font-size:12.5px; line-height:1.45; color:var(--paper); }
+/* planta del vano de piso: líneas de viga + hueco arrastrable */
+.plantasvg .vpvig{ stroke:var(--outline2); stroke-width:1; }
+.plantasvg .vphole rect{ fill:rgba(232,93,42,.35); stroke:var(--tangerine); stroke-width:2; cursor:grab; }
+.plantasvg .vphole:active rect{ cursor:grabbing; }
+.plantasvg .vphole text{ fill:var(--paper); font-family:var(--mono); font-size:10px; pointer-events:none; }
 .pane.center{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; }
 .pane.center .sub{ max-width:420px; }
 .pane.center .sub b{ font-family:"Barlow Condensed", sans-serif; font-weight:700; font-size:22px; text-transform:uppercase; color:var(--on-surface); display:block; margin-bottom:6px; }

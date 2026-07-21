@@ -52,8 +52,9 @@ function descomponer(input){
   const encaj = Math.max(ancho - 2 * e, 1);
   return {
     largo, ancho, alto, placa, e, encaj, front,
+    // `vano`: passthrough del vano de escalera/trampa del piso (mismas coords que el entramado).
     pisoInput: { sistema: input.sistema, largo, ancho, separacion: input.separacion || 400,
-      apoyo: input.apoyo || "platea", placa, opciones: input.opciones },
+      apoyo: input.apoyo || "platea", placa, opciones: input.opciones, vano: input.vano || null },
     // Arriostramiento por muro (passthrough al módulo Muro; el orquestador no reimplementa nada).
     // `caraExterior:"ymax"` en fondo/der: esos muros se ubican sin espejar, así que su cara local
     // Y=0 mira HACIA ADENTRO del ambiente; el fleje debe salir por la cara opuesta.

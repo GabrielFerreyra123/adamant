@@ -30,7 +30,13 @@ materiales/cortes/PDF → export Ruby), una fase por vez, con freno para revisi�
   cielo entre al combinado.
 
 ## Backlog ordenado
-1. Vano de escalera/trampa en piso (vigas dobles de borde de vano + cabezales).
+1. ~~Vano de escalera/trampa en piso (vigas dobles de borde de vano + cabezales).~~ **HECHO (Fase B)**:
+   `input.vano = {x, y, ancho, largo}` en coords del entramado (X = corrida, Y = luz). Enmarcado con
+   trimmers (dobles, de cenefa a cenefa; si el borde cae sobre una viga de la modulación esa viga pasa
+   a doble), cabezales entre caras de trimmers y vigas cola (tramo < 150 mm se descarta). Blocking
+   omitido en el hueco y placa que descuenta el área. Margen mínimo de una franja de modulación:
+   fuera de eso es error BLOQUEANTE (no se genera geometría). Un solo vano por piso.
+   Pendiente de esta línea: múltiples vanos y dimensionado verificado de cabezales.
 2. Techo: cabreadas/cerchas simples a dos aguas.
 3. ~~Muro exterior portante con Cruz de San Andrés (arriostramiento).~~ **HECHO (Fase A)**: selector
    `arriostramiento` por muro (ninguno/cruz) en Muro y por lado en Ambiente (`arriostraFrente/…`,
