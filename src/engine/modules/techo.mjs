@@ -41,10 +41,13 @@ function barra(tipo, perfil, a, b, y, sec, offset = 0){
   if (L < 1) return null;
   const u = [dx / L, 0, dz / L];
   const v = [-u[2], 0, u[0]];                 // perpendicular en el plano (dirección del alma)
+  // n cierra la base a DERECHA (u × v = n). Con [0,1,0] la base queda izquierda y el visor dibuja la
+  // pieza espejada: las caras se invierten y se ve el interior del perfil en vez de la cara de afuera.
+  const n = [0, -1, 0];
   const cx = (a[0] + b[0]) / 2 + v[0] * offset;
   const cz = (a[1] + b[1]) / 2 + v[2] * offset;
   return { tipo, perfil, largo: Math.round(L), mat: "cabriada",
-    orient: { c: [cx, y, cz], u, v, n: [0, 1, 0], w: sec.h, t: sec.b } };
+    orient: { c: [cx, y, cz], u, v, n, w: sec.h, t: sec.b } };
 }
 
 // --- una cabriada, en su plano (y = posición a lo largo) --------------------------------------
@@ -264,7 +267,7 @@ export const techo = {
     const xsCielo = posCorreas(c.luz, FLEJE_CIELO.sep);
     xsCielo.forEach(x => P.push({ tipo: "FLEJE_CIELO", categoria: "fleje", perfil: FLEJE_CIELO_PERFIL,
       mat: "fleje", largo: Math.round(c.largo),
-      orient: { c: [x, c.largo/2, zAlaInf], u: T, v: [1,0,0], n: [0,0,1],
+      orient: { c: [x, c.largo/2, zAlaInf], u: T, v: [-1,0,0], n: [0,0,1],   // base derecha: u × v = n
         w: FLEJE_CIELO.ancho, t: FLEJE_CIELO.esp } }));
 
     // --- CUBIERTA: capa visual por faldón (m² al cómputo, sin despiece de chapas) ---
@@ -273,6 +276,14 @@ export const techo = {
       P.push({ tipo: "CUBIERTA", perfil: "Chapa", largo: Math.round(f.largoF), superficie: true, capa: "cubierta",
         mat: "chapa", box: { size: [Math.abs(f.s[0]) * f.largoF, c.largo, 6], center: [x, c.largo/2, z] } });
     });
+
+    // --- DATUM DEL MÓDULO ---
+    // Todo el armado se calcula con la LÍNEA DE NODOS en z=0 (así un montante mide exactamente x·p),
+    // pero el cordón inferior cuelga de esa línea y el conjunto quedaba enterrado bajo el piso. Se
+    // sube todo para que z=0 sea el PLANO DE APOYO sobre el muro (cara inferior del cordón inferior),
+    // que además es el z que necesita el Ambiente para posarlo sobre la solera superior.
+    const zApoyo = hC;
+    P.forEach(q => { if (q.orient) q.orient.c[2] += zApoyo; else if (q.box) q.box.center[2] += zApoyo; });
 
     // --- ADVERTENCIAS ---
     const v = validarTecho(input);

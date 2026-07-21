@@ -76,7 +76,10 @@ test("dosAguas: las diagonales nacen y mueren en los nodos teóricos", () => {
   const med = cabriadaMedia(techo.generar(t({ tipo: "dosAguas", luz, pendiente: 30 })).piezas);
   const extremos = med.filter(d => d.tipo === "DIAGONAL").flatMap(d =>
     [1, -1].map(s => [0,1,2].map(i => d.orient.c[i] + s * d.orient.u[i] * d.largo/2)));
-  const nodos = [[luz/4, (luz/4)*p], [luz/3, 0], [luz/2, (luz/2)*p], [2*luz/3, 0], [3*luz/4, (luz/4)*p]];
+  // z=0 es el plano de apoyo sobre el muro: la línea de nodos queda un alma más arriba (PGC 100).
+  const z0 = 100;
+  const nodos = [[luz/4, (luz/4)*p], [luz/3, 0], [luz/2, (luz/2)*p], [2*luz/3, 0], [3*luz/4, (luz/4)*p]]
+    .map(([x, z]) => [x, z + z0]);
   extremos.forEach(([x, , z]) => {
     const cerca = nodos.some(([nx, nz]) => Math.abs(nx - x) < 1 && Math.abs(nz - z) < 1);
     assert.ok(cerca, `extremo (${x.toFixed(1)}, ${z.toFixed(1)}) no cae en un nodo`);
@@ -261,8 +264,9 @@ test("arriostre de cielo: luz 3600 → 4 líneas de fleje 38×0,84 a lo largo de
   const xs = fc.map(p => p.orient.c[0]).sort((a,b) => a-b);
   assert.deepEqual(xs, [0, 1200, 2400, 3600]);
   xs.slice(1).forEach((x, i) => assert.ok(x - xs[i] <= FLEJE_CIELO.sep + 0.1, "separación real ≤ 1200"));
-  // pegado al ala INFERIOR del cordón inferior (que va de z=−100 a z=0 con PGC 100)
-  fc.forEach(p => assert.ok(p.orient.c[2] < -100, `bajo el ala inferior, no dentro del cordón (z=${p.orient.c[2]})`));
+  // pegado al ala INFERIOR del cordón inferior: justo por debajo del plano de apoyo (z=0), no dentro
+  fc.forEach(p => assert.ok(p.orient.c[2] < 0 && p.orient.c[2] > -FLEJE_CIELO.esp,
+    `pegado bajo el ala inferior (z=${p.orient.c[2]})`));
 
   // en cortes: sección propia de fleje, fuera del bin-packing de barras
   const secc = cutPlan(P, cutOpts(inp)).filter(s => s.fleje);

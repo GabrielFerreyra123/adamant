@@ -60,7 +60,9 @@ function cruz(x0, ancho, alto, yCara, haciaAfuera){
     return {
       tipo: "FLEJE", categoria: "fleje", perfil: FLEJE_PERFIL, mat: "fleje",
       largo: Math.round(L),
-      orient: { c: [cx, cy, cz], u, v, n: [0, 1, 0], w, t }
+      // n = [0,-1,0] y no [0,1,0]: la base tiene que ser DERECHA (u × v = n) o el visor dibuja la
+      // pieza espejada, con las caras invertidas (se ve el interior en vez de la cara de afuera).
+      orient: { c: [cx, cy, cz], u, v, n: [0, -1, 0], w, t }
     };
   });
 }
