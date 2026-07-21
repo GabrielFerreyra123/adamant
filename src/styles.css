@@ -180,6 +180,22 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .mtable .n{ text-align:right; white-space:nowrap; font-family:var(--mono); letter-spacing:.02em; } /* números alineados a la derecha en mono */
 .mtable .u{ color:var(--muted); font-family:var(--mono); font-size:11px; text-transform:uppercase; }
 .pinput{ width:92px; text-align:right; padding:8px; font-size:14px; font-family:var(--mono); }
+/* fila de material sin precio cargado: nunca suma 0 en silencio */
+.mtable tr.nop td{ color:var(--muted); }
+.sinp{ font-style:normal; font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--tangerine); }
+.lnk{ background:none; border:0; padding:0; color:var(--primary-lite); font:inherit; text-decoration:underline; cursor:pointer; }
+/* panel de precios (único para todos los módulos) */
+.pbusca{ flex:1 1 160px; min-width:140px; background:var(--su-lowest); border:1px solid var(--outline2);
+  color:var(--paper); border-radius:var(--r-lg,4px); padding:10px 12px; font:inherit; font-size:14px; }
+.pbusca:focus{ outline:none; border-color:var(--teal); }
+.pgrupo{ margin-bottom:18px; }
+.pgrupo h3{ font-family:"Barlow Condensed",sans-serif; font-weight:600; font-size:15px; text-transform:uppercase;
+  letter-spacing:.04em; color:var(--primary-lite); border-bottom:1px solid var(--outline2); padding-bottom:5px; margin:0 0 8px; }
+.prow{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid rgba(60,73,70,.5); }
+.prow.usa{ background:rgba(27,182,164,.05); }
+.pnom{ display:flex; flex-direction:column; gap:2px; font-size:13px; }
+.pnom i{ color:var(--teal); font-style:normal; margin-left:5px; }
+.pnom small{ font-family:var(--mono); font-size:10px; color:var(--muted); }
 .mtable tfoot td{ border-top:2px solid var(--teal); border-bottom:0; font-family:var(--mono); font-size:15px; color:var(--primary-lite); padding-top:12px; }
 .mtable tfoot b{ font-weight:700; letter-spacing:.05em; }
 
