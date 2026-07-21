@@ -12,7 +12,7 @@ const TIPO_DEFAULTS = {
 export const muro = {
   id: "muro",
   nombre: "Muro / Tabique",
-  descripcion: "División o cierre vertical, con puertas y ventanas.",
+  descripcion: "Paredes y tabiques con aberturas.",
   icono: "🧱",
 
   // valores iniciales del proyecto

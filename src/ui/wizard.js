@@ -142,9 +142,8 @@ function renderNav(){
 }
 
 // ---------- paso 0: grilla de módulos ----------
-// Etiqueta técnica + ícono de línea del pie de cada card (solo visual, estilo design-ref). Aditivo:
-// el ícono SVG reemplaza al emoji sólo en esta grilla; el m.icono del registro no se toca.
-const MOD_TAG = { muro:"STEEL FRAME / PGC", piso:"ESTRUCTURA PORTANTE", cielo:"CONSTRUCCIÓN EN SECO", combinado:"SOLUCIÓN INTEGRAL" };
+// Ícono de línea de cada card (solo visual, estilo design-ref). Aditivo: el SVG reemplaza al emoji
+// sólo en esta grilla; el m.icono del registro no se toca.
 const svg = p => `<svg class="modicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const MOD_ICON = {
   muro:  svg('<rect x="4" y="3" width="4" height="18" rx="1"/><rect x="10" y="3" width="4" height="18" rx="1"/><rect x="16" y="3" width="4" height="18" rx="1"/>'),
@@ -157,8 +156,7 @@ function stepGrid(){
     <p class="sub">Elegí el módulo estructural para iniciar el cálculo de materiales y planos de montaje.</p></header>
     <div class="modgrid">${listModules().map(m => `<button class="modcard ${state.kind===m.id?'on':''}" data-id="${m.id}">
       <span class="modtop">${MOD_ICON[m.id] || `<span class="modicon">${m.icono}</span>`}</span>
-      <b>${m.nombre}</b><span class="moddesc">${m.descripcion}</span>
-      <span class="modfoot"><span class="modtag">${MOD_TAG[m.id]||""}</span><span class="modarrow">→</span></span></button>`).join("")}</div>`;
+      <b>${m.nombre}</b><span class="moddesc">${m.descripcion}</span></button>`).join("")}</div>`;
 }
 function wireGrid(){
   document.querySelectorAll(".modcard").forEach(b => b.onclick = () => {

@@ -28,7 +28,7 @@ function soportesCentrados(span, sep){
 export const cielo = {
   id: "cielo",
   nombre: "Cielorraso suspendido",
-  descripcion: "Grilla de dos niveles (maestras + montantes) colgada del techo.",
+  descripcion: "Grilla suspendida de dos niveles.",
   icono: "☁️",
 
   defaults(){

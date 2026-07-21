@@ -54,7 +54,7 @@ function descomponer(input){
 export const combinado = {
   id: "combinado",
   nombre: "Ambiente completo",
-  descripcion: "Piso + 4 muros de un ambiente rectangular, ensamblados.",
+  descripcion: "Piso y 4 muros, ensamblados.",
   icono: "🏠",
 
   defaults(){

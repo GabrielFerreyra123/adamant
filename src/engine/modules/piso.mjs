@@ -19,7 +19,7 @@ const pguDe = pgc => "PGU " + pgc.split(" ")[1]; // PGC 150x1.60 → PGU 150x1.6
 export const piso = {
   id: "piso",
   nombre: "Entramado de piso",
-  descripcion: "Plataforma de vigas: base para muros o deck.",
+  descripcion: "Entramado de vigas para pisos y decks.",
   icono: "🪵",
 
   defaults(){
