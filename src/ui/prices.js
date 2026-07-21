@@ -1,7 +1,4 @@
-// ADAMANT · esquema VIEJO de precios (una clave por módulo/material). LEGADO: la lista única vive en
-// `src/ui/precios-store.js` (clave `adamant.precios.v1`) y el cálculo en `src/engine/precios.mjs`.
-// Se conserva a propósito: `migrarPrecios()` lee esta clave y NO la borra, para poder volver atrás.
-// Del archivo sólo se sigue usando `money`; el resto es la ruta de rollback — no borrar todavía.
+// ADAMANT · precios unitarios editables, persistidos en localStorage (por clave de material).
 const KEY = "adamant_precios";
 
 export function loadPrices(){

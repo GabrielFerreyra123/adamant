@@ -5,16 +5,14 @@ import autoTable from "jspdf-autotable";
 import { computeProject, cutPlan, cutOpts, getModule } from "../engine/index.mjs";
 import { cortesPorEtapaVsGlobal } from "../engine/modules/combinado.mjs";
 import { buildBraces } from "../engine/brace.mjs";
-import { listaCompra, resolverPresupuesto, diasDesde } from "../engine/precios.mjs";
 
 const TEAL = [27,182,164], OBS = [10,26,34], TANG = [232,93,42], MUT = [110,128,136];
 const unidadBarra = len => `${len >= 6000 ? "barra" : "tira"} ${(len/1000).toFixed(2).replace(".", ",")} m`;
 const money = n => "$ " + Math.round(n || 0).toLocaleString("es-AR");
 
-// Lista de precios inyectada por el consumidor (cliente: localStorage vía opts; servidor: mapa del
-// request). Este módulo NO toca DOM ni localStorage: corre igual en navegador y en Node (backend).
-// Acepta el store nuevo ({id:{precio,actualizado}}) y el mapa plano ({id:precio}).
-let PRECIOS = {};
+// Precios inyectados por el consumidor (cliente: localStorage vía opts; servidor: mapa del request).
+// Este módulo NO toca DOM ni localStorage: corre igual en navegador y en Node (backend).
+let getPrice = () => 0;
 
 // rect defensivo: valida que los 4 argumentos sean finitos; si no, loguea la sección y no dibuja
 // (en vez de romper toda la exportación con "Invalid arguments passed to jsPDF.rect").
@@ -147,12 +145,15 @@ function drawHeader(doc, titulo, subt){
 function drawCompra(doc, materiales, y){
   const W = doc.internal.pageSize.getWidth(), M = 14;
   doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...OBS); doc.text("Lista de compra", M, y);
-  // Mismo resolver que la app: ítems del catálogo valorizados contra la lista única de precios.
-  const pres = resolverPresupuesto(listaCompra(materiales), PRECIOS);
-  const rows = pres.filas.map(f => [f.nombre, f.unidad, String(f.cantidad),
-    f.sinPrecio ? "s/precio" : money(f.precio), f.sinPrecio ? "—" : money(f.subtotal)]);
-  autoTable(doc, { startY: y + 2, head: [["Material", "Unidad", "Cant", "$ unit.", "Subtotal"]], body: rows,
-    foot: [["", "", "", `TOTAL${pres.parcial ? " (parcial)" : ""}`, money(pres.total)]],
+  const rows = []; let total = 0;
+  const push = (label, unidad, cant, key) => { const pu = getPrice(key), st = cant * pu; total += st; rows.push([label, unidad, String(cant), pu ? money(pu) : "—", st ? money(st) : "—"]); };
+  materiales.perfiles.forEach(p => push(p.perfil, unidadBarra(p.largoBarra), p.barras, `perf:${p.perfil}`));
+  (materiales.placas || []).forEach(p => push(`Placa ${p.material} · ${p.cara}`, "placa 1,20×2,40", p.unidades, `placa:${p.material}`));
+  if (materiales.aislacion > 0) push("Aislación (lana)", "m²", Math.ceil(materiales.aislacion), "aislacion");
+  if (materiales.tornillos?.t1) push("Tornillo T1 (estructura)", "u", materiales.tornillos.t1, "t1");
+  if (materiales.tornillos?.t2) push("Tornillo T2 (placa)", "u", materiales.tornillos.t2, "t2");
+  (materiales.otros || []).forEach(o => push(o.label, o.unidad, o.cantidad, o.key));
+  autoTable(doc, { startY: y + 2, head: [["Material", "Unidad", "Cant", "$ unit.", "Subtotal"]], body: rows, foot: [["", "", "", "TOTAL", money(total)]],
     styles: { fontSize: 8.5, cellPadding: 1.6 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 }, footStyles: { fillColor: [255,255,255], textColor: TEAL, fontStyle: "bold" },
     columnStyles: { 2:{halign:"right"}, 3:{halign:"right"}, 4:{halign:"right"} }, margin: { left: M, right: M } });
   return doc.lastAutoTable.finalY + 6;
@@ -247,7 +248,7 @@ async function pdfCombinado(doc, input, piezas, materiales, metadatos, img3d){
 // opts: { img: dataURL del 3D (el WebGL vive en el cliente), precios: mapa clave→$, out: "save"|"buffer" }
 // Devuelve { doc, nombre }; con out:"save" además dispara la descarga (solo navegador).
 export async function exportPDF(input, opts = {}){
-  PRECIOS = opts.precios || {};
+  getPrice = k => (opts.precios || {})[k] ?? 0;
   const { piezas, materiales, metadatos } = computeProject(input);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   if (input.kind === "combinado"){
@@ -309,12 +310,17 @@ export async function exportPDF(input, opts = {}){
   // lista de compra
   doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...OBS);
   doc.text("Lista de compra", M, y); y += 2;
-  const pres = resolverPresupuesto(listaCompra(materiales), PRECIOS);
-  const rows = pres.filas.map(f => [f.nombre, f.unidad, String(f.cantidad),
-    f.sinPrecio ? "s/precio" : money(f.precio), f.sinPrecio ? "—" : money(f.subtotal)]);
+  const rows = []; let total = 0;
+  const push = (label, unidad, cant, key) => { const pu = getPrice(key), st = cant * pu; total += st; rows.push([label, unidad, String(cant), pu ? money(pu) : "—", st ? money(st) : "—"]); };
+  materiales.perfiles.forEach(p => push(p.perfil, unidadBarra(p.largoBarra), p.barras, `perf:${p.perfil}`));
+  materiales.placas.forEach(p => push(`Placa ${p.material} · ${p.cara}`, "placa 1,20×2,40", p.unidades, `placa:${p.material}`));
+  if (materiales.aislacion > 0) push("Aislación (lana)", "m²", Math.ceil(materiales.aislacion), "aislacion");
+  if (materiales.tornillos?.t1) push("Tornillo T1 (estructura)", "u", materiales.tornillos.t1, "t1");
+  if (materiales.tornillos?.t2) push("Tornillo T2 (placa)", "u", materiales.tornillos.t2, "t2");
+  (materiales.otros || []).forEach(o => push(o.label, o.unidad, o.cantidad, o.key));
   autoTable(doc, {
     startY: y + 1, head: [["Material", "Unidad", "Cant", "$ unit.", "Subtotal"]],
-    body: rows, foot: [["", "", "", `TOTAL${pres.parcial ? " (parcial)" : ""}`, money(pres.total)]],
+    body: rows, foot: [["", "", "", "TOTAL", money(total)]],
     styles: { fontSize: 8.5, cellPadding: 1.6 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 },
     footStyles: { fillColor: [255,255,255], textColor: TEAL, fontStyle: "bold" },
     columnStyles: { 2:{halign:"right"}, 3:{halign:"right"}, 4:{halign:"right"} }, margin: { left: M, right: M }
@@ -345,11 +351,7 @@ export async function exportPDF(input, opts = {}){
   });
 
   doc.setFontSize(7.5); doc.setTextColor(...MUT);
-  // Pie: antigüedad del precio más viejo usado (si la lista trae fechas).
-  const dViejo = diasDesde(pres.masViejo);
-  doc.text("Cómputo de estimación. El cálculo estructural definitivo lo realiza un profesional habilitado. — Adamant"
-    + (dViejo !== null ? ` · Precio más antiguo: ${pres.masViejo.slice(0,10)} (${dViejo} d)` : ""),
-    M, doc.internal.pageSize.getHeight() - 8);
+  doc.text("Cómputo de estimación. El cálculo estructural definitivo lo realiza un profesional habilitado. — Adamant", M, doc.internal.pageSize.getHeight() - 8);
 
   const tag = input.largo ? `${(input.largo/1000).toFixed(1)}x${(input.alto/1000).toFixed(1)}` : `${(input.alto/1000).toFixed(1)}`;
   const nombre = `adamant-${input.kind || "muro"}-${input.sistema}-${tag}.pdf`;

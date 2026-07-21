@@ -6,10 +6,7 @@ import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.mjs";
 import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
-import { money } from "./prices.js";
-import { listaCompra, resolverPresupuesto, diasDesde, DIAS_AVISO_PRECIOS } from "../engine/precios.mjs";
-import { CATALOGO, CATEGORIAS, CAT_LABEL } from "../engine/catalogo.mjs";
-import { cargarPrecios, setPrecio, migrarPrecios, exportarPrecios, importarPrecios } from "./precios-store.js";
+import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { getLicencia, diasRestantes, iniciarPago, generar, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
 
 const VANO_DEFAULTS = {
@@ -95,7 +92,6 @@ export function startWizard(el){
      <div class="progress" id="progress"></div>
      <section class="content" id="content"></section>
      <nav class="wnav" id="wnav"></nav>`;
-  migrarPrecios();     // lista de precios única: migra el esquema viejo por módulo (idempotente)
   restaurarProyecto(); // si volvemos del pago (o recarga), recuperar el proyecto en curso
   render();
   // Si venimos del checkout de Mercado Pago, canjear el pago por la licencia y refrescar la UI.
@@ -465,7 +461,7 @@ function drawPlanta4(){
 
 // ---------- paso resultado (común a todos los módulos) ----------
 function stepResultado(){
-  const tabs = [["3d","3D"],["mat","Materiales"],["prec","Precios"],["cut","Cortes"],["pdf","PDF"]];
+  const tabs = [["3d","3D"],["mat","Materiales"],["cut","Cortes"],["pdf","PDF"]];
   return `<div class="result"><div class="tabs">${tabs.map(([k,l]) => `<button class="tab ${state.tab===k?'on':''}" data-tab="${k}">${l}</button>`).join("")}</div><div class="tabbody" id="tabbody"></div></div>`;
 }
 function wireResultado(){ document.querySelectorAll(".tabs .tab").forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderTab(); }); renderTab(); }
@@ -523,7 +519,6 @@ function renderTab(){
       const r = document.getElementById("retry3d"); if (r) r.onclick = () => renderTab();
     }
   } else if (state.tab === "mat"){ renderMateriales(body); }
-  else if (state.tab === "prec"){ renderPrecios(body); }
   else if (state.tab === "cut"){ renderCortes(body); }
   else { renderExport(body); }
 }
@@ -547,121 +542,38 @@ function avisosHTML(metadatos){
   const av = metadatos?.avisos || [];
   return av.length ? `<div class="avisos"><b>⚠ Arriostramiento</b>${av.map(a => `<span>${a}</span>`).join("")}</div>` : "";
 }
-// Aviso de precios viejos (el más antiguo usado supera el umbral).
-function avisoPreciosHTML(masViejo){
-  const d = diasDesde(masViejo);
-  return d !== null && d > DIAS_AVISO_PRECIOS
-    ? `<div class="avisos"><b>⚠ Precios</b><span>Precios con más de ${DIAS_AVISO_PRECIOS} días (el más viejo tiene ${d}), revisá antes de presupuestar.</span></div>`
-    : "";
+function shoppingList(mat){
+  const items = [];
+  mat.perfiles.forEach(p => items.push({ key:`perf:${p.perfil}`, label:p.perfil, unidad:unidadBarra(p.largoBarra), cant:p.barras }));
+  (mat.placas || []).forEach(p => items.push({ key:`placa:${p.material}`, label:`Placa ${p.material} · ${p.cara}`, unidad:"placa 1,20×2,40", cant:p.unidades }));
+  if (mat.aislacion > 0) items.push({ key:"aislacion", label:"Aislación (lana)", unidad:"m²", cant:Math.ceil(mat.aislacion) });
+  if (mat.tornillos?.t1) items.push({ key:"t1", label:"Tornillo T1 (estructura)", unidad:"u", cant:mat.tornillos.t1 });
+  if (mat.tornillos?.t2) items.push({ key:"t2", label:"Tornillo T2 (placa)", unidad:"u", cant:mat.tornillos.t2 });
+  (mat.otros || []).forEach(o => items.push({ key:o.key, label:o.label, unidad:o.unidad, cant:o.cantidad })); // ítems propios del módulo (placa de piso, implantación…)
+  return items;
 }
-// MATERIALES: acá se arma el presupuesto. Cargás el precio que conseguiste EN LA FILA del material y
-// el subtotal y el total se actualizan al instante (sin re-render: no se pierde el foco al tipear).
-// Lo que se escribe va a la lista ÚNICA (misma que usan los otros módulos y el PDF).
 function renderMateriales(body){
   const { materiales, metadatos } = computeProject(toEngineInput());
-  const items = listaCompra(materiales);
-  const pres = resolverPresupuesto(items, cargarPrecios());
-  const rows = pres.filas.map(f => {
-    const sku = String(f.id || f.nombre).replace(/[^a-z0-9.]+/gi, "-");
-    return `<tr data-id="${f.id || ""}">
-      <td>${f.nombre}</td><td class="u">${f.unidad}</td><td class="n">${f.cantidad}</td>
-      <td class="n"><input class="pinput" type="text" inputmode="decimal" autocomplete="off"
-        name="precio-unitario-${sku}" id="precio-unitario-${sku}" aria-label="Precio de ${f.nombre}"
-        data-id="${f.id || ""}" data-cant="${f.cantidad}" value="${f.precio || ""}" placeholder="0"></td>
-      <td class="n" data-sub>${f.sinPrecio ? `<i class="sinp">sin precio</i>` : money(f.subtotal)}</td></tr>`;
+  const items = shoppingList(materiales);
+  const rows = items.map(it => {
+    const sku = it.key.replace(/[^a-z0-9]+/gi, "-");
+    return `<tr><td>${it.label}</td><td class="u">${it.unidad}</td><td class="n">${it.cant}</td>
+      <td class="n"><input class="pinput" type="text" inputmode="decimal" autocomplete="off" name="precio-unitario-${sku}" id="precio-unitario-${sku}" aria-label="Precio ${it.label}" data-key="${it.key}" data-cant="${it.cant}" value="${getPrice(it.key) || ""}" placeholder="0"></td>
+      <td class="n" data-sub>${money(it.cant * getPrice(it.key))}</td></tr>`;
   }).join("");
-  body.innerHTML = `<div class="pane">
-    ${avisosHTML(metadatos)}${avisoPreciosHTML(pres.masViejo)}
-    <p class="sub">Andá cargando los precios que conseguís en tu corralón: el presupuesto se arma solo.
-      Quedan guardados y se comparten con los otros módulos.</p>
+  body.innerHTML = `<form class="pane" autocomplete="off" onsubmit="return false">
+    ${avisosHTML(metadatos)}
     <table class="mtable"><thead><tr><th>Material</th><th>Unidad</th><th class="n">Cant</th><th class="n">$ unit.</th><th class="n">Subtotal</th></tr></thead>
-    <tbody>${rows}</tbody>
-    <tfoot><tr><td colspan="4" class="n"><b data-tlabel>TOTAL${pres.parcial ? " (parcial)" : ""}</b></td>
-      <td class="n"><b data-total>${money(pres.total)}</b></td></tr></tfoot></table>
-    <p class="sub">Perfiles/maderas en barras comerciales (6 m steel · 3,05 m wood); placas 1,20×2,40. Sólo materiales.
-      La lista completa (con backup y export) está en <button class="lnk" id="irPrecios">Precios</button>.</p>
-  </div>`;
-
-  // Recalcula en el lugar: subtotal de la fila + total y la marca de "(parcial)".
+    <tbody>${rows}</tbody><tfoot><tr><td colspan="4" class="n"><b>TOTAL</b></td><td class="n"><b data-total></b></td></tr></tfoot></table>
+    <p class="sub">Perfiles/maderas en barras comerciales (6 m steel · 3,05 m wood); placas 1,20×2,40. Cargá el precio de tu corralón — se guarda en este navegador. Sólo materiales.</p>
+  </form>`;
   const recompute = () => {
-    let total = 0, faltan = 0;
-    body.querySelectorAll(".pinput").forEach(inp => {
-      const p = parseNum(inp.value), cant = +inp.dataset.cant, celda = inp.closest("tr").querySelector("[data-sub]");
-      if (p > 0){ total += p * cant; celda.textContent = money(p * cant); }
-      else { faltan++; celda.innerHTML = `<i class="sinp">sin precio</i>`; }
-    });
+    let total = 0;
+    body.querySelectorAll(".pinput").forEach(inp => { const st = (+inp.dataset.cant) * parseNum(inp.value); total += st; inp.closest("tr").querySelector("[data-sub]").textContent = money(st); });
     body.querySelector("[data-total]").textContent = money(total);
-    body.querySelector("[data-tlabel]").textContent = "TOTAL" + (faltan ? " (parcial)" : "");
   };
-  body.querySelectorAll(".pinput").forEach(inp => inp.addEventListener("input", () => {
-    if (inp.dataset.id) setPrecio(inp.dataset.id, parseNum(inp.value));
-    recompute();
-  }));
-  document.getElementById("irPrecios").onclick = () => { state.tab = "prec"; renderTab(); };
-}
-
-// ---------- precios (panel ÚNICO, compartido por todos los módulos) ----------
-function renderPrecios(body){
-  const { materiales } = computeProject(toEngineInput());
-  const usados = new Set(listaCompra(materiales).map(i => i.id));   // ítems que este proyecto necesita
-  const lista = cargarPrecios();
-  const q = (state.precioQ || "").toLowerCase();
-  const visibles = CATALOGO.filter(i => !q || i.nombre.toLowerCase().includes(q) || i.id.includes(q));
-  const grupos = CATEGORIAS.map(cat => {
-    const its = visibles.filter(i => i.categoria === cat);
-    if (!its.length) return "";
-    return `<div class="pgrupo"><h3>${CAT_LABEL[cat]}</h3>${its.map(i => {
-      const v = lista[i.id], p = v?.precio || 0, d = diasDesde(v?.actualizado);
-      return `<label class="prow ${usados.has(i.id) ? "usa" : ""}">
-        <span class="pnom">${i.nombre}${usados.has(i.id) ? `<i title="lo usa este proyecto">•</i>` : ""}
-          <small>${i.unidad}${d !== null ? ` · hace ${d} d` : ""}</small></span>
-        <input class="pinput" type="text" inputmode="decimal" autocomplete="off"
-          name="precio-${i.id}" id="precio-${i.id}" aria-label="Precio de ${i.nombre}"
-          data-id="${i.id}" value="${p || ""}" placeholder="0"></label>`;
-    }).join("")}</div>`;
-  }).join("");
-  const faltan = [...usados].filter(id => !(lista[id]?.precio > 0));
-  body.innerHTML = `<div class="pane">
-    <p class="sub">Una sola lista de precios para todos los módulos. Se guarda en este navegador.
-      El punto • marca lo que usa el proyecto actual.</p>
-    <div class="addrow">
-      <input class="pbusca" type="search" autocomplete="off" name="buscar-precio" id="buscar-precio"
-        aria-label="Buscar material" placeholder="Buscar material…" value="${state.precioQ || ""}">
-      <button class="btn sm" id="pExp">⬇ Exportar</button>
-      <button class="btn sm" id="pImp">⬆ Importar</button>
-      ${faltan.length ? `<button class="btn sm" id="pCopiar">📋 Copiar ${faltan.length} sin precio</button>` : ""}
-    </div>
-    <p class="expmsg" id="pmsg"></p>
-    ${grupos || `<p class="sub">Nada coincide con la búsqueda.</p>`}
-    <input type="file" id="pFile" accept="application/json,.json" hidden></div>`;
-
-  const msg = document.getElementById("pmsg");
-  body.querySelectorAll(".pinput").forEach(inp => inp.onchange = () => {
-    setPrecio(inp.dataset.id, parseNum(inp.value)); renderTab();
-  });
-  const bus = document.getElementById("buscar-precio");
-  bus.oninput = () => { state.precioQ = bus.value; const s = bus.selectionStart; renderTab();
-    const b2 = document.getElementById("buscar-precio"); if (b2){ b2.focus(); b2.setSelectionRange(s, s); } };
-  document.getElementById("pExp").onclick = () => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([exportarPrecios()], { type: "application/json" }));
-    a.download = "adamant-precios.json"; a.click(); URL.revokeObjectURL(a.href);
-    msg.textContent = "✓ Lista exportada";
-  };
-  const file = document.getElementById("pFile");
-  document.getElementById("pImp").onclick = () => file.click();
-  file.onchange = async () => {
-    const f = file.files?.[0]; if (!f) return;
-    const r = importarPrecios(await f.text());
-    msg.textContent = r.ok ? `✓ ${r.n} precio(s) importados` : "Error: " + r.error;
-    if (r.ok) renderTab();
-  };
-  const cop = document.getElementById("pCopiar");
-  if (cop) cop.onclick = async () => {
-    const txt = faltan.map(id => CATALOGO.find(i => i.id === id)?.nombre || id).join("\n");
-    try { await navigator.clipboard.writeText(txt); msg.textContent = "✓ Copiado: pedile la cotización al corralón"; }
-    catch { msg.textContent = txt; }
-  };
+  body.querySelectorAll(".pinput").forEach(inp => inp.addEventListener("input", () => { setPrice(inp.dataset.key, parseNum(inp.value)); recompute(); }));
+  recompute();
 }
 
 // ---------- cortes ----------
@@ -749,7 +661,7 @@ function renderExport(body){
       const input = toEngineInput();
       const { piezas, metadatos } = computeProject(input);
       const img = capture3D(piezas.filter(p => !p.superficie), metadatos);
-      const blob = await generar("pdf", input, { img, precios: cargarPrecios() });
+      const blob = await generar("pdf", input, { img, precios: loadPrices() });
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = `adamant-${state.kind}-${state.params.sistema}.pdf`; a.click(); URL.revokeObjectURL(a.href);
       msg.textContent = "✓ PDF descargado";

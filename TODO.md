@@ -46,13 +46,7 @@ materiales/cortes/PDF → export Ruby), una fase por vez, con freno para revisi�
    Pendiente de esta línea: arriostramiento por placa OSB estructural (va con el despiece de revestimientos)
    y editor manual de posición de cruces.
 4. Proyecto combinado: piso + 4 muros (quincho/habitación completa) reutilizando módulos.
-5. ~~Precios compartidos entre módulos (un solo listado de precios por usuario en localStorage).~~
-   **HECHO (Fase C)**: catálogo con ids estables (`src/engine/catalogo.mjs`), resolver puro
-   (`src/engine/precios.mjs`: `listaCompra` + `resolverPresupuesto`) y persistencia fina
-   (`src/ui/precios-store.js`, clave `adamant.precios.v1`) con migración idempotente del esquema
-   viejo (que NO se borra: rollback). Panel "Precios" único con búsqueda, export/import JSON y
-   "copiar sin precio"; los ítems sin precio marcan el total como parcial. Fuera de alcance por
-   ahora: precios online, multi-moneda, historial y múltiples listas por proveedor.
+5. Precios compartidos entre módulos (un solo listado de precios por usuario en localStorage).
 6. **Cielorraso — losa de referencia en el 3D**: las velas ya se modelan (piezas VELA verticales del
    entramado hacia arriba, tipo/color propios, en leyenda/cortes/materiales). Falta dibujar la LOSA como
    plano tenue a la altura `alt + suspension` para dar contexto a las velas (hoy suben "al aire").
