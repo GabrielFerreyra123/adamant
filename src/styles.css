@@ -221,19 +221,20 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 /* visor 3D */
 .viewer{ position:relative; width:100%; height:100%; touch-action:none; }
 .viewer canvas{ display:block; width:100%; height:100%; }
-.legend{ position:absolute; top:10px; left:10px; right:10px; display:flex; flex-wrap:wrap; gap:6px; pointer-events:none; }
-.chip{ display:inline-flex; align-items:center; gap:6px; background:rgba(2,16,24,.85); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:4px 9px; font-family:var(--mono); font-size:11px; letter-spacing:.02em; }
-.chip i{ width:11px; height:11px; border-radius:2px; display:inline-block; }
-.info{ position:absolute; left:10px; right:10px; bottom:10px; background:rgba(2,16,24,.94); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:12px 14px; font-size:14px; line-height:1.5; }
+/* Sin leyenda fija de tipos: tapaba el modelo. La identificación sale al TOCAR la pieza (.info). */
+.info{ position:absolute; left:10px; right:10px; bottom:10px; background:rgba(2,16,24,.94); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:12px 14px; font-size:14px; line-height:1.5;
+  animation:infoIn .16s ease-out; }
+@keyframes infoIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
 .info.hidden{ display:none; }
-.info .row{ color:var(--muted); font-family:var(--mono); font-size:12.5px; } .info .row b{ color:var(--primary-lite); }
+.info b{ display:flex; align-items:center; gap:8px; }
+.info .dot{ width:11px; height:11px; border-radius:2px; flex:0 0 auto; }
+.info .row{ color:var(--muted); font-family:var(--mono); font-size:12.5px; } .info .row b{ display:inline; color:var(--primary-lite); }
 .viewsel{ position:absolute; top:10px; right:10px; z-index:3; display:flex; gap:3px; background:rgba(2,16,24,.88); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:3px; }
 .viewsel button{ border:0; background:transparent; color:var(--muted); font-family:var(--mono); font-size:11px; padding:6px 11px; border-radius:var(--r-default,2px); cursor:pointer; transition:background-color .15s ease, color .15s ease; }
 .viewsel button.on{ background:var(--teal); color:var(--on-primary); font-weight:700; }
 .partesel{ position:absolute; top:10px; left:10px; z-index:3; display:flex; flex-wrap:wrap; gap:3px; max-width:60%; background:rgba(2,16,24,.88); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:3px; }
 .partesel button{ border:0; background:transparent; color:var(--muted); font-family:var(--mono); font-size:10.5px; padding:5px 9px; border-radius:var(--r-default,2px); cursor:pointer; transition:background-color .15s ease, color .15s ease; }
 .partesel button.on{ background:var(--teal); color:var(--on-primary); font-weight:700; }
-.viewer.hasparts .legend{ top:48px; }
 /* combinado · aberturas por muro en planta */
 /* combinado — planta blueprint: sala punteada teal + 4 muros seleccionables */
 .planta4{ margin:8px 0 14px; border:1px solid var(--outline2); border-radius:var(--r-lg,4px); background:var(--su-lowest); padding:6px;

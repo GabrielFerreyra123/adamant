@@ -7,6 +7,7 @@ import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.m
 import { validarTecho } from "../engine/modules/techo.mjs";
 import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
+import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { getLicencia, diasRestantes, iniciarPago, generar, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
 
@@ -65,7 +66,7 @@ function pasoValido(paso){
   // El vano de piso fuera de margen es un error BLOQUEANTE: no se avanza (ni se genera geometría inválida).
   if (paso.componente === "vanoPiso" && validarVanoPiso(toEngineInput()).errores.length) return false;
   // Pendiente de techo por debajo del mínimo de escurrimiento: tampoco se avanza.
-  if (paso.id === "pendiente" && state.kind === "techo" && validarTecho(toEngineInput()).errores.length) return false;
+  if (paso.id === "medidas" && state.kind === "techo" && validarTecho(toEngineInput()).errores.length) return false;
   return [...(paso.campos||[]), ...(paso.avanzado||[])].every(c => c.tipo !== "medida" || !errCampo(c));
 }
 
@@ -487,14 +488,14 @@ function renderTab(){
     const capas = capasDe(piezas);
     const capasPanel = capas.length
       ? `<div class="capas" id="capaspanel"><b>Capas</b>${capas.map(c => `<label><input type="checkbox" data-capa="${c.id}" ${state.capas[c.id]?'checked':''}><i style="background:${colorHex(c.tipo)}"></i>${c.l}</label>`).join("")}</div>` : "";
-    body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${selector}${partesel}${capasPanel}<div class="legend" id="legend3d"></div><div class="info hidden" id="info3d"></div>
-      <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · tocá una pieza</p></div>`;
+    // Sin leyenda fija: tapaba el modelo. La identificación de cada perfil sale al TOCARLO (info3d).
+    body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${selector}${partesel}${capasPanel}<div class="info hidden" id="info3d"></div>
+      <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · <b>tocá una pieza para ver qué es</b></p></div>`;
     try {
       viewer = new Viewer(document.getElementById("viewer3d"), { onSelect: showInfo3d });
       const mostrar = () => (partes && state.parte3d !== "todo") ? piezas.filter(p => p.parte === state.parte3d) : piezas;
       const aplicarCapas = () => capas.forEach(c => { if (state.capas[c.id]) viewer.setLayerVisible(c.id, true); });
       viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
-      document.getElementById("legend3d").innerHTML = [...new Set(piezas.map(p => p.tipo))].map(t => `<span class="chip"><i style="background:${colorHex(t)}"></i>${TIPO_LABEL[t]||t}</span>`).join("");
       const vs = document.getElementById("viewsel");
       if (vs) vs.querySelectorAll("button").forEach(b => b.onclick = () => {
         state.vista3d = b.dataset.v; vs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); viewer.setView(state.vista3d);
@@ -534,7 +535,14 @@ function showInfo3d(p){
   const el = document.getElementById("info3d"); if (!el) return;
   if (!p){ el.classList.add("hidden"); return; }
   el.classList.remove("hidden");
-  el.innerHTML = `<b style="color:${colorHex(p.tipo)}">${TIPO_LABEL[p.tipo]||p.tipo}</b><div class="row">${p.perfil}</div><div class="row">Largo <b>${p.largo} mm</b> · eje <b>${p.axis.toUpperCase()}</b></div>`;
+  // OJO: `axis` NO existe en las piezas diagonales (cabriada, flejes), que traen su base propia
+  // `orient`. Además el eje no le sirve a quien construye: lo que necesita es qué perfil es y cuánto
+  // mide. El punto de color reemplaza a la leyenda fija que antes tapaba el modelo.
+  const s = secDims(p.perfil);
+  const sec = p.categoria === "fleje" ? "" : ` · ${Math.round(s.h)} × ${Math.round(s.b)} mm`;
+  el.innerHTML = `<b><i class="dot" style="background:${colorHex(p.tipo)}"></i>${TIPO_LABEL[p.tipo]||p.tipo}</b>
+    <div class="row">${p.perfil}${sec}</div>
+    <div class="row">Largo <b>${p.largo} mm</b></div>`;
 }
 
 // ---------- materiales ----------

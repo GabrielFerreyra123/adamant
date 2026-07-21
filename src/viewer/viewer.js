@@ -236,11 +236,13 @@ export class Viewer {
     this.select(target);
   }
 
+  // Resaltado SUTIL: un emissive teal (el de la marca) en vez de blanco fuerte, que lavaba el color
+  // del perfil y hacía perder de vista cuál era la pieza elegida.
   select(mesh){
     this.clearSelection();
     this.selected = mesh;
-    mesh.material.emissive = new THREE.Color(0xffffff);
-    mesh.material.emissiveIntensity = 0.35;
+    mesh.material.emissive = new THREE.Color(0x1bb6a4);
+    mesh.material.emissiveIntensity = 0.28;
     this.onSelect(mesh.userData.pieza);
   }
   clearSelection(){

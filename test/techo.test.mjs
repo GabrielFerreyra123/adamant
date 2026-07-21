@@ -383,6 +383,28 @@ test("la correa apoya en el plano del faldón, no a plomo", () => {
     .forEach(p => assert.ok(p.orient.n[2] > 0.99, "casi horizontal con 7 %"));
 });
 
+// A11) El wizard no puede pedir datos que el motor no usa (premisa: autoconstrucción, cero fricción).
+test("schema: 2 pasos y ningún campo que el motor ignore", () => {
+  const pasos = techo.schema.pasos;
+  assert.deepEqual(pasos.map(p => p.id), ["tipo", "medidas"], "la pendiente va dentro de Medidas");
+  const campos = pasos.flatMap(p => [...(p.campos||[]), ...(p.avanzado||[])]).filter(c => c.k);
+  assert.ok(campos.some(c => c.k === "pendiente"), "la pendiente sigue estando");
+  // cada campo del schema tiene que cambiar la geometría o el cómputo; si no, sobra en pantalla
+  const base = { kind: "techo", ...techo.defaults() };
+  const huella = inp => JSON.stringify(techo.generar(inp).piezas) +
+    JSON.stringify(techo.materiales(techo.generar(inp).piezas, inp));
+  const ref = huella(base);
+  const OTRO = { tipo: "dosAguas", luz: 4000, largo: 6000, pendiente: 50, alero: 200,
+    separacion: 400, timpanos: false, cubierta: false };
+  campos.forEach(c => {
+    if (!(c.k in OTRO)) return;                      // sólo los que sabemos variar
+    assert.notEqual(huella({ ...base, [c.k]: OTRO[c.k] }), ref, `el campo "${c.k}" no cambia nada: sobra`);
+  });
+  // "caída del agua" se eliminó: era un selector que no leía nadie
+  assert.ok(!campos.some(c => c.k === "caida"), "no vuelve el selector de caída");
+  assert.ok(!("caida" in techo.defaults()), "tampoco en los defaults");
+});
+
 // A7) Correas siempre presentes (el manual valida cabriadas a 1,20 m sólo con correas).
 test("a 1200 mm de separación las correas siguen estando", () => {
   const P = techo.generar(t({ separacion: 1200 })).piezas;

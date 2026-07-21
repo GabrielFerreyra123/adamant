@@ -124,7 +124,6 @@ function normalizar(input){
     perfilCorrea: PERFIL_CORREA,
     timpanos: input.timpanos !== false,
     cubierta: input.cubierta !== false,
-    caida: input.caida || "frente",
     moduloMuro: +input.moduloMuro || 0,   // sólo lo pasa el Ambiente, para el aviso de in-line framing
     _s: s
   };
@@ -156,7 +155,7 @@ export const techo = {
 
   defaults(){
     return { tipo: "unAgua", luz: 3000, largo: 4000, pendiente: 25, alero: 400,
-      separacion: 600, sepCorreas: 1000, timpanos: true, cubierta: true, caida: "frente",
+      separacion: 600, sepCorreas: 1000, timpanos: true, cubierta: true,
       sistema: "steel", opciones: { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90" } };
   },
 
@@ -170,7 +169,12 @@ export const techo = {
       ]},
       { id: "medidas", titulo: "Medidas", campos: [
         { k: "luz", tipo: "medida", label: "Luz (lo que cruza la cabriada)", rango: [2000, 12000] },
-        { k: "largo", tipo: "medida", label: "Largo del techo", rango: [1000, 20000] }
+        { k: "largo", tipo: "medida", label: "Largo del techo", rango: [1000, 20000] },
+        // Lenguaje llano: la pendiente en % con presets de obra. El manual recomienda 25–100 %;
+        // menos de 25 % se puede hacer con chapa pero avisa, y menos de 7 % no escurre (bloquea).
+        { k: "pendiente", tipo: "seg", label: "Pendiente (el manual recomienda de 25 % para arriba)",
+          opciones: [{ v: 7, l: "7 % (mínima chapa)" }, { v: 15, l: "15 %" }, { v: 25, l: "25 % (recomendada)" },
+            { v: 30, l: "30 %" }, { v: 50, l: "50 %" }] }
       ], avanzado: [
         { k: "alero", tipo: "medida", label: "Alero (máximo 600 mm)", rango: [0, ALERO_MAX] },
         { k: "separacion", tipo: "seg", label: "Separación de cabriadas",
@@ -178,15 +182,6 @@ export const techo = {
         { k: "timpanos", tipo: "seg", label: "Tímpanos (cerrar los extremos)", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] },
         { k: "cubierta", tipo: "seg", label: "Chapa de cubierta", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] },
         { tipo: "perfil" }
-      ]},
-      { id: "pendiente", titulo: "Pendiente", campos: [
-        // Lenguaje llano: la pendiente en % con presets de obra. El manual recomienda 25–100 %;
-        // menos de 25 % se puede hacer con chapa pero avisa, y menos de 7 % no escurre (bloquea).
-        { k: "pendiente", tipo: "seg", label: "Pendiente (el manual recomienda de 25 % para arriba)",
-          opciones: [{ v: 7, l: "7 % (mínima chapa)" }, { v: 15, l: "15 %" }, { v: 25, l: "25 % (recomendada)" },
-            { v: 30, l: "30 %" }, { v: 50, l: "50 %" }] },
-        { k: "caida", tipo: "seg", label: "¿Hacia dónde cae el agua?",
-          opciones: [{ v: "frente", l: "Frente" }, { v: "fondo", l: "Fondo" }, { v: "izq", l: "Izq." }, { v: "der", l: "Der." }] }
       ]}
     ]
   },
