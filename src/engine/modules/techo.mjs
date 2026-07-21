@@ -220,11 +220,20 @@ export const techo = {
     };
 
     // --- CORREAS: perpendiculares a las cabriadas (corren en Y), apoyadas sobre los cordones ---
-    faldones.forEach(f => posCorreas(f.largoF, c.sepCorreas).forEach(d => {
-      const [x, , z] = puntoFaldon(f, d, hC + secC.h / 2);
-      P.push({ tipo: "CORREA", perfil: c.perfilCorrea, largo: Math.round(c.largo), mat: "correa",
-        orient: { c: [x, c.largo/2, z], u: T, v: [0,0,1], n: [1,0,0], w: secC.h, t: secC.b } });
-    }));
+    // La correa Omega se acuesta EN EL PLANO DEL FALDÓN (alma plana apoyada sobre el cordón, alas
+    // hacia abajo), no a plomo: sobre un faldón inclinado son cosas distintas.
+    //   n = normal del faldón (siempre hacia arriba) · u = largo del techo · v = n × u (línea de máxima
+    //   pendiente). Así `w` (el alma, 37) corre en el plano y `t` (el ala, 22) sube desde el cordón.
+    const normalArriba = f => { const n = [-f.s[2], 0, f.s[0]]; return n[2] < 0 ? n.map(v => -v) : n; };
+    faldones.forEach(f => {
+      const n = normalArriba(f), v = [-n[2], 0, n[0]];      // v = n × u, con u = [0,1,0]
+      posCorreas(f.largoF, c.sepCorreas).forEach(d => {
+        const [x0, , z0] = puntoFaldon(f, d, 0);            // punto sobre la línea de nodos
+        const off = hC + secC.b / 2;                        // espesor del cordón + media correa, según la normal
+        P.push({ tipo: "CORREA", perfil: c.perfilCorrea, largo: Math.round(c.largo), mat: "correa",
+          orient: { c: [x0 + n[0]*off, c.largo/2, z0 + n[2]*off], u: T, v, n, w: secC.h, t: secC.b } });
+      });
+    });
 
     // --- ARRIOSTRAMIENTO del plano de cubierta: 1 cruz de flejes por faldón (misma regla que Fase A,
     //     pero tumbada EN EL PLANO DEL FALDÓN: `s` (pendiente) × `t` (largo) ---

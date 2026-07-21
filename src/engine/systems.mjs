@@ -57,7 +57,9 @@ export const FLEJE_CIELO_PERFIL = `Fleje ${FLEJE_CIELO.ancho}x${FLEJE_CIELO.esp}
 export const rolloDe = perfil => perfil === FLEJE_CIELO_PERFIL ? FLEJE_CIELO.rollo : FLEJE.rollo;
 export const PGC_ALA = 40, PGC_LABIO = 15, PGU_ALA = 35, WOOD_DENS = 480;
 // PGO (Omega) — perfil de cielorraso suspendido (IRAM, kg/m estimado).
-export const PGO = { a: 37, b: 22, c: 12.5, kg: 0.47 };
+// a = alma (la cara plana que apoya) · b = ala (altura) · c = pestaña · e = espesor de chapa.
+// `e` sale del kg/m de la tabla: desarrollo (a + 2b + 2c) = 106 mm × e × 7,85 g/cm³ ≈ 0,47 kg/m.
+export const PGO = { a: 37, b: 22, c: 12.5, e: 0.56, kg: 0.47 };
 
 export function lumberKg(sz){ const L = LUMBER[sz]; return L.e * L.a * WOOD_DENS / 1e6; } // kg/m
 

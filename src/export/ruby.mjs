@@ -1,7 +1,7 @@
 // ADAMANT · export a SketchUp (.rb). Reutiliza el generador legacy: el HELPER (`_profile` + MAP_*)
 // es el mismo del app original; se emite una llamada `_profile` por pieza del motor, con la sección
 // y el mapper que corresponden a su tipo (idéntica maquinaria que scriptMuro/_wall).
-import { resolveSystem } from "../engine/systems.mjs";
+import { resolveSystem, PGC, PGO, PGO_PERFIL, PGC_ALA, PGC_LABIO, LUMBER } from "../engine/systems.mjs";
 import { getModule } from "../engine/modules/index.mjs";
 
 // HELPER legacy verbatim (el bloque ETIQUETAS queda inerte: ETIQUETAS no está definido).
@@ -24,8 +24,43 @@ MAP_YZ = ->(y,z){ Geom::Point3d.new(0, y.mm, z.mm) }
 MAP_XZ = ->(x,z){ Geom::Point3d.new(x.mm, 0, z.mm) }
 MAP_XY = ->(x,y){ Geom::Point3d.new(x.mm, y.mm, 0) }`;
 
-const rbSec = sec => "[" + sec.map(p => `[${p[0]},${p[1]}]`).join(",") + "]";
+const rbSec = sec => "[" + sec.map(p => `[${num(p[0])},${num(p[1])}]`).join(",") + "]";
 const num = v => Number.isInteger(v) ? v : +(+v).toFixed(2);
+
+// --- secciones de las piezas DIAGONALES (`orient`) ---------------------------------------------
+// Una pieza con base propia se dibuja con su sección en el plano (v, n): la coordenada 1 corre sobre
+// `v` (para las barras de cabriada, la dirección del ALMA) y la 2 sobre `n` (la de las ALAS).
+// Sin esto todas salían como un rectángulo macizo — o sea, láminas en vez de perfiles.
+const rect = (w, t) => [[-w/2,-t/2],[w/2,-t/2],[w/2,t/2],[-w/2,t/2]];
+
+// Perfil C (PGC) DE CANTO: el mismo contorno que usa el muro, pero con el alma sobre la coordenada 1.
+function secC_canto(perfil){
+  const ca = PGC[perfil].a, ct = PGC[perfil].e, cf = PGC_ALA, cl = PGC_LABIO;
+  const C = [[cf,cl],[cf,0],[0,0],[0,ca],[cf,ca],[cf,ca-cl],[cf-ct,ca-cl],[cf-ct,ca-ct],
+             [ct,ca-ct],[ct,ct],[cf-ct,ct],[cf-ct,cl]];
+  return C.map(([ala, alma]) => [alma - ca/2, ala - cf/2]); // (ala,alma) → (alma,ala), centrado
+}
+
+// Perfil Omega (PGO) de correa, como se coloca: alma plana ARRIBA (recibe la chapa) y las dos
+// pestañas ABAJO, apoyadas sobre el cordón. Coordenada 1 = ancho total (a + 2c), 2 = altura (b).
+// Contorno cerrado de espesor `e`, recorrido: pestaña sup. izq → ala → alma → ala → pestaña der.,
+// y la vuelta por abajo. Las pestañas nacen en y0+e (no en y0) o el contorno se cortaría a sí mismo.
+function secOmega(){
+  const W = PGO.a, H = PGO.b, P = PGO.c, e = PGO.e, x = W/2, xp = W/2 + P, y0 = -H/2, y1 = H/2;
+  return [
+    [-xp, y0+e], [-x, y0+e], [-x, y1], [x, y1], [x, y0+e], [xp, y0+e],  // cara de arriba/afuera
+    [xp, y0], [x-e, y0], [x-e, y1-e], [-x+e, y1-e], [-x+e, y0], [-xp, y0] // vuelta por abajo/adentro
+  ];
+}
+
+// Sección real de una pieza `orient` según su perfil. El fleje y la madera SÍ son macizos.
+function secOrientDe(p, wood){
+  const { w, t } = p.orient;
+  if (p.categoria === "fleje" || wood || LUMBER[p.perfil]) return rect(w, t);
+  if (PGC[p.perfil]) return secC_canto(p.perfil);
+  if (p.perfil === PGO_PERFIL) return secOmega();
+  return rect(w, t);
+}
 
 export function exportRuby(input){
   const s = resolveSystem(input), wood = s.wood;
@@ -60,7 +95,8 @@ export function exportRuby(input){
     VIGA:"ForestGreen", VIGA_DOBLE:"DarkGreen", BLOCKING:"HotPink",
     MAESTRA:"SeaGreen", VELA:"OrangeRed",
     CORDON_SUPERIOR:"Chocolate", CORDON_INFERIOR:"Sienna", DIAGONAL:"CornflowerBlue",
-    MONTANTE_CABRIADA:"LightSeaGreen", MONTANTE_TIMPANO:"MediumSeaGreen", CORREA:"MediumPurple"
+    MONTANTE_CABRIADA:"LightSeaGreen", MONTANTE_TIMPANO:"MediumSeaGreen", CORREA:"MediumPurple",
+    FLEJE:"Gainsboro", FLEJE_CIELO:"LightSlateGray"
   };
   const sub = t => soleraLike(t) ? "t_sol" : (t === "KING" || t === "JACK" || t === "DINTEL" || t === "CRIPPLE") ? "t_van" : "t_mon";
   const secOf = p => soleraLike(p.tipo)
@@ -89,7 +125,7 @@ export function exportRuby(input){
       if (p.categoria === "fleje") usaFleje = true; else if (TECHO_TIPOS.has(p.tipo)) usaTecho = true;
       const o = p.orient, L = p.largo;
       const p0 = [0,1,2].map(i => o.c[i] - o.u[i] * L / 2); // extremo de arranque de la diagonal
-      const sec = rbSec([[-o.w/2,-o.t/2],[o.w/2,-o.t/2],[o.w/2,o.t/2],[-o.w/2,o.t/2]]);
+      const sec = rbSec(secOrientDe(p, wood));
       // los versores van con precisión alta: redondearlos a 2 decimales desviaría el extremo varios mm
       const vec = v => `Geom::Vector3d.new(${v.map(c => +c.toFixed(6)).join(",")})`;
       const ax = `Geom::Transformation.axes(Geom::Point3d.new(${p0.map(v => num(v) + ".mm").join(",")}), ${vec(o.u)}, ${vec(o.v)}, ${vec(o.n)})`;

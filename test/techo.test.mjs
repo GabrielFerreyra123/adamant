@@ -330,6 +330,55 @@ test("regresión: la cabriada y las correas son las mismas que antes del addendu
   assert.equal(rollo30.unidad, "rollo"); assert.equal(rollo38.unidad, "rollo");
 });
 
+// A9) Secciones REALES en el export: las barras de cabriada salen como perfil C y las correas como
+// Omega, no como un rectángulo macizo (que en SketchUp se ve como una lámina/planchuela).
+test("export: perfil C en la cabriada y Omega en la correa, no rectángulos macizos", () => {
+  const rb = exportRuby(t({ largo: 2400 }));
+  const secs = [...rb.matchAll(/^_profile\(we, (\[\[[^\]]*\](?:,\[[^\]]*\])*\]), MAP_YZ.*?"(\w+)"/gm)]
+    .reduce((m, x) => (m[x[2]] = m[x[2]] || JSON.parse(x[1]), m), {});
+  const bbox = S => [Math.max(...S.map(p=>p[0])) - Math.min(...S.map(p=>p[0])),
+                     Math.max(...S.map(p=>p[1])) - Math.min(...S.map(p=>p[1]))];
+  // cordón superior (Chocolate) = PGC 100x0.90 de canto: 12 vértices, alma 100 × ala 40
+  const cs = secs.Chocolate;
+  assert.equal(cs.length, 12, "el C tiene labios: 12 vértices, no 4");
+  assert.deepEqual(bbox(cs), [100, 40], "alma en el plano de la cabriada, alas de costado");
+  // correa (MediumPurple) = Omega 37x22x12.5: ancho total 37+2·12.5, alto 22
+  const co = secs.MediumPurple;
+  assert.equal(co.length, 12, "el Omega es un contorno cerrado, no un rectángulo");
+  assert.deepEqual(bbox(co), [62, 22], "alma 37 + 2 pestañas de 12,5 · ala 22");
+  // el fleje SÍ es una planchuela: 4 vértices
+  assert.equal(secs.Gainsboro.length, 4, "el fleje es chapa plana de verdad");
+  assert.deepEqual(bbox(secs.Gainsboro), [30, 0.5]);
+
+  // ningún contorno se auto-interseca (SketchUp no crea la cara si se cruza)
+  const cruza = (p,q,r,s) => { const d=(a,b,c)=>Math.sign((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]));
+    return d(p,q,r)*d(p,q,s) < 0 && d(r,s,p)*d(r,s,q) < 0; };
+  Object.entries(secs).forEach(([col, S]) => {
+    for (let i = 0; i < S.length; i++) for (let j = i+1; j < S.length; j++){
+      if (j === i || (j+1) % S.length === i) continue;
+      assert.ok(!cruza(S[i], S[(i+1)%S.length], S[j], S[(j+1)%S.length]), `sección ${col} se cruza (${i},${j})`);
+    }
+  });
+});
+
+// A10) La correa Omega se acuesta EN EL PLANO del faldón (no a plomo).
+test("la correa apoya en el plano del faldón, no a plomo", () => {
+  const P = techo.generar(t({ pendiente: 25 })).piezas.filter(p => p.tipo === "CORREA");
+  const n = Math.hypot(1, 0.25);
+  P.forEach(p => {
+    const o = p.orient;
+    assert.deepEqual(o.u, [0,1,0], "corre a lo largo del techo");
+    // la normal de la correa es la del faldón (inclinada), no la vertical
+    assert.ok(Math.abs(o.n[2] - 1/n) < 1e-9 && Math.abs(o.n[0] + 0.25/n) < 1e-9, `normal del faldón, no [0,0,1]`);
+    // base ortonormal y derecha (u × v = n): si no, la geometría sale espejada
+    const cr = [o.u[1]*o.v[2]-o.u[2]*o.v[1], o.u[2]*o.v[0]-o.u[0]*o.v[2], o.u[0]*o.v[1]-o.u[1]*o.v[0]];
+    cr.forEach((v, i) => assert.ok(Math.abs(v - o.n[i]) < 1e-9, "base derecha (u × v = n)"));
+  });
+  // sobre un techo plano la correa queda horizontal (control de coherencia)
+  techo.generar(t({ pendiente: 7 })).piezas.filter(p => p.tipo === "CORREA")
+    .forEach(p => assert.ok(p.orient.n[2] > 0.99, "casi horizontal con 7 %"));
+});
+
 // A7) Correas siempre presentes (el manual valida cabriadas a 1,20 m sólo con correas).
 test("a 1200 mm de separación las correas siguen estando", () => {
   const P = techo.generar(t({ separacion: 1200 })).piezas;
