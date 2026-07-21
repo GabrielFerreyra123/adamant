@@ -4,7 +4,7 @@
 // Coordenadas del entramado: X = corrida (lado mayor) · Y = luz (lado menor, lo que salva cada viga).
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
-import { piso, validarVanoPiso } from "../src/engine/modules/piso.mjs";
+import { piso, validarVanoPiso, encajarVano, zonaVano } from "../src/engine/modules/piso.mjs";
 import { combinado } from "../src/engine/modules/combinado.mjs";
 import { cutList } from "../src/engine/cuts.mjs";
 import { pieceBoxEngine } from "../src/engine/geometry.mjs";
@@ -89,7 +89,8 @@ describe("validación de margen (error bloqueante)", () => {
     const v = { x: sep - 1, y: sep, ancho: corrida - 2*sep, largo: luz - 2*sep };
     const r = validarVanoPiso(suelo({ vano: v }));
     assert.equal(r.errores.length, 1);
-    assert.match(r.errores[0], /una franja de modulación/);
+    assert.match(r.errores[0], /muy pegado al borde/, "el error habla en lenguaje de obra");
+    assert.match(r.errores[0], /Acomodar/, "y ofrece la salida en un toque");
     assert.equal(r.vano, null);
     const { piezas, metadatos } = piso.generar(suelo({ vano: v }));
     assert.equal(metadatos.vano, null, "no se genera geometría inválida");
@@ -162,6 +163,44 @@ test("export Ruby: trimmer / cabezal / viga cola emitidos", () => {
   assert.equal((rb.match(/_profile\(/g) || []).length - 1, P.length, "una llamada por pieza (menos la def del helper)");
   assert.match(rb, /MAP_XZ/, "los cabezales corren en X y se extruyen con su mapper");
   assert.ok(!/undefined|NaN/.test(rb), "sin valores inválidos en el script");
+});
+
+// El vano se ACOMODA solo: la UI nunca deja al usuario contra el error bloqueante.
+describe("encajarVano: el hueco siempre entra", () => {
+  // caso reportado: entramado 5000×4000 @600 con el preset "Escalera recta 1000×3000".
+  // A lo largo de las vigas (luz 4000) 3000+600+600 = 4200 no entra; girado sí (3000 sobre 5000).
+  const suelo600 = { sistema: "steel", largo: 5000, ancho: 4000, separacion: 600, opciones: OPC };
+  test("gira el vano cuando no entra en esa orientación", () => {
+    const crudo = { x: 2000, y: 500, ancho: 1000, largo: 3000 };
+    assert.equal(validarVanoPiso({ ...suelo600, vano: crudo }).errores.length, 1, "crudo no entra");
+    const { vano, ajustes } = encajarVano(suelo600, crudo);
+    assert.deepEqual([vano.ancho, vano.largo], [3000, 1000], "quedó girado");
+    assert.match(ajustes[0], /gir/i);
+    assert.deepEqual(validarVanoPiso({ ...suelo600, vano }).errores, [], "ya es válido");
+  });
+  test("achica el vano si no entra ni girado", () => {
+    const { vano, ajustes } = encajarVano(suelo600, { x: 0, y: 0, ancho: 9000, largo: 9000 });
+    const z = zonaVano(suelo600);
+    assert.deepEqual([vano.ancho, vano.largo], [z.maxAncho, z.maxLargo]);
+    assert.ok(ajustes.some(a => /Achiqu/.test(a)));
+    assert.deepEqual(validarVanoPiso({ ...suelo600, vano }).errores, []);
+  });
+  test("corre el vano si quedó pegado al borde", () => {
+    const { vano, ajustes } = encajarVano(suelo600, { x: 0, y: 0, ancho: 800, largo: 800 });
+    assert.deepEqual([vano.x, vano.y], [600, 600], "lo lleva al margen mínimo");
+    assert.ok(ajustes.some(a => /corr/i.test(a)));
+  });
+  test("si ya es válido no toca nada ni informa ajustes", () => {
+    const ok = { x: 1900, y: 600, ancho: 1000, largo: 2400 };
+    const r = encajarVano(suelo(), ok);
+    assert.deepEqual(r.vano, ok);
+    assert.deepEqual(r.ajustes, []);
+  });
+  test("entramado demasiado chico: lo dice, sin romper", () => {
+    const r = encajarVano({ sistema: "steel", largo: 1200, ancho: 1000, separacion: 600, opciones: OPC }, { x: 0, y: 0, ancho: 600, largo: 600 });
+    assert.equal(r.vano, null);
+    assert.match(r.ajustes[0], /muy chico/);
+  });
 });
 
 // Ambiente completo: passthrough del vano al piso, sin lógica nueva en el orquestador.

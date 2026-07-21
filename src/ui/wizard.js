@@ -3,7 +3,7 @@
 // Agregar un tipo nuevo NO toca este archivo si usa sólo campos simples (sistema/medida/seg/cards/perfil).
 import { computeProject, cutPlan, cutOpts, listModules, getModule } from "../engine/index.mjs";
 import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
-import { validarVanoPiso } from "../engine/modules/piso.mjs";
+import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.mjs";
 import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
@@ -342,11 +342,15 @@ function vanoPisoHTML(){
     <div class="addrow"><button class="btn sm" id="vpAdd">＋ Agregar vano</button></div>
     <p class="sub">Entramado ${corrida}×${luz} mm · modulación ${sep} mm.</p>`;
   const { errores, avisos } = validarVanoPiso(toEngineInput());
-  return `<p class="sub">Arrastrá el hueco sobre la planta (snap a la modulación de ${sep} mm) o cargá las medidas.</p>
+  const { maxAncho, maxLargo } = zonaVano(state.params);
+  return `<p class="sub">Arrastrá el hueco sobre la planta (se acomoda solo a la modulación de ${sep} mm).
+    Máximo que entra acá: <b>${maxAncho}×${maxLargo} mm</b>.</p>
     <div class="addrow">${PRESETS_VANO.map((q, i) => `<button class="btn sm" data-preset="${i}">${q.l}</button>`).join("")}
-      <button class="btn sm" id="vpDel">✕ Quitar</button></div>
+      <button class="btn sm" id="vpGirar">⟲ Girar</button><button class="btn sm" id="vpDel">✕ Quitar</button></div>
     <div class="planta4" id="vpPlanta"></div>
-    ${errores.length ? `<div class="errores"><b>⛔ No se puede generar</b>${errores.map(e => `<span>${e}</span>`).join("")}</div>` : ""}
+    ${state.vanoAjustes?.length ? `<div class="avisos"><b>✓ Lo acomodé</b>${state.vanoAjustes.map(a => `<span>${a}</span>`).join("")}</div>` : ""}
+    ${errores.length ? `<div class="errores"><b>⛔ Así no entra</b>${errores.map(e => `<span>${e}</span>`).join("")}
+      <button class="btn sm" id="vpFix">Acomodar</button></div>` : ""}
     ${avisos.length ? `<div class="avisos"><b>⚠ Vano</b>${avisos.map(a => `<span>${a}</span>`).join("")}</div>` : ""}
     <div class="vgrid">
       <label>Posición X (corrida)<input type="number" data-vp="x" value="${v.x}"><i>mm</i></label>
@@ -378,41 +382,45 @@ function drawVanoPlanta(){
 function startVanoPisoDrag(e){
   e.preventDefault();
   const box = document.getElementById("vpPlanta"), { pad, sx, sy, ih } = box._geo;
-  const v = state.params.vano, { corrida, luz, sep } = pisoPlanta();
+  const v = state.params.vano, { sep } = pisoPlanta();
+  const { m, corrida, luz } = zonaVano(state.params);
   const rect = box.querySelector("svg").getBoundingClientRect();
   const snap = n => Math.round(n / sep) * sep;
   const move = ev => {
-    // el puntero toma el CENTRO del hueco; se snapea a la modulación y se clampea al entramado
+    // El puntero toma el CENTRO del hueco; se snapea a la modulación y se limita al margen de apoyo,
+    // así arrastrando NUNCA se llega a un vano inválido.
     const cx = (ev.clientX - rect.left - pad) / sx, cy = (ih - (ev.clientY - rect.top - pad)) / sy;
-    v.x = Math.max(0, Math.min(corrida - v.ancho, snap(cx - v.ancho/2)));
-    v.y = Math.max(0, Math.min(luz - v.largo,     snap(cy - v.largo/2)));
+    v.x = Math.min(Math.max(snap(cx - v.ancho/2), m), corrida - m - v.ancho);
+    v.y = Math.min(Math.max(snap(cy - v.largo/2), m), luz - m - v.largo);
     drawVanoPlanta();
   };
   const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); render(); };
   window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
 }
+// Aplica un vano pasándolo SIEMPRE por el acomodador: nunca deja al usuario en un estado inválido.
+function ponerVano(v){
+  const { vano, ajustes } = encajarVano(state.params, v);
+  state.params.vano = vano; state.vanoAjustes = ajustes;
+  render();
+}
 function wireVanoPiso(){
   const add = document.getElementById("vpAdd");
   if (add){
-    add.onclick = () => { // centrado y dentro del margen mínimo
-      const { corrida, luz, sep } = pisoPlanta();
-      const ancho = Math.min(600, Math.max(200, corrida - 2*sep)), largo = Math.min(600, Math.max(200, luz - 2*sep));
-      state.params.vano = { x: Math.round((corrida - ancho)/2), y: Math.round((luz - largo)/2), ancho, largo };
-      render();
-    };
+    add.onclick = () => { const { corrida, luz } = pisoPlanta();
+      ponerVano({ x: Math.round(corrida/2 - 300), y: Math.round(luz/2 - 300), ancho: 600, largo: 600 }); };
     return;
   }
-  const del = document.getElementById("vpDel"); if (del) del.onclick = () => { state.params.vano = null; render(); };
+  const del = document.getElementById("vpDel"); if (del) del.onclick = () => { state.params.vano = null; state.vanoAjustes = null; render(); };
+  const fix = document.getElementById("vpFix"); if (fix) fix.onclick = () => ponerVano(state.params.vano);
+  const gir = document.getElementById("vpGirar"); if (gir) gir.onclick = () => {
+    const v = state.params.vano; ponerVano({ ...v, ancho: v.largo, largo: v.ancho });
+  };
   document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => {
     const q = PRESETS_VANO[+b.dataset.preset], { corrida, luz } = pisoPlanta();
-    const v = state.params.vano;
-    v.ancho = q.ancho; v.largo = q.largo;
-    v.x = Math.max(0, Math.round((corrida - q.ancho)/2)); v.y = Math.max(0, Math.round((luz - q.largo)/2));
-    render();
+    ponerVano({ x: Math.round((corrida - q.ancho)/2), y: Math.round((luz - q.largo)/2), ancho: q.ancho, largo: q.largo });
   });
-  document.querySelectorAll("[data-vp]").forEach(inp => inp.oninput = () => {
-    state.params.vano[inp.dataset.vp] = Math.round(parseFloat(inp.value) || 0);
-    drawVanoPlanta(); renderNav();
+  document.querySelectorAll("[data-vp]").forEach(inp => inp.onchange = () => { // al salir del campo, lo acomodo
+    ponerVano({ ...state.params.vano, [inp.dataset.vp]: Math.round(parseFloat(inp.value) || 0) });
   });
   drawVanoPlanta();
 }

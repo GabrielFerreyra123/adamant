@@ -44,13 +44,49 @@ export function validarVanoPiso(input){
   if (x + ancho > corrida - m) falta.push("derecha");
   if (y + largo > luz - m) falta.push("arriba");
   if (falta.length){
-    errores.push(`El vano debe dejar al menos ${m} mm (una franja de modulación) contra cada borde del ` +
-      `entramado; falta margen ${falta.join(", ")}. Entramado ${corrida}×${luz} mm.`);
+    // Mensaje en lenguaje de obra: el margen existe porque el cabezal tiene que apoyar sobre un paño
+    // entero de vigas; pegado al borde no hay dónde apoyarlo.
+    errores.push(`El hueco queda muy pegado al borde (${falta.join(" y ")}). Tiene que quedar a ${m} mm ` +
+      `como mínimo de cada lado, que es donde apoyan los cabezales. Tocá «Acomodar» y lo ubico solo.`);
     return { vano: null, errores, avisos };
   }
   if (ancho > CABEZAL_LUZ_AVISO)
     avisos.push(`Vano ancho: verificar dimensionado de cabezales con un profesional (${ancho} mm entre trimmers).`);
   return { vano: { x, y, ancho, largo }, errores, avisos };
+}
+
+// Zona donde puede vivir el hueco (respetando el margen a los 4 bordes), en coords del entramado.
+export function zonaVano(input){
+  const L = +input.largo, W = +input.ancho, m = (+input.separacion || 400) * VANO_MARGEN_MOD;
+  const luz = Math.min(L, W), corrida = Math.max(L, W);
+  return { m, corrida, luz, maxAncho: corrida - 2*m, maxLargo: luz - 2*m };
+}
+
+// Acomoda un vano para que SIEMPRE entre: si no entra como está pero sí girado, lo gira; si aún no
+// entra, lo achica; y lo corre dentro del margen. Devuelve el vano válido + qué hizo, en castellano.
+// Es lo que usa la UI para que el usuario nunca quede trabado contra el error.
+export function encajarVano(input, v){
+  const { m, corrida, luz, maxAncho, maxLargo } = zonaVano(input);
+  const ajustes = [];
+  if (maxAncho < 200 || maxLargo < 200)
+    return { vano: null, ajustes: [`El entramado (${corrida}×${luz} mm) es muy chico para abrir un hueco.`] };
+
+  let ancho = Math.max(200, Math.round(+v.ancho || 0)), largo = Math.max(200, Math.round(+v.largo || 0));
+  // 1) girarlo si así no entra pero girado sí (caso típico: escalera larga en el lado corto)
+  if ((ancho > maxAncho || largo > maxLargo) && ancho <= maxLargo && largo <= maxAncho){
+    [ancho, largo] = [largo, ancho];
+    ajustes.push("Lo giré 90°: así entra en el entramado.");
+  }
+  // 2) achicarlo si sigue sin entrar
+  if (ancho > maxAncho){ ancho = maxAncho; ajustes.push(`Achiqué el ancho a ${ancho} mm (es lo máximo que entra).`); }
+  if (largo > maxLargo){ largo = maxLargo; ajustes.push(`Achiqué el largo a ${largo} mm (es lo máximo que entra).`); }
+  // 3) correrlo para que respete el margen contra los bordes
+  const x0 = +v.x, y0 = +v.y;
+  const x = Math.min(Math.max(Number.isFinite(x0) ? x0 : m, m), corrida - m - ancho);
+  const y = Math.min(Math.max(Number.isFinite(y0) ? y0 : m, m), luz - m - largo);
+  if (Math.round(x) !== Math.round(x0) || Math.round(y) !== Math.round(y0))
+    ajustes.push(`Lo corrí para dejar los ${m} mm de apoyo contra cada borde.`);
+  return { vano: { x: Math.round(x), y: Math.round(y), ancho, largo }, ajustes };
 }
 
 export const piso = {
