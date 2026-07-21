@@ -554,26 +554,50 @@ function avisoPreciosHTML(masViejo){
     ? `<div class="avisos"><b>⚠ Precios</b><span>Precios con más de ${DIAS_AVISO_PRECIOS} días (el más viejo tiene ${d}), revisá antes de presupuestar.</span></div>`
     : "";
 }
-// MATERIALES: cantidades + presupuesto resuelto contra la lista única. Los precios se editan en la
-// pestaña Precios (un solo panel para todos los módulos), acá sólo se muestran.
+// MATERIALES: acá se arma el presupuesto. Cargás el precio que conseguiste EN LA FILA del material y
+// el subtotal y el total se actualizan al instante (sin re-render: no se pierde el foco al tipear).
+// Lo que se escribe va a la lista ÚNICA (misma que usan los otros módulos y el PDF).
 function renderMateriales(body){
   const { materiales, metadatos } = computeProject(toEngineInput());
-  const pres = resolverPresupuesto(listaCompra(materiales), cargarPrecios());
-  const rows = pres.filas.map(f => `<tr class="${f.sinPrecio ? "nop" : ""}">
+  const items = listaCompra(materiales);
+  const pres = resolverPresupuesto(items, cargarPrecios());
+  const rows = pres.filas.map(f => {
+    const sku = String(f.id || f.nombre).replace(/[^a-z0-9.]+/gi, "-");
+    return `<tr data-id="${f.id || ""}">
       <td>${f.nombre}</td><td class="u">${f.unidad}</td><td class="n">${f.cantidad}</td>
-      <td class="n">${f.sinPrecio ? "—" : money(f.precio)}</td>
-      <td class="n">${f.sinPrecio ? `<i class="sinp">sin precio</i>` : money(f.subtotal)}</td></tr>`).join("");
+      <td class="n"><input class="pinput" type="text" inputmode="decimal" autocomplete="off"
+        name="precio-unitario-${sku}" id="precio-unitario-${sku}" aria-label="Precio de ${f.nombre}"
+        data-id="${f.id || ""}" data-cant="${f.cantidad}" value="${f.precio || ""}" placeholder="0"></td>
+      <td class="n" data-sub>${f.sinPrecio ? `<i class="sinp">sin precio</i>` : money(f.subtotal)}</td></tr>`;
+  }).join("");
   body.innerHTML = `<div class="pane">
     ${avisosHTML(metadatos)}${avisoPreciosHTML(pres.masViejo)}
+    <p class="sub">Andá cargando los precios que conseguís en tu corralón: el presupuesto se arma solo.
+      Quedan guardados y se comparten con los otros módulos.</p>
     <table class="mtable"><thead><tr><th>Material</th><th>Unidad</th><th class="n">Cant</th><th class="n">$ unit.</th><th class="n">Subtotal</th></tr></thead>
     <tbody>${rows}</tbody>
-    <tfoot><tr><td colspan="4" class="n"><b>TOTAL${pres.parcial ? " (parcial)" : ""}</b></td><td class="n"><b>${money(pres.total)}</b></td></tr></tfoot></table>
-    ${pres.parcial ? `<p class="sub">Faltan ${pres.sinPrecio.length} precio(s): el total es <b>parcial</b>.
-      Cargalos en <button class="lnk" id="irPrecios">Precios</button>.</p>` : ""}
-    <p class="sub">Perfiles/maderas en barras comerciales (6 m steel · 3,05 m wood); placas 1,20×2,40. Sólo materiales.</p>
+    <tfoot><tr><td colspan="4" class="n"><b data-tlabel>TOTAL${pres.parcial ? " (parcial)" : ""}</b></td>
+      <td class="n"><b data-total>${money(pres.total)}</b></td></tr></tfoot></table>
+    <p class="sub">Perfiles/maderas en barras comerciales (6 m steel · 3,05 m wood); placas 1,20×2,40. Sólo materiales.
+      La lista completa (con backup y export) está en <button class="lnk" id="irPrecios">Precios</button>.</p>
   </div>`;
-  const ir = document.getElementById("irPrecios");
-  if (ir) ir.onclick = () => { state.tab = "prec"; renderTab(); };
+
+  // Recalcula en el lugar: subtotal de la fila + total y la marca de "(parcial)".
+  const recompute = () => {
+    let total = 0, faltan = 0;
+    body.querySelectorAll(".pinput").forEach(inp => {
+      const p = parseNum(inp.value), cant = +inp.dataset.cant, celda = inp.closest("tr").querySelector("[data-sub]");
+      if (p > 0){ total += p * cant; celda.textContent = money(p * cant); }
+      else { faltan++; celda.innerHTML = `<i class="sinp">sin precio</i>`; }
+    });
+    body.querySelector("[data-total]").textContent = money(total);
+    body.querySelector("[data-tlabel]").textContent = "TOTAL" + (faltan ? " (parcial)" : "");
+  };
+  body.querySelectorAll(".pinput").forEach(inp => inp.addEventListener("input", () => {
+    if (inp.dataset.id) setPrecio(inp.dataset.id, parseNum(inp.value));
+    recompute();
+  }));
+  document.getElementById("irPrecios").onclick = () => { state.tab = "prec"; renderTab(); };
 }
 
 // ---------- precios (panel ÚNICO, compartido por todos los módulos) ----------
