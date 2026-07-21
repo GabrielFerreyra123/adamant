@@ -4,7 +4,7 @@
 // Acá se calcula la caja (size + center) de cada pieza EN COORDENADAS DEL MOTOR, respetando su eje.
 // Una pieza puede traer `p.box` (AABB ya resuelto en coords del motor): se usa tal cual — así el módulo
 // combinado puede reubicar (rotar/trasladar/elevar) piezas de submódulos sin reimplementar secciones.
-import { PGC, PGU, LUMBER, CIELO, PGC_ALA, PGU_ALA } from "./systems.mjs";
+import { PGC, PGU, LUMBER, CIELO, PGC_ALA, PGU_ALA, PGO, PGO_PERFIL } from "./systems.mjs";
 
 // Sección aproximada del perfil (mm): { b: ala/espesor, h: alma/ancho }.
 export function secDims(perfil){
@@ -12,13 +12,15 @@ export function secDims(perfil){
   if (PGU[perfil]) return { b: PGU_ALA, h: PGU[perfil].a };
   if (LUMBER[perfil]) return { b: LUMBER[perfil].e, h: LUMBER[perfil].a };
   if (CIELO[perfil]) return { b: CIELO[perfil].fl, h: CIELO[perfil].a };
+  if (perfil === PGO_PERFIL) return { b: PGO.b, h: PGO.a };   // correa Omega
   return { b: 40, h: 100 };
 }
 
 // Piezas DE CANTO (alma vertical, en Z) también cuando corren en X: dintel del muro y todo el
 // entramado de piso / grilla de cielorraso (viga, viga doble, cenefa, blocking, solera, montante, maestra).
 const CANTO = new Set(["DINTEL", "VIGA", "VIGA_DOBLE", "CENEFA", "BLOCKING", "SOLERA", "MONTANTE", "MAESTRA",
-  "TRIMMER", "CABEZAL", "VIGA_COLA"]); // enmarcado del vano de piso: mismo armado que la viga
+  "TRIMMER", "CABEZAL", "VIGA_COLA",
+  "CORDON_SUPERIOR", "CORDON_INFERIOR", "DIAGONAL", "MONTANTE_CABRIADA", "MONTANTE_TIMPANO", "CORREA"]); // enmarcado del vano de piso: mismo armado que la viga
 
 // Caja de una pieza en coordenadas del motor (mm). size y center en [x, y, z].
 export function pieceBoxEngine(p){

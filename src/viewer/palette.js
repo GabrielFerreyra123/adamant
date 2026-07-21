@@ -21,6 +21,9 @@ export const TIPO_COLOR = {
   SOLERA:      0xe8b53a, // ámbar (solera perimetral PGU)
   MAESTRA:     0x3d9970, // verde azulado (viga maestra, nivel superior)
   VELA:        0xf2803d, // naranja (vela vertical a la losa)
+  // techo (cabriadas)
+  CORDON_SUPERIOR: 0xe07a3f, CORDON_INFERIOR: 0xc4622c, DIAGONAL: 0x6aa0d8,
+  MONTANTE_CABRIADA: 0x1bb6a4, MONTANTE_TIMPANO: 0x3d9970, CORREA: 0x9b6dd6, CUBIERTA: 0x8fa3ad,
   // arriostramiento
   FLEJE:       0xd9dee2, // gris chapa galvanizada (cruz de San Andrés)
   // combinado / capas de revestimiento (superficies visuales)
@@ -35,6 +38,8 @@ export const TIPO_LABEL = {
   TRIMMER:"Trimmer (borde de vano)", CABEZAL:"Cabezal", VIGA_COLA:"Viga cola",
   SOLERA:"Solera", MONTANTE:"Montante", MAESTRA:"Viga maestra", VELA:"Vela", PLACA:"Placa de piso",
   FLEJE:"Fleje (Cruz de San Andrés)",
+  CORDON_SUPERIOR:"Cordón superior", CORDON_INFERIOR:"Cordón inferior", DIAGONAL:"Diagonal (Fink)",
+  MONTANTE_CABRIADA:"Montante de cabriada", MONTANTE_TIMPANO:"Montante de tímpano", CORREA:"Correa", CUBIERTA:"Chapa de cubierta",
   "REV.EXT":"Revestimiento exterior — a definir", "REV.INT":"Revestimiento interior — a definir"
 };
 export const colorHex = tipo => "#" + (TIPO_COLOR[tipo] ?? 0x888888).toString(16).padStart(6, "0");

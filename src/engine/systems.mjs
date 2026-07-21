@@ -60,8 +60,10 @@ export function lumberKg(sz){ const L = LUMBER[sz]; return L.e * L.a * WOOD_DENS
 //   riel/portante cielorraso  → 2,60 / 3,00 m  (default 3,00)
 //   tirante de madera         → 3,05 / 3,66 / 4,88 m (default 3,05; el piso usa 4,88)
 // `opts` permite override por proyecto: { barLen, cieloLen, tiraLen }.
-export const BAR_LEN = { steel: 6000, cielo: 3000, wood: 3050 };
+export const BAR_LEN = { steel: 6000, cielo: 3000, wood: 3050, pgo: 6000 };
+export const PGO_PERFIL = "PGO 37x22x12.5";
 export function barLenOf(perfil, opts = {}){
+  if (perfil === PGO_PERFIL) return +opts.pgoLen || BAR_LEN.pgo;
   if (CIELO[perfil])  return +opts.cieloLen || BAR_LEN.cielo;
   if (LUMBER[perfil]) return +opts.tiraLen  || BAR_LEN.wood;
   return +opts.barLen || BAR_LEN.steel; // PGC / PGU (y perfiles desconocidos)
@@ -69,7 +71,7 @@ export function barLenOf(perfil, opts = {}){
 // Overrides de largo comercial que declara el proyecto (desde input.opciones), para pasar a cortes.
 export function cutOpts(input){
   const o = (input && input.opciones) || {};
-  return { barLen: o.barLen, cieloLen: o.cieloLen, tiraLen: o.tiraLen };
+  return { barLen: o.barLen, cieloLen: o.cieloLen, tiraLen: o.tiraLen, pgoLen: o.pgoLen };
 }
 
 export const DEFAULTS = { modulo:400, pgc:"PGC 100x0.90", pgu:"PGU 100x0.90", lumber:"2x6 (38×140)",

@@ -4,8 +4,9 @@ import { muro } from "./muro.mjs";
 import { piso } from "./piso.mjs";
 import { cielo } from "./cielo.mjs";
 import { combinado } from "./combinado.mjs";
+import { techo } from "./techo.mjs";
 
-const MODULES = [muro, piso, cielo, combinado];
+const MODULES = [muro, piso, cielo, techo, combinado];
 const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 
 export function listModules(){ return MODULES; }

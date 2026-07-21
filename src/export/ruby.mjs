@@ -32,7 +32,7 @@ export function exportRuby(input){
   const gen = getModule(input.kind).generar(input);
   const metadatos = gen.metadatos;
   // Los revestimientos son capas VISUALES "a definir" → no se exportan a SketchUp (la placa de piso sí).
-  const piezas = gen.piezas.filter(p => p.capa !== "rev-ext" && p.capa !== "rev-int");
+  const piezas = gen.piezas.filter(p => !["rev-ext", "rev-int", "cubierta"].includes(p.capa));
   // Fallback de largo desde la geometría sólo si no vino input.largo: algunas piezas (combinado
   // reubicado) llevan `box` y no `pos`, así que se descartan para no romper.
   const LARGO = Math.round(+input.largo || Math.max(1, ...piezas.filter(p => Array.isArray(p.pos)).map(p => p.pos[0] + p.largo)));
@@ -58,7 +58,9 @@ export function exportRuby(input){
     "SOL.PANEL":"Silver", "SOL.VANO":"Silver", "SOL.DINTEL":"Silver", CENEFA:"MediumPurple", SOLERA:"Goldenrod",
     MONTANTE: wood ? "SaddleBrown" : "SteelBlue", KING:"Orange", JACK:"Cyan", DINTEL:"Gray", CRIPPLE:"SteelBlue",
     VIGA:"ForestGreen", VIGA_DOBLE:"DarkGreen", BLOCKING:"HotPink",
-    MAESTRA:"SeaGreen", VELA:"OrangeRed"
+    MAESTRA:"SeaGreen", VELA:"OrangeRed",
+    CORDON_SUPERIOR:"Chocolate", CORDON_INFERIOR:"Sienna", DIAGONAL:"CornflowerBlue",
+    MONTANTE_CABRIADA:"LightSeaGreen", MONTANTE_TIMPANO:"MediumSeaGreen", CORREA:"MediumPurple"
   };
   const sub = t => soleraLike(t) ? "t_sol" : (t === "KING" || t === "JACK" || t === "DINTEL" || t === "CRIPPLE") ? "t_van" : "t_mon";
   const secOf = p => soleraLike(p.tipo)
@@ -76,21 +78,24 @@ export function exportRuby(input){
     const tr = `Geom::Transformation.new([${num(t.tx)}.mm, ${num(t.ty)}.mm, ${num(t.tz)}.mm])`;
     return ", " + (t.rot === 90 ? `${tr} * ROTZ90` : tr);
   };
-  let usaFleje = false;
+  const TECHO_TIPOS = new Set(["CORDON_SUPERIOR","CORDON_INFERIOR","DIAGONAL","MONTANTE_CABRIADA","MONTANTE_TIMPANO","CORREA"]);
+  let usaFleje = false, usaTecho = false;
   const calls = piezas.map(p => {
     // FLEJE (Cruz de San Andrés): pieza DIAGONAL. Se dibuja la chapa (sección ancho×espesor) extruida
     // en X local y se la lleva a su lugar con `Geom::Transformation.axes`, que mapea los ejes locales
     // a la base real de la pieza (u = largo, v = ancho, n = espesor). La base ya viene en coordenadas
     // finales (el combinado la rota al reubicar), por eso NO lleva además el `xf` de la parte.
     if (p.orient){
-      usaFleje = true;
+      if (p.categoria === "fleje") usaFleje = true; else if (TECHO_TIPOS.has(p.tipo)) usaTecho = true;
       const o = p.orient, L = p.largo;
       const p0 = [0,1,2].map(i => o.c[i] - o.u[i] * L / 2); // extremo de arranque de la diagonal
       const sec = rbSec([[-o.w/2,-o.t/2],[o.w/2,-o.t/2],[o.w/2,o.t/2],[-o.w/2,o.t/2]]);
       // los versores van con precisión alta: redondearlos a 2 decimales desviaría el extremo varios mm
       const vec = v => `Geom::Vector3d.new(${v.map(c => +c.toFixed(6)).join(",")})`;
       const ax = `Geom::Transformation.axes(Geom::Point3d.new(${p0.map(v => num(v) + ".mm").join(",")}), ${vec(o.u)}, ${vec(o.v)}, ${vec(o.n)})`;
-      return `_profile(we, ${sec}, MAP_YZ, ${num(L)}, :x, [0,0,0], "Gainsboro", t_fle, ${ax})`;
+      // color y capa según el tipo: el fleje va a Estructura-Flejes; las barras de cabriada, a Techo.
+      const capa = p.categoria === "fleje" ? "t_fle" : (TECHO_TIPOS.has(p.tipo) ? "t_tec" : "t_mon");
+      return `_profile(we, ${sec}, MAP_YZ, ${num(L)}, :x, [0,0,0], "${MAT[p.tipo] || "Gainsboro"}", ${capa}, ${ax})`;
     }
     // PLACA de piso: superficie plana (rectángulo largo×ancho + pushpull del espesor), no un perfil.
     if (p.tipo === "PLACA"){
@@ -104,7 +109,8 @@ export function exportRuby(input){
     return `_profile(we, ${secOf(p)}, ${mapper}, ${num(p.largo)}, ${axis}, ${org}, "${MAT[p.tipo]||"Silver"}", ${sub(p.tipo)}${xfDe(p)})`;
   }).join("\n");
   const rotzDecl = usaXf ? "\nROTZ90 = Geom::Transformation.rotation(ORIGIN, Z_AXIS, 90.degrees)" : "";
-  const flejeDecl = usaFleje ? `\nt_fle=model.layers.add("Estructura-Flejes")` : "";
+  const flejeDecl = (usaFleje ? `\nt_fle=model.layers.add("Estructura-Flejes")` : "")
+    + (usaTecho ? `\nt_tec=model.layers.add("Estructura-Techo")` : "");
 
   const nombre = `${metadatos.nombre} ${wood ? "wood" : "steel"}`;
   return `# ADAMANT · ${nombre} (export desde el motor) | unidades en mm

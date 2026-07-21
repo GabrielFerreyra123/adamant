@@ -29,6 +29,22 @@ export function subdivisiones(ancho, alto, angMin = FLEJE.angMin){
   return Math.max(1, Math.ceil(ancho * Math.tan(rad(angMin)) / alto - 1e-9));
 }
 
+// Cruz de San Andrés sobre un rectángulo CUALQUIERA (paño de muro o faldón de techo): elige cuántas
+// cruces hacen falta para que el ángulo entre en rango y devuelve las zonas + los avisos.
+// Sólo geometría del reparto: quién materializa los flejes decide en qué plano van.
+export function cruzEnPlano(ancho, alto){
+  const avisos = [], zonas = [];
+  if (!(ancho > 0) || !(alto > 0)) return { zonas, avisos };
+  const ang = anguloGrados(ancho, alto);
+  const n = ang < FLEJE.angMin ? subdivisiones(ancho, alto) : 1;
+  const wSub = ancho / n, angSub = anguloGrados(wSub, alto);
+  if (angSub > FLEJE.angMax)
+    avisos.push(`Tramo angosto: ángulo de fleje ${angSub.toFixed(1)}° fuera del rango recomendado ` +
+      `${FLEJE.angMin}–${FLEJE.angMax}°. Consultar arriostramiento con un profesional.`);
+  for (let i = 0; i < n; i++) zonas.push({ x0: i * wSub, ancho: wSub, alto, angulo: +angSub.toFixed(1) });
+  return { zonas, avisos };
+}
+
 // Los dos flejes de una cruz sobre la zona [x0, x0+ancho] × [0, alto].
 // Van APOYADOS sobre la cara exterior del frame (no lo penetran): el primero a medio espesor de la
 // cara y el segundo montado sobre el primero (un espesor más afuera), para que la X no se auto-interseque.

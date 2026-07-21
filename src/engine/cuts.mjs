@@ -7,7 +7,8 @@ import { barLenOf, FLEJE } from "./systems.mjs";
 const CODE_PREF = { MONTANTE:"M", KING:"K", JACK:"J", CRIPPLE:"C", DINTEL:"D",
   "SOL.PANEL":"SP", "SOL.VANO":"SV", "SOL.DINTEL":"SD",
   VIGA:"V", VIGA_DOBLE:"VD", CENEFA:"CE", BLOCKING:"B", SOLERA:"S", MAESTRA:"VM", VELA:"VL", FLEJE:"F",
-  TRIMMER:"TR", CABEZAL:"CB", VIGA_COLA:"VC" };
+  TRIMMER:"TR", CABEZAL:"CB", VIGA_COLA:"VC",
+  CORDON_SUPERIOR:"CS", CORDON_INFERIOR:"CI", DIAGONAL:"DG", MONTANTE_CABRIADA:"MC", MONTANTE_TIMPANO:"MT", CORREA:"CO" };
 
 // Largo de barra por perfil. `opts` puede ser un objeto de overrides (barLen/cieloLen/tiraLen) o,
 // por compatibilidad, un número (mismo largo para todos los perfiles).
