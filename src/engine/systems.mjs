@@ -39,6 +39,15 @@ export const BORDE_LIBRE = 600, RIGIDIZA_MARGEN = 1000;
 // Dintel: hasta este ancho de vano va simple; si lo supera, se refuerza (dintel DOBLE = 2 perfiles/
 // tirantes adicionales espejados). Aplica a los tres tipos de vano (puerta/ventana/arcada). Configurable.
 export const DINTEL_SIMPLE_MAX = 1500;
+// Arriostramiento por Cruz de San Andrés (fleje de chapa galvanizada, Barbieri/ConsulSteel).
+// El fleje se atornilla SÓLO en los extremos (nunca en montantes intermedios) y lleva 1 tensor.
+//   ancho/esp   — sección del fleje (mm).
+//   rollo       — largo del rollo comercial (mm): el fleje NO se corta de barra, viene en rollo.
+//   tornExtremo — tornillos T1 por extremo de fleje (→ 2·tornExtremo por fleje).
+//   angMin/Max  — rango válido del ángulo del fleje respecto de la horizontal (ideal ~45°).
+//   tramoMin    — ancho mínimo de tramo lleno para poder arriostrar (mm).
+export const FLEJE = { ancho:30, esp:0.5, rollo:25000, tornExtremo:4, angMin:30, angMax:60, tramoMin:400 };
+export const FLEJE_PERFIL = `Fleje ${FLEJE.ancho}x${FLEJE.esp}`;
 export const PGC_ALA = 40, PGC_LABIO = 15, PGU_ALA = 35, WOOD_DENS = 480;
 // PGO (Omega) — perfil de cielorraso suspendido (IRAM, kg/m estimado).
 export const PGO = { a: 37, b: 22, c: 12.5, kg: 0.47 };

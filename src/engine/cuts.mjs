@@ -2,11 +2,11 @@
 // (B) La lista de corte se deriva SIEMPRE de las piezas de la geometría (`buildPieces`).
 // No recalcula largos por su cuenta: así geometría y cómputo no pueden divergir
 // (p. ej. el largo del cripple sale del que dibuja el motor, descontando el cap PGU en steel).
-import { barLenOf } from "./systems.mjs";
+import { barLenOf, FLEJE } from "./systems.mjs";
 
 const CODE_PREF = { MONTANTE:"M", KING:"K", JACK:"J", CRIPPLE:"C", DINTEL:"D",
   "SOL.PANEL":"SP", "SOL.VANO":"SV", "SOL.DINTEL":"SD",
-  VIGA:"V", VIGA_DOBLE:"VD", CENEFA:"CE", BLOCKING:"B", SOLERA:"S", MAESTRA:"VM", VELA:"VL" };
+  VIGA:"V", VIGA_DOBLE:"VD", CENEFA:"CE", BLOCKING:"B", SOLERA:"S", MAESTRA:"VM", VELA:"VL", FLEJE:"F" };
 
 // Largo de barra por perfil. `opts` puede ser un objeto de overrides (barLen/cieloLen/tiraLen) o,
 // por compatibilidad, un número (mismo largo para todos los perfiles).
@@ -19,13 +19,18 @@ export function cutList(piezas){
     if (p.superficie) return; // superficies (placa de piso, revestimientos): m², no salen de una barra
     const k = p.tipo + "|" + p.perfil + "|" + p.largo;
     if (map.has(k)) map.get(k).cant += 1;
-    else map.set(k, { tipo:p.tipo, perfil:p.perfil, largo:p.largo, cant:1 });
+    else map.set(k, { tipo:p.tipo, perfil:p.perfil, largo:p.largo, cant:1, categoria:p.categoria || null });
   });
   const groups = [...map.values()].sort((a,b) => a.tipo < b.tipo ? -1 : a.tipo > b.tipo ? 1 : a.largo - b.largo);
   const seq = {};
   groups.forEach(g => { const pf = CODE_PREF[g.tipo] || "P"; seq[pf] = (seq[pf]||0) + 1; g.code = pf + seq[pf]; });
+  // `byProfile` alimenta el bin-packing de BARRAS. El fleje viene en ROLLO, no en barra: queda en
+  // `groups` (aparece en la lista de corte, sección FLEJES) pero fuera del empaquetado.
   const byProfile = {};
-  groups.forEach(g => { (byProfile[g.perfil] = byProfile[g.perfil] || []).push(...Array(g.cant).fill(g.largo)); });
+  groups.forEach(g => {
+    if (g.categoria === "fleje") return;
+    (byProfile[g.perfil] = byProfile[g.perfil] || []).push(...Array(g.cant).fill(g.largo));
+  });
   return { groups, byProfile };
 }
 
@@ -33,10 +38,10 @@ export function cutList(piezas){
 // cada una (First-Fit). Sirve para la pestaña Cortes: "de qué barra sale" cada pieza.
 export function cutPlan(piezas, opts){
   const { groups } = cutList(piezas);
-  const byPerfil = {};
+  const byPerfil = {}, flejes = [];
   groups.forEach(g => {
-    const arr = byPerfil[g.perfil] || (byPerfil[g.perfil] = []);
-    for (let i = 0; i < g.cant; i++) arr.push({ code: g.code, tipo: g.tipo, largo: g.largo });
+    const dest = g.categoria === "fleje" ? flejes : (byPerfil[g.perfil] || (byPerfil[g.perfil] = []));
+    for (let i = 0; i < g.cant; i++) dest.push({ code: g.code, tipo: g.tipo, largo: g.largo, perfil: g.perfil });
   });
   const out = [];
   Object.keys(byPerfil).sort().forEach(perfil => {
@@ -54,6 +59,12 @@ export function cutPlan(piezas, opts){
     const waste = bins.length ? +(1 - usadoTot / (bins.length * barLen)).toFixed(3) * 100 : 0;
     out.push({ perfil, barLen, bins, piezas: items.length - over, over, waste: +waste.toFixed(1) });
   });
+  // Sección FLEJES: se listan los largos por pieza, pero NO se empaquetan en barras (vienen en rollo).
+  if (flejes.length){
+    const mm = flejes.reduce((a, it) => a + it.largo, 0);
+    out.push({ perfil: flejes[0].perfil, fleje: true, items: flejes, piezas: flejes.length,
+      metros: +(mm/1000).toFixed(2), rollos: Math.ceil(mm / FLEJE.rollo), largoRollo: FLEJE.rollo });
+  }
   return out;
 }
 

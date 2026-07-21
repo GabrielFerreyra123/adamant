@@ -120,6 +120,7 @@ export class Viewer {
     (piezas || []).forEach(p => {
       let geo, center = null;
       if (p.rev){ geo = this._revGeo(p.rev); } // revestimiento con vanos recortados (Shape + holes)
+      else if (p.orient){ geo = this._orientGeo(p); } // pieza DIAGONAL (fleje): caja con base propia
       else {
         const box = pieceBoxEngine(p); center = box.center; // en mm, ejes del motor
         geo = new THREE.BoxGeometry(Math.max(box.size[0]*MM, 0.001), Math.max(box.size[1]*MM, 0.001), Math.max(box.size[2]*MM, 0.001));
@@ -152,6 +153,20 @@ export class Viewer {
     m.setPosition(rev.origin[0], rev.origin[1], rev.origin[2]);
     geo.applyMatrix4(m);        // local (u,v,esp) → coords del motor (mm)
     geo.scale(MM, MM, MM);      // mm → m, como el resto del grupo
+    return geo;
+  }
+
+  // Geometría de una pieza DIAGONAL (fleje de arriostramiento). El motor no la describe con un `axis`
+  // ortogonal sino con su base real { c, u(largo), v(ancho), n(espesor) }: se arma la caja en ejes
+  // locales (largo × ancho × espesor) y se lleva a coords del motor con esa base. La conversión a
+  // Y-up sigue siendo única (el grupo raíz rotado −90° X), como el resto de las piezas.
+  _orientGeo(p){
+    const o = p.orient;
+    const geo = new THREE.BoxGeometry(Math.max(p.largo, 0.001), Math.max(o.w, 0.001), Math.max(o.t, 0.001));
+    const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(...o.u), new THREE.Vector3(...o.v), new THREE.Vector3(...o.n));
+    m.setPosition(o.c[0], o.c[1], o.c[2]);
+    geo.applyMatrix4(m);   // local → coords del motor (mm)
+    geo.scale(MM, MM, MM); // mm → m
     return geo;
   }
 

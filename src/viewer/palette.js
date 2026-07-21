@@ -17,6 +17,8 @@ export const TIPO_COLOR = {
   SOLERA:      0xe8b53a, // ámbar (solera perimetral PGU)
   MAESTRA:     0x3d9970, // verde azulado (viga maestra, nivel superior)
   VELA:        0xf2803d, // naranja (vela vertical a la losa)
+  // arriostramiento
+  FLEJE:       0xd9dee2, // gris chapa galvanizada (cruz de San Andrés)
   // combinado / capas de revestimiento (superficies visuales)
   PLACA:       0xc9a66b, // madera (placa de piso OSB/fenólico)
   "REV.EXT":   0x8a6d9e, // violeta apagado (revestimiento exterior — a definir)
@@ -27,6 +29,7 @@ export const TIPO_LABEL = {
   "SOL.PANEL":"Solera panel", "SOL.VANO":"Solera de vano", "SOL.DINTEL":"Solera de dintel",
   VIGA:"Viga", VIGA_DOBLE:"Viga doble", CENEFA:"Cenefa", BLOCKING:"Blocking",
   SOLERA:"Solera", MONTANTE:"Montante", MAESTRA:"Viga maestra", VELA:"Vela", PLACA:"Placa de piso",
+  FLEJE:"Fleje (Cruz de San Andrés)",
   "REV.EXT":"Revestimiento exterior — a definir", "REV.INT":"Revestimiento interior — a definir"
 };
 export const colorHex = tipo => "#" + (TIPO_COLOR[tipo] ?? 0x888888).toString(16).padStart(6, "0");

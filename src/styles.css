@@ -193,6 +193,12 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .binitems i{ font-style:normal; background:var(--su-high); border:1px solid var(--hair-teal); border-radius:var(--r-default,2px); padding:2px 6px; }
 .binrem{ color:var(--muted); white-space:nowrap; }
 .warn{ color:var(--tangerine); font-family:var(--mono); font-size:11px; margin-top:6px; }
+/* advertencias del proyecto (arriostramiento): banner ámbar, no bloquea */
+.avisos{ display:flex; flex-direction:column; gap:5px; margin-bottom:14px; padding:12px 14px;
+  border:1px solid var(--tangerine); border-left-width:3px; border-radius:var(--r-lg,4px);
+  background:rgba(232,93,42,.08); }
+.avisos b{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--tangerine); }
+.avisos span{ font-size:12.5px; line-height:1.45; color:var(--paper); }
 .pane.center{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; }
 .pane.center .sub{ max-width:420px; }
 .pane.center .sub b{ font-family:"Barlow Condensed", sans-serif; font-weight:700; font-size:22px; text-transform:uppercase; color:var(--on-surface); display:block; margin-bottom:6px; }

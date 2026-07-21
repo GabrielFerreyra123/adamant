@@ -1,6 +1,7 @@
 // Módulo constructivo: Muro / Tabique con vanos. Migración del MVP a la interfaz de módulos (F6).
 // No cambia el comportamiento: reutiliza buildPieces + computeMaterials existentes.
 import { buildPieces } from "../frame.mjs";
+import { buildBraces } from "../brace.mjs";
 import { computeMaterials } from "../materials.mjs";
 import { resolveSystem } from "../systems.mjs";
 
@@ -18,7 +19,7 @@ export const muro = {
   // valores iniciales del proyecto
   defaults(){
     return {
-      sistema: "steel", tipo: "tabique", largo: 3000, alto: 2600, vanos: [],
+      sistema: "steel", tipo: "tabique", largo: 3000, alto: 2600, vanos: [], arriostramiento: "ninguno",
       opciones: { modulo: 400, pgc: "PGC 100x0.90", pgu: "PGU 100x0.90", lumber: "2x6 (38×140)", ...TIPO_DEFAULTS.tabique }
     };
   },
@@ -38,6 +39,8 @@ export const muro = {
         { k: "alto",  tipo: "medida", label: "Alto",  rango: [2000, 3500] }
       ], avanzado: [
         { k: "modulo", opt: true, tipo: "seg", label: "Modulación", opciones: [{ v: 400, l: "400 mm" }, { v: 600, l: "600 mm" }] },
+        { k: "arriostramiento", tipo: "seg", label: "Arriostramiento",
+          opciones: [{ v: "ninguno", l: "Ninguno" }, { v: "cruz", l: "Cruz de San Andrés" }] },
         { tipo: "perfil" }
       ]},
       { id: "aberturas", titulo: "Aberturas", componente: "vanos" }
@@ -50,9 +53,13 @@ export const muro = {
     // Nombre de la solera inferior para distinguirla en el listado (apoya sobre la plataforma de piso).
     // No cambia geometría ni `tipo` (los tests siguen contando "SOL.PANEL").
     piezas.forEach(p => { if (p.tipo === "SOL.PANEL" && p.pos[2] < 1) p.nombre = "Solera inferior (sobre plataforma)"; });
+    // Arriostramiento (Cruz de San Andrés): piezas diagonales sobre la cara exterior + avisos de ángulo.
+    const br = buildBraces(input);
+    piezas.push(...br.piezas);
     return {
       piezas,
-      metadatos: { nombre: "Muro / Tabique", esquema: "frontal", barLen: s.barLen, sistema: input.sistema }
+      metadatos: { nombre: "Muro / Tabique", esquema: "frontal", barLen: s.barLen, sistema: input.sistema,
+        avisos: br.avisos, cruces: br.zonas }
     };
   },
   materiales(piezas, input){ return computeMaterials(input, piezas); }

@@ -17,9 +17,12 @@ const amb = (sistema, largo, ancho, extra = {}) => ({
 // además de la estructura de los submódulos: +1 PLACA de piso (placa activa por default) y +8 superficies
 // de revestimiento (exterior + interior por cada uno de los 4 muros).
 const SUPERF = 1 + 8;
+// Los 4 muros del ambiente son perimetrales portantes: el combinado los arriostra por default
+// (`arriostraX: "cruz"`), así que el muro de referencia se genera con la misma opción.
 function esperado(sistema, largo, ancho, vanos = {}){
-  const wall = (larg, vv) => muro.generar({ sistema, largo: larg, alto: 2600, vanos: vv || [], opciones: OPC }).piezas;
-  const e = Math.round(boundsEngine(wall(largo)).size[1]);
+  const wall = (larg, vv) => muro.generar({ sistema, largo: larg, alto: 2600, vanos: vv || [], opciones: OPC, arriostramiento: "cruz" }).piezas;
+  // el espesor se mide sobre el FRAME (los flejes van apoyados por fuera de la cara)
+  const e = Math.round(boundsEngine(wall(largo).filter(p => p.categoria !== "fleje")).size[1]);
   const encaj = ancho - 2 * e;
   const pisoN = piso.generar({ sistema, largo, ancho, separacion: 400, apoyo: "platea", placa: true, opciones: OPC }).piezas.length;
   const n = pisoN + SUPERF
@@ -61,9 +64,14 @@ test("combinado wood 4×3 sin vanos: suma exacta", () => {
 // 4) AABB entre partes: ninguna pieza de una parte se interpenetra con otra (contacto permitido).
 //    Cubre las 4 esquinas (muro↔muro) y el apoyo muro↔piso. El encastre montante↔solera es interno de
 //    cada muro (esperado), por eso el chequeo es ENTRE partes distintas.
+//    EXENCIÓN `fleje`: la Cruz de San Andrés va APOYADA sobre la cara exterior del frame (no lo penetra),
+//    pero (a) las dos diagonales de una cruz se superponen a propósito en el centro de la X, (b) su AABB
+//    —al ser piezas diagonales— es mucho mayor que la chapa real y se solapa con la de la otra diagonal y
+//    con la capa visual de revestimiento exterior. Un test de cajas alineadas a los ejes no puede decidir
+//    interpenetración de piezas rotadas, así que los flejes quedan fuera de este chequeo.
 for (const [nombre, sis, L, W] of [["steel 4×3", "steel", 4000, 3000], ["wood 5×4", "wood", 5000, 4000]]){
   test(`combinado ${nombre}: sin colisión entre partes (AABB)`, () => {
-    const P = combinado.generar(amb(sis, L, W)).piezas.filter(p => !p.superficie); // sólo estructura (placa/rev son superficies)
+    const P = combinado.generar(amb(sis, L, W)).piezas.filter(p => !p.superficie && p.categoria !== "fleje");
     const bs = P.map(p => { const { size, center } = pieceBoxEngine(p); return { parte: p.parte, tipo: p.tipo, b: [0,1,2].map(i => [center[i]-size[i]/2, center[i]+size[i]/2]) }; });
     const eps = 0.5;
     const solapa = (a, b) => [0,1,2].every(i => a[i][0] < b[i][1] - eps && b[i][0] < a[i][1] - eps);
@@ -77,7 +85,8 @@ for (const [nombre, sis, L, W] of [["steel 4×3", "steel", 4000, 3000], ["wood 5
 test("combinado steel 4×3: bounding box = largo × ancho × alto total", () => {
   const inp = amb("steel", 4000, 3000);
   const { piezas, metadatos } = combinado.generar(inp);
-  const { size } = boundsEngine(piezas.filter(p => !p.superficie)); // envolvente estructural (rev sobresale)
+  // envolvente ESTRUCTURAL: rev (superficie) y flejes sobresalen del frame por diseño
+  const { size } = boundsEngine(piezas.filter(p => !p.superficie && p.categoria !== "fleje"));
   assert.ok(Math.abs(size[0] - 4000) < 1 && Math.abs(size[1] - 3000) < 1, `footprint ${size[0]}×${size[1]}`);
   const hPiso = boundsEngine(piso.generar({ sistema: "steel", largo: 4000, ancho: 3000, separacion: 400, apoyo: "platea", placa: true, opciones: OPC }).piezas).size[2];
   assert.ok(Math.abs(size[2] - (hPiso + 18 + 2600)) < 2, `alto total ${size[2]} (esperado ${hPiso + 18 + 2600})`);
@@ -91,7 +100,8 @@ for (const placa of [true, false]){
     const P = combinado.generar(amb("steel", 4000, 3000, { placa })).piezas;
     const zRange = arr => { const bs = arr.map(p => pieceBoxEngine(p)); return [Math.min(...bs.map(b => b.center[2]-b.size[2]/2)), Math.max(...bs.map(b => b.center[2]+b.size[2]/2))]; };
     const entramado = zRange(P.filter(p => p.parte === "piso" && p.tipo !== "PLACA"))[1]; // cota sup del entramado
-    const muroBot = zRange(P.filter(p => ["frente","fondo","izq","der"].includes(p.parte)))[0];
+    // el fleje es diagonal: su AABB desborda el alto del muro por el ancho de la chapa (no es su base)
+    const muroBot = zRange(P.filter(p => ["frente","fondo","izq","der"].includes(p.parte) && p.categoria !== "fleje"))[0];
     const placaPiece = P.find(p => p.tipo === "PLACA");
     if (placa){
       assert.ok(placaPiece, "la placa se renderiza como pieza");
@@ -162,7 +172,9 @@ test("combinado steel 4×3: materiales fusionados (perfiles global + otros del p
 //     `p.box` que dibuja el visor. Si esto coincide, el script pegado en SketchUp arma lo mismo que el 3D.
 test("combinado: el xf del export reproduce la caja del visor", () => {
   const P = combinado.generar(amb("steel", 4000, 3000)).piezas;
-  P.filter(p => p.xf).forEach(p => { // la PLACA se emite directo desde su box (sin xf)
+  // Los flejes quedan fuera: su transform NO viaja en `xf` sino BAKEADO en su base `orient` (el
+  // orquestador rota la base al reubicarlos), y el export los emite desde ahí.
+  P.filter(p => p.xf && p.categoria !== "fleje").forEach(p => { // la PLACA se emite directo desde su box (sin xf)
     const can = pieceBoxEngine({ ...p, box: undefined }); // caja canónica (local, sin reubicar)
     const t = p.xf, [sx, sy, sz] = can.size, [cx, cy, cz] = can.center;
     const box = t.rot === 90

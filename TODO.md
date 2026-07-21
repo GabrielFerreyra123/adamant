@@ -32,7 +32,13 @@ materiales/cortes/PDF → export Ruby), una fase por vez, con freno para revisi�
 ## Backlog ordenado
 1. Vano de escalera/trampa en piso (vigas dobles de borde de vano + cabezales).
 2. Techo: cabreadas/cerchas simples a dos aguas.
-3. Muro exterior portante con Cruz de San Andrés (arriostramiento).
+3. ~~Muro exterior portante con Cruz de San Andrés (arriostramiento).~~ **HECHO (Fase A)**: selector
+   `arriostramiento` por muro (ninguno/cruz) en Muro y por lado en Ambiente (`arriostraFrente/…`,
+   default `cruz`). Colocación automática: tramo lleno más ancho, subdivisión si el ángulo < 30°,
+   advertencia si > 60° o si no hay tramo ≥ 400 mm. Piezas diagonales (`orient`) apoyadas sobre la
+   cara exterior; el fleje va en ROLLO (fuera del bin-packing) + tensores + T1. `src/engine/brace.mjs`.
+   Pendiente de esta línea: arriostramiento por placa OSB estructural (va con el despiece de revestimientos)
+   y editor manual de posición de cruces.
 4. Proyecto combinado: piso + 4 muros (quincho/habitación completa) reutilizando módulos.
 5. Precios compartidos entre módulos (un solo listado de precios por usuario en localStorage).
 6. **Cielorraso — losa de referencia en el 3D**: las velas ya se modelan (piezas VELA verticales del

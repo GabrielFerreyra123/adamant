@@ -22,6 +22,15 @@ const CANTO = new Set(["DINTEL", "VIGA", "VIGA_DOBLE", "CENEFA", "BLOCKING", "SO
 // Caja de una pieza en coordenadas del motor (mm). size y center en [x, y, z].
 export function pieceBoxEngine(p){
   if (p.box) return p.box; // AABB ya resuelto (piezas reubicadas por el combinado)
+  // Pieza DIAGONAL (fleje de arriostramiento): no tiene `axis`, sino una base propia
+  // { c, u, v, n, w, t }. La AABB es la proyección de la caja rotada sobre los ejes del motor:
+  // medio-tamaño = Σ |eje_i| · medio-extensión_i.
+  if (p.orient){
+    const o = p.orient, ejes = [[o.u, p.largo/2], [o.v, o.w/2], [o.n, o.t/2]];
+    const half = [0, 0, 0];
+    ejes.forEach(([e, h]) => { for (let i = 0; i < 3; i++) half[i] += Math.abs(e[i]) * h; });
+    return { size: [half[0]*2, half[1]*2, half[2]*2], center: o.c.slice() };
+  }
   const { b, h } = secDims(p.perfil), L = p.largo; // b = ala/espesor, h = alma/ancho
   // VELA: recorte de montante PARADO (vertical) como stub cuadrado b×b que sube desde el entramado.
   if (p.tipo === "VELA"){ const [ox, oy, oz] = p.pos; return { size: [b, b, L], center: [ox + b/2, oy + b/2, oz + L/2] }; }

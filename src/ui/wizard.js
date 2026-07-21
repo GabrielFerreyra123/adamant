@@ -431,6 +431,11 @@ function showInfo3d(p){
 // ---------- materiales ----------
 // Unidad de venta con el largo comercial REAL del perfil (6,00 m barra / 3,05 · 3,00 · 4,88 m tira).
 const unidadBarra = len => `${len >= 6000 ? "barra" : "tira"} ${(len/1000).toFixed(2).replace(".", ",")} m`;
+// Advertencias del proyecto (hoy: arriostramiento). Muro y Ambiente las publican en metadatos.avisos.
+function avisosHTML(metadatos){
+  const av = metadatos?.avisos || [];
+  return av.length ? `<div class="avisos"><b>⚠ Arriostramiento</b>${av.map(a => `<span>${a}</span>`).join("")}</div>` : "";
+}
 function shoppingList(mat){
   const items = [];
   mat.perfiles.forEach(p => items.push({ key:`perf:${p.perfil}`, label:p.perfil, unidad:unidadBarra(p.largoBarra), cant:p.barras }));
@@ -442,7 +447,7 @@ function shoppingList(mat){
   return items;
 }
 function renderMateriales(body){
-  const { materiales } = computeProject(toEngineInput());
+  const { materiales, metadatos } = computeProject(toEngineInput());
   const items = shoppingList(materiales);
   const rows = items.map(it => {
     const sku = it.key.replace(/[^a-z0-9]+/gi, "-");
@@ -451,6 +456,7 @@ function renderMateriales(body){
       <td class="n" data-sub>${money(it.cant * getPrice(it.key))}</td></tr>`;
   }).join("");
   body.innerHTML = `<form class="pane" autocomplete="off" onsubmit="return false">
+    ${avisosHTML(metadatos)}
     <table class="mtable"><thead><tr><th>Material</th><th>Unidad</th><th class="n">Cant</th><th class="n">$ unit.</th><th class="n">Subtotal</th></tr></thead>
     <tbody>${rows}</tbody><tfoot><tr><td colspan="4" class="n"><b>TOTAL</b></td><td class="n"><b data-total></b></td></tr></tfoot></table>
     <p class="sub">Perfiles/maderas en barras comerciales (6 m steel · 3,05 m wood); placas 1,20×2,40. Cargá el precio de tu corralón — se guarda en este navegador. Sólo materiales.</p>
@@ -469,6 +475,12 @@ function renderCortes(body){
   const { piezas } = computeProject(toEngineInput());
   const plan = cutPlan(piezas, cutOpts(toEngineInput())); // largo de barra por perfil
   const secciones = plan.map(pl => {
+    // FLEJES: vienen en rollo, no salen de una barra → se listan los largos, sin barras ni sobra.
+    if (pl.fleje) return `<div class="cutgrp"><div class="cuthead"><b>${pl.perfil}</b>
+      <span>${pl.metros} m · ${pl.rollos} rollo${pl.rollos!==1?"s":""} de ${pl.largoRollo/1000} m</span></div>
+      <div class="bin"><span class="binno">Rollo</span><span class="binitems">${pl.items.map(it =>
+        `<i title="${TIPO_LABEL[it.tipo]||it.tipo}">${it.code}·${it.largo}</i>`).join("")}</span>
+      <span class="binrem">${pl.piezas} pieza${pl.piezas!==1?"s":""}</span></div></div>`;
     const unidad = unidadBarra(pl.barLen), esTira = unidad.split(" ")[0] === "tira";
     const bins = pl.bins.map((b, i) => `<div class="bin"><span class="binno">${esTira?"Tira":"Barra"} ${i+1}</span>
       <span class="binitems">${b.items.map(it => `<i title="${TIPO_LABEL[it.tipo]||it.tipo}">${it.code}·${it.largo}</i>`).join("")}</span>
@@ -477,7 +489,7 @@ function renderCortes(body){
     return `<div class="cutgrp"><div class="cuthead"><b>${pl.perfil}</b><span>${pl.bins.length} ${unidad}${pl.bins.length!==1?"s":""} · desperdicio ${pl.waste}%</span></div>${bins}${alerta}</div>`;
   }).join("");
   const gate = !getLicencia();
-  body.innerHTML = `<div class="pane ${gate ? "gated" : ""}">${secciones || `<p class="sub">Sin piezas.</p>`}
+  body.innerHTML = `<div class="pane ${gate ? "gated" : ""}">${avisosHTML(computeProject(toEngineInput()).metadatos)}${secciones || `<p class="sub">Sin piezas.</p>`}
     <p class="sub">Cada etiqueta es <b>código·largo(mm)</b>. Optimización First-Fit, sin descontar merma de sierra.</p>
     ${gate ? `<div class="gateoverlay"><p>La lista de cortes optimizada viene con el proyecto desbloqueado.</p><button class="btn" id="gate-pagar">Desbloquear proyecto</button></div>` : ""}</div>`;
   if (gate) document.getElementById("gate-pagar").onclick = () => { guardarProyecto(); iniciarPago().catch(e => alert(e.message)); };

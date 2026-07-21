@@ -2,8 +2,9 @@
 // (B) Todo lo cuantitativo sale de la geometría (`buildPieces`): conteos, metros, peso y
 // la lista de corte. El área de revestimiento es lo único que no es una pieza (se calcula
 // como superficie de muro menos vanos).
-import { resolveSystem, PGC, PGU, LUMBER, REVEST, lumberKg, cutOpts } from "./systems.mjs";
+import { resolveSystem, PGC, PGU, LUMBER, REVEST, lumberKg, cutOpts, FLEJE, FLEJE_PERFIL } from "./systems.mjs";
 import { buildPieces } from "./frame.mjs";
+import { computeFlejes } from "./brace.mjs";
 import { cutList, optimizeCuts } from "./cuts.mjs";
 
 const MONT_FAM = new Set(["MONTANTE","KING","JACK","DINTEL","CRIPPLE"]); // familia montante (perfil vertical/dintel)
@@ -25,7 +26,10 @@ export function computeMaterials(input, piezas){
   const nMont = piezas.filter(p => p.tipo === "MONTANTE").length;
   const nVanos = vanos.length;
   let mMont = 0, mSol = 0, peso = 0;
-  piezas.forEach(p => { const m = p.largo/1000; if (MONT_FAM.has(p.tipo)) mMont += m; else mSol += m; peso += m * kgPerfil(p.perfil); });
+  piezas.forEach(p => {
+    if (p.categoria === "fleje") return; // el fleje se computa aparte (rollo, no barra); ver `flejes`
+    const m = p.largo/1000; if (MONT_FAM.has(p.tipo)) mMont += m; else mSol += m; peso += m * kgPerfil(p.perfil);
+  });
 
   // área de muro menos vanos (no es una pieza)
   let area = (larg/1000) * (ALT/1000);
@@ -53,8 +57,12 @@ export function computeMaterials(input, piezas){
   });
   const aislacion = o.aislacion ? +area.toFixed(2) : 0;
 
+  // arriostramiento: el fleje viene en rollo (metros lineales + rollos), 1 tensor por fleje y
+  // 4 tornillos T1 por extremo (se suman a los T1 de estructura).
+  const flejes = computeFlejes(piezas);
+
   // fijaciones (estimación): T1 estructura (perfil-perfil) + T2 placa
-  const t1 = Math.round(nMont * 2 + nVanos * 12);
+  const t1 = Math.round(nMont * 2 + nVanos * 12) + (flejes ? flejes.t1 : 0);
   const m2placa = placas.reduce((a,p) => a + p.m2, 0);
   const t2 = Math.round(m2placa * 14);
 
@@ -65,12 +73,17 @@ export function computeMaterials(input, piezas){
   const otros = [];
   if (nPuerta) otros.push({ key:"carp-puerta", label:"Puerta (hoja) — a definir por el usuario", unidad:"u", cantidad:nPuerta });
   if (nVent)   otros.push({ key:"carp-ventana", label:"Ventana — a definir por el usuario", unidad:"u", cantidad:nVent });
+  if (flejes){
+    otros.push({ key:"fleje-rollo", label:`${FLEJE_PERFIL} galvanizado (rollo ${FLEJE.rollo/1000} m) — ${flejes.metros} m`,
+      unidad:"rollo", cantidad:flejes.rollos });
+    otros.push({ key:"tensor", label:"Tensor para fleje", unidad:"u", cantidad:flejes.tensores });
+  }
 
   return {
     sistema: input.sistema, larg, alto: ALT, modulo: s.modulo,
     area: +area.toFixed(2), nMont, nVanos,
     mMont: +mMont.toFixed(2), mSol: +mSol.toFixed(2), peso: +peso.toFixed(1),
-    perfiles, placas, aislacion, otros,
+    perfiles, placas, aislacion, otros, flejes,
     tornillos: { t1, t2 },
     barLen: s.barLen
   };

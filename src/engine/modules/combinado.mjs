@@ -9,7 +9,8 @@
 // el del encajado), sin superponerse.  Montaje platform framing: los muros apoyan SOBRE la placa de piso.
 import { piso } from "./piso.mjs";
 import { muro } from "./muro.mjs";
-import { resolveSystem, cutOpts } from "../systems.mjs";
+import { resolveSystem, cutOpts, FLEJE, FLEJE_PERFIL } from "../systems.mjs";
+import { computeFlejes } from "../brace.mjs";
 import { pieceBoxEngine, boundsEngine } from "../geometry.mjs";
 import { cutList, optimizeCuts } from "../cuts.mjs";
 
@@ -21,12 +22,19 @@ const REV_EXT = 12, REV_INT = 12.5; // espesores nominales de revestimiento exte
 //   p.xf    — { rot, tx, ty, tz } el MISMO transform, para que el export Ruby lo reproduzca (paridad),
 //   p.parte — piso/frente/fondo/izq/der (para "ver por partes" y el PDF por etapas).
 function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
+  // rot 90° CCW en Z: un punto (x,y) → (−y, x); lo mismo vale para los vectores de una base.
+  const rotV = v => rot === 90 ? [-v[1], v[0], v[2]] : v;
+  const rotP = ([x, y, z]) => rot === 90 ? [-y + tx, x + ty, z + tz] : [x + tx, y + ty, z + tz];
   return piezas.map(p => {
     const { size: [sx, sy, sz], center: [cx, cy, cz] } = pieceBoxEngine(p);
     const box = rot === 90
       ? { size: [sy, sx, sz], center: [-cy + tx, cx + ty, cz + tz] } // (x,y) → (−y, x)
       : { size: [sx, sy, sz], center: [cx + tx, cy + ty, cz + tz] };
-    return { ...p, box, xf: { rot, tx, ty, tz }, parte };
+    // Las piezas DIAGONALES (flejes) llevan su propia base: hay que transformarla igual que la caja,
+    // si no el visor/export las dibujaría en la posición del submódulo.
+    const orient = p.orient && { ...p.orient, c: rotP(p.orient.c),
+      u: rotV(p.orient.u), v: rotV(p.orient.v), n: rotV(p.orient.n) };
+    return { ...p, box, ...(orient ? { orient } : {}), xf: { rot, tx, ty, tz }, parte };
   });
 }
 
@@ -35,18 +43,25 @@ function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
 function descomponer(input){
   const largo = +input.largo, ancho = +input.ancho, alto = +input.alto || 2600, placa = input.placa !== false;
   const muroBase = { sistema: input.sistema, alto, opciones: input.opciones, tipo: input.tipo || "tabique" };
-  const front = muro.generar({ ...muroBase, largo, vanos: input.vanoFrente || [] });
-  const e = Math.round(boundsEngine(front.piezas).size[1]); // espesor del muro = profundidad (Y)
+  // `arriostraFrente/Fondo/Izq/Der`: selector por muro (default 'cruz', son perimetrales portantes).
+  const arr = lado => input["arriostra" + lado] || "cruz";
+  const front = muro.generar({ ...muroBase, largo, vanos: input.vanoFrente || [], arriostramiento: arr("Frente") });
+  // Espesor del muro = profundidad (Y) del FRAME. Se miden sólo las piezas estructurales: los flejes
+  // van apoyados por fuera de la cara y falsearían el espesor (y con él la posición de los 4 muros).
+  const e = Math.round(boundsEngine(front.piezas.filter(p => p.categoria !== "fleje")).size[1]);
   const encaj = Math.max(ancho - 2 * e, 1);
   return {
     largo, ancho, alto, placa, e, encaj, front,
     pisoInput: { sistema: input.sistema, largo, ancho, separacion: input.separacion || 400,
       apoyo: input.apoyo || "platea", placa, opciones: input.opciones },
+    // Arriostramiento por muro (passthrough al módulo Muro; el orquestador no reimplementa nada).
+    // `caraExterior:"ymax"` en fondo/der: esos muros se ubican sin espejar, así que su cara local
+    // Y=0 mira HACIA ADENTRO del ambiente; el fleje debe salir por la cara opuesta.
     muros: [
-      { parte: "frente", input: { ...muroBase, largo, vanos: input.vanoFrente || [] } },
-      { parte: "fondo",  input: { ...muroBase, largo, vanos: input.vanoFondo || [] } },
-      { parte: "izq",    input: { ...muroBase, largo: encaj, vanos: input.vanoIzq || [] } },
-      { parte: "der",    input: { ...muroBase, largo: encaj, vanos: input.vanoDer || [] } }
+      { parte: "frente", input: { ...muroBase, largo, vanos: input.vanoFrente || [], arriostramiento: arr("Frente") } },
+      { parte: "fondo",  input: { ...muroBase, largo, vanos: input.vanoFondo || [], arriostramiento: arr("Fondo"), caraExterior: "ymax" } },
+      { parte: "izq",    input: { ...muroBase, largo: encaj, vanos: input.vanoIzq || [], arriostramiento: arr("Izq"), caraExterior: "ymax" } },
+      { parte: "der",    input: { ...muroBase, largo: encaj, vanos: input.vanoDer || [], arriostramiento: arr("Der") } }
     ]
   };
 }
@@ -60,7 +75,8 @@ export const combinado = {
   defaults(){
     return { sistema: "steel", largo: 4000, ancho: 3000, alto: 2600, apoyo: "platea", placa: true,
       opciones: { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90", lumber: "2x6 (38×140)", modulo: 400 },
-      vanoFrente: [], vanoFondo: [], vanoIzq: [], vanoDer: [] };
+      vanoFrente: [], vanoFondo: [], vanoIzq: [], vanoDer: [],
+      arriostraFrente: "cruz", arriostraFondo: "cruz", arriostraIzq: "cruz", arriostraDer: "cruz" };
   },
 
   // schema básico (el wizard con selector de muros en planta es F9c).
@@ -153,8 +169,13 @@ export const combinado = {
     for (const parte of ["frente", "fondo", "izq", "der"])
       P.push(revPieza(parte, "ext"), revPieza(parte, "int"));
 
-    const bb = boundsEngine(P.filter(p => !p.superficie)); // envolvente ESTRUCTURAL (los rev exteriores sobresalen)
-    return { piezas: P, metadatos: { nombre: "Ambiente completo", esquema: "planta",
+    // envolvente ESTRUCTURAL: los rev (superficie) y los flejes van apoyados por FUERA del frame
+    const bb = boundsEngine(P.filter(p => !p.superficie && p.categoria !== "fleje"));
+    // Avisos de arriostramiento de los 4 muros, prefijados con el lado (los consume la UI y el PDF).
+    const LADO = { frente: "Frente", fondo: "Fondo", izq: "Lateral izq.", der: "Lateral der." };
+    const avisos = Object.entries(gens).flatMap(([k, g]) => (g.metadatos.avisos || []).map(a => `${LADO[k]}: ${a}`));
+
+    return { piezas: P, metadatos: { nombre: "Ambiente completo", esquema: "planta", avisos,
       sistema: input.sistema, planta: { x: d.largo, y: d.ancho }, elevacion: 0,
       barLen: pisoGen.metadatos.barLen, espesorMuro: e, hMuro: hp,
       partes: [{ id: "piso", l: "Piso" }, { id: "frente", l: "Frente" }, { id: "fondo", l: "Fondo" }, { id: "izq", l: "Lateral izq." }, { id: "der", l: "Lateral der." }],
@@ -190,7 +211,15 @@ export const combinado = {
     all.flatMap(m => m.otros || []).forEach(o => {
       (om[o.key] = om[o.key] || { ...o, cantidad: 0 }).cantidad += o.cantidad;
     });
-    const otros = Object.values(om);
+    // El FLEJE viene en rollo: sumar los rollos ya redondeados de cada muro sobre-estima (4×1 rollo
+    // para 47 m que entran en 2). Se recalcula GLOBAL desde todas las piezas, igual que los perfiles.
+    const flejes = computeFlejes(piezas);
+    const otros = Object.values(om).filter(o => o.key !== "fleje-rollo" && o.key !== "tensor");
+    if (flejes){
+      otros.push({ key:"fleje-rollo", label:`${FLEJE_PERFIL} galvanizado (rollo ${FLEJE.rollo/1000} m) — ${flejes.metros} m`,
+        unidad:"rollo", cantidad: flejes.rollos });
+      otros.push({ key:"tensor", label:"Tensor para fleje", unidad:"u", cantidad: flejes.tensores });
+    }
     const aislacion = +all.reduce((a, m) => a + (m.aislacion || 0), 0).toFixed(2);
     const tornillos = { t1: all.reduce((a, m) => a + (m.tornillos?.t1 || 0), 0), t2: all.reduce((a, m) => a + (m.tornillos?.t2 || 0), 0) };
     const peso = +all.reduce((a, m) => a + (m.peso || 0), 0).toFixed(1);
@@ -198,7 +227,7 @@ export const combinado = {
     const nVanos = d.muros.reduce((a, m) => a + (m.input.vanos?.length || 0), 0);
 
     return { sistema: input.sistema, area: +(d.largo * d.ancho / 1e6).toFixed(2), peso, nMont, nVanos,
-      perfiles, placas, aislacion, tornillos, otros, barLen: perfiles[0]?.largoBarra || 6000 };
+      perfiles, placas, aislacion, tornillos, otros, flejes, barLen: perfiles[0]?.largoBarra || 6000 };
   }
 };
 

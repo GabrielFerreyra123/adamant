@@ -4,6 +4,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { computeProject, cutPlan, cutOpts, getModule } from "../engine/index.mjs";
 import { cortesPorEtapaVsGlobal } from "../engine/modules/combinado.mjs";
+import { buildBraces } from "../engine/brace.mjs";
 
 const TEAL = [27,182,164], OBS = [10,26,34], TANG = [232,93,42], MUT = [110,128,136];
 const unidadBarra = len => `${len >= 6000 ? "barra" : "tira"} ${(len/1000).toFixed(2).replace(".", ",")} m`;
@@ -35,6 +36,17 @@ function drawSchema(doc, input, x0, y0, maxW, maxH){
     doc.setFillColor(...(VCOL[v.tipo] || VCOL.ventana)); doc.setDrawColor(...OBS);
     safeRect(doc, vx, vy, vw, vh, "FD", `vano ${i+1}`);
   });
+  // Cruz de San Andrés: una X por zona arriostrada (los flejes van sobre la cara exterior del paño).
+  const br = buildBraces(input);
+  if (br.zonas.length){
+    doc.setDrawColor(110,120,130); doc.setLineWidth(0.5);
+    br.zonas.forEach(z => {
+      const zx = x + z.x0 * sc, zw = z.ancho * sc;
+      doc.line(zx, y + h, zx + zw, y);   // diagonal ascendente
+      doc.line(zx, y, zx + zw, y + h);   // diagonal descendente
+    });
+    doc.setLineWidth(0.2);
+  }
   // cotas: largo (abajo) y alto (izquierda)
   doc.setDrawColor(...TEAL); doc.setTextColor(...MUT); doc.setFontSize(7);
   doc.line(x, y + h + 3, x + w, y + h + 3);
@@ -140,9 +152,12 @@ function drawCortesTabla(doc, piezas, input, titulo, y){
   const M = 14;
   doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...OBS); doc.text(titulo, M, y);
   const plan = cutPlan(piezas, cutOpts(input)), rows = [];
-  plan.forEach(pl => pl.bins.forEach((b, i) => rows.push([pl.perfil,
+  plan.filter(pl => !pl.fleje).forEach(pl => pl.bins.forEach((b, i) => rows.push([pl.perfil,
     `${unidadBarra(pl.barLen).split(" ")[0] === "tira" ? "Tira" : "Barra"} ${i+1}`,
     b.items.map(it => `${it.code}·${it.largo}`).join("  "), `${b.rem} mm`])));
+  // Sección FLEJES: el fleje viene en ROLLO, no sale de una barra → se listan los largos, sin sobra.
+  plan.filter(pl => pl.fleje).forEach(pl => rows.push([pl.perfil, `Rollo ${pl.largoRollo/1000} m`,
+    pl.items.map(it => `${it.code}·${it.largo}`).join("  "), `${pl.metros} m · ${pl.rollos} rollo(s)`]));
   autoTable(doc, { startY: y + 2, head: [["Perfil", "Barra/Tira", "Piezas (código·largo mm)", "Sobra"]], body: rows.length ? rows : [["—","","",""]],
     styles: { fontSize: 8, cellPadding: 1.4 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 }, columnStyles: { 3: { halign: "right" } }, margin: { left: M, right: M } });
   return doc.lastAutoTable.finalY + 6;
@@ -270,6 +285,17 @@ export async function exportPDF(input, opts = {}){
   else if (metadatos.esquema === "frontal" && input.largo) drawSchema(doc, input, M + colW + 6, y, colW - 6, imgH);
   y += imgH + 8;
 
+  // Advertencias del arriostramiento (ángulo fuera de rango / sin tramo lleno suficiente).
+  // Muro y Ambiente las publican igual en metadatos.avisos (el ambiente ya las prefija con el lado).
+  const avisos = metadatos.avisos || [];
+  if (avisos.length){
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...TANG);
+    doc.text("Arriostramiento — advertencias", M, y); y += 4;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...OBS);
+    avisos.forEach(a => { doc.splitTextToSize(`• ${a}`, W - 2*M).forEach(l => { doc.text(l, M, y); y += 3.6; }); });
+    y += 4;
+  }
+
   // lista de compra
   doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...OBS);
   doc.text("Lista de compra", M, y); y += 2;
@@ -296,12 +322,17 @@ export async function exportPDF(input, opts = {}){
   doc.text("Lista de cortes", M, y); y += 3;
   const plan = cutPlan(piezas, cutOpts(input)); // largo de barra por perfil
   const cutRows = [];
-  plan.forEach(pl => {
+  plan.filter(pl => !pl.fleje).forEach(pl => {
     pl.bins.forEach((b, i) => cutRows.push([
       `${pl.perfil}`, `${unidadBarra(pl.barLen).split(" ")[0] === "tira" ? "Tira" : "Barra"} ${i+1}`,
       b.items.map(it => `${it.code}·${it.largo}`).join("  "), `${b.rem} mm`
     ]));
   });
+  // Sección FLEJES: vienen en ROLLO, no salen de una barra → largos por pieza, sin sobra.
+  plan.filter(pl => pl.fleje).forEach(pl => cutRows.push([
+    pl.perfil, `Rollo ${pl.largoRollo/1000} m`,
+    pl.items.map(it => `${it.code}·${it.largo}`).join("  "), `${pl.metros} m · ${pl.rollos} rollo(s)`
+  ]));
   autoTable(doc, {
     startY: y, head: [["Perfil", "Barra/Tira", "Piezas (código·largo mm)", "Sobra"]],
     body: cutRows, styles: { fontSize: 8, cellPadding: 1.4 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 },

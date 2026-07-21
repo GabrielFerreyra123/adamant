@@ -76,7 +76,22 @@ export function exportRuby(input){
     const tr = `Geom::Transformation.new([${num(t.tx)}.mm, ${num(t.ty)}.mm, ${num(t.tz)}.mm])`;
     return ", " + (t.rot === 90 ? `${tr} * ROTZ90` : tr);
   };
+  let usaFleje = false;
   const calls = piezas.map(p => {
+    // FLEJE (Cruz de San Andrés): pieza DIAGONAL. Se dibuja la chapa (sección ancho×espesor) extruida
+    // en X local y se la lleva a su lugar con `Geom::Transformation.axes`, que mapea los ejes locales
+    // a la base real de la pieza (u = largo, v = ancho, n = espesor). La base ya viene en coordenadas
+    // finales (el combinado la rota al reubicar), por eso NO lleva además el `xf` de la parte.
+    if (p.orient){
+      usaFleje = true;
+      const o = p.orient, L = p.largo;
+      const p0 = [0,1,2].map(i => o.c[i] - o.u[i] * L / 2); // extremo de arranque de la diagonal
+      const sec = rbSec([[-o.w/2,-o.t/2],[o.w/2,-o.t/2],[o.w/2,o.t/2],[-o.w/2,o.t/2]]);
+      // los versores van con precisión alta: redondearlos a 2 decimales desviaría el extremo varios mm
+      const vec = v => `Geom::Vector3d.new(${v.map(c => +c.toFixed(6)).join(",")})`;
+      const ax = `Geom::Transformation.axes(Geom::Point3d.new(${p0.map(v => num(v) + ".mm").join(",")}), ${vec(o.u)}, ${vec(o.v)}, ${vec(o.n)})`;
+      return `_profile(we, ${sec}, MAP_YZ, ${num(L)}, :x, [0,0,0], "Gainsboro", t_fle, ${ax})`;
+    }
     // PLACA de piso: superficie plana (rectángulo largo×ancho + pushpull del espesor), no un perfil.
     if (p.tipo === "PLACA"){
       const [sx, sy, sz] = p.box.size, [cx, cy, cz] = p.box.center;
@@ -89,13 +104,14 @@ export function exportRuby(input){
     return `_profile(we, ${secOf(p)}, ${mapper}, ${num(p.largo)}, ${axis}, ${org}, "${MAT[p.tipo]||"Silver"}", ${sub(p.tipo)}${xfDe(p)})`;
   }).join("\n");
   const rotzDecl = usaXf ? "\nROTZ90 = Geom::Transformation.rotation(ORIGIN, Z_AXIS, 90.degrees)" : "";
+  const flejeDecl = usaFleje ? `\nt_fle=model.layers.add("Estructura-Flejes")` : "";
 
   const nombre = `${metadatos.nombre} ${wood ? "wood" : "steel"}`;
   return `# ADAMANT · ${nombre} (export desde el motor) | unidades en mm
 LARGO=${LARGO}; ALTURA=${ALTURA}
 ${HELPER}${rotzDecl}
 model=Sketchup.active_model; model.start_operation("Muro",true); root=model.active_entities
-t_sol=model.layers.add("Estructura-Soleras"); t_mon=model.layers.add("Estructura-Montantes"); t_van=model.layers.add("Estructura-Vanos")
+t_sol=model.layers.add("Estructura-Soleras"); t_mon=model.layers.add("Estructura-Montantes"); t_van=model.layers.add("Estructura-Vanos")${flejeDecl}
 wall=root.add_group; wall.name="Muro #{LARGO.to_i}x#{ALTURA.to_i}"; we=wall.entities
 ${secDecl}
 ${calls}
