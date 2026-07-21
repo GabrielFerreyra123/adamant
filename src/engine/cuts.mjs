@@ -2,13 +2,14 @@
 // (B) La lista de corte se deriva SIEMPRE de las piezas de la geometría (`buildPieces`).
 // No recalcula largos por su cuenta: así geometría y cómputo no pueden divergir
 // (p. ej. el largo del cripple sale del que dibuja el motor, descontando el cap PGU en steel).
-import { barLenOf, FLEJE } from "./systems.mjs";
+import { barLenOf, rolloDe } from "./systems.mjs";
 
 const CODE_PREF = { MONTANTE:"M", KING:"K", JACK:"J", CRIPPLE:"C", DINTEL:"D",
   "SOL.PANEL":"SP", "SOL.VANO":"SV", "SOL.DINTEL":"SD",
   VIGA:"V", VIGA_DOBLE:"VD", CENEFA:"CE", BLOCKING:"B", SOLERA:"S", MAESTRA:"VM", VELA:"VL", FLEJE:"F",
   TRIMMER:"TR", CABEZAL:"CB", VIGA_COLA:"VC",
-  CORDON_SUPERIOR:"CS", CORDON_INFERIOR:"CI", DIAGONAL:"DG", MONTANTE_CABRIADA:"MC", MONTANTE_TIMPANO:"MT", CORREA:"CO" };
+  CORDON_SUPERIOR:"CS", CORDON_INFERIOR:"CI", DIAGONAL:"DG", MONTANTE_CABRIADA:"MC", MONTANTE_TIMPANO:"MT", CORREA:"CO",
+  FLEJE_CIELO:"FC" };
 
 // Largo de barra por perfil. `opts` puede ser un objeto de overrides (barLen/cieloLen/tiraLen) o,
 // por compatibilidad, un número (mismo largo para todos los perfiles).
@@ -62,11 +63,14 @@ export function cutPlan(piezas, opts){
     out.push({ perfil, barLen, bins, piezas: items.length - over, over, waste: +waste.toFixed(1) });
   });
   // Sección FLEJES: se listan los largos por pieza, pero NO se empaquetan en barras (vienen en rollo).
-  if (flejes.length){
-    const mm = flejes.reduce((a, it) => a + it.largo, 0);
-    out.push({ perfil: flejes[0].perfil, fleje: true, items: flejes, piezas: flejes.length,
-      metros: +(mm/1000).toFixed(2), rollos: Math.ceil(mm / FLEJE.rollo), largoRollo: FLEJE.rollo });
-  }
+  // Una sección por MEDIDA de fleje (30×0,5 del muro y 38×0,84 del arriostre de cielo se compran aparte).
+  const porMedida = {};
+  flejes.forEach(it => (porMedida[it.perfil] = porMedida[it.perfil] || []).push(it));
+  Object.keys(porMedida).sort().forEach(perfil => {
+    const items = porMedida[perfil], mm = items.reduce((a, it) => a + it.largo, 0), rollo = rolloDe(perfil);
+    out.push({ perfil, fleje: true, items, piezas: items.length,
+      metros: +(mm/1000).toFixed(2), rollos: Math.ceil(mm / rollo), largoRollo: rollo });
+  });
   return out;
 }
 

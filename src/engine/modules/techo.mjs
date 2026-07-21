@@ -7,15 +7,29 @@
 // Cada barra de la cabriada es una pieza DIAGONAL (`orient`, igual que el fleje de la Fase A): trae
 // su base real {c,u,v,n,w,t} con el perfil DE CANTO en el plano de la cabriada (alma en el plano,
 // ala perpendicular), que es como se arma en obra.
-import { PGC, PGO, resolveSystem, cutOpts, FLEJE } from "../systems.mjs";
+import { PGC, PGO, resolveSystem, cutOpts, FLEJE, FLEJE_PERFIL, FLEJE_CIELO, FLEJE_CIELO_PERFIL } from "../systems.mjs";
 import { secDims } from "../geometry.mjs";
 import { cutList, optimizeCuts } from "../cuts.mjs";
 import { cruzEnPlano, computeFlejes } from "../brace.mjs";
 
-export const PEND_MIN_CHAPA = 7;      // % — bajo esto la chapa puede filtrar (advertencia)
+// Pendiente (manual ConsulSteel/Barbieri): la cubierta de vivienda va entre 25 % y 100 %. Debajo del
+// 25 % se puede resolver con chapa (mínimo técnico 7 %), pero ya no es lo que recomienda el manual.
+export const PEND_MIN_CHAPA = 7;      // % — bajo esto la chapa filtra: BLOQUEANTE
+export const PEND_REC = { min: 25, max: 100 };
+// Voladizos en proyección horizontal. El alero LATERAL (prolongación del cordón superior) es el que
+// modelamos. El alero FRONTAL (voladizo del tímpano, límite 300 mm) no está en el modelo.
+export const ALERO_MAX = 600, ALERO_FRENTE_MAX = 300;
+// Peso propio de la cubierta terminada (kg/m², incluye perfilería, aislación y cielo de yeso).
+// Dato de referencia para quien verifique el cálculo; hoy sólo se emite chapa.
+export const PESO_CUBIERTA = { chapa: 30, teja: 67 };
+export const MEMBRANA_SOLAPE = 1.15;  // factor por solapes (15–35 cm) de la membrana hidrófuga
 export const PERFIL_CORREA = "PGO 37x22x12.5";
 const T1_POR_NODO = 4;                // tornillos por nodo de cabriada
 const T1_POR_CRUCE = 2;               // correa ↔ cordón
+const T1_POR_ANCLAJE = 8;             // conector cabriada ↔ muro (anti-succión)
+// FUERA DE ALCANCE (sistema de CABIOS, no de cabriadas): cabio individual con puntal a 45° y viga de
+// cumbrera tipo cajón. Acá todo es CABRIADA (reticulado). El diafragma de OSB en el plano de cubierta
+// tampoco se despieza todavía (Fase F); su clavado sería cada 150 mm en bordes y 300 mm en el campo.
 
 const rad = g => g * Math.PI / 180;
 export const anguloPendiente = pend => Math.atan((+pend || 0) / 100) * 180 / Math.PI;
@@ -91,12 +105,16 @@ export function posCorreas(largoFaldon, sepCorreas){
 function normalizar(input){
   const tipo = input.tipo === "dosAguas" ? "dosAguas" : "unAgua";
   const s = resolveSystem(input);
+  // El alero lateral se RECORTA al máximo del manual en vez de rechazar el proyecto (autoconstrucción:
+  // se acomoda solo y se avisa qué se cambió).
+  const aleroPedido = input.alero == null ? 400 : +input.alero;
   return {
     tipo,
     luz: +input.luz || 3000,
     largo: +input.largo || 4000,
-    pendiente: +input.pendiente || (tipo === "dosAguas" ? 30 : 15),
-    alero: input.alero == null ? 400 : +input.alero,
+    pendiente: +input.pendiente || (tipo === "dosAguas" ? 30 : 25),
+    alero: Math.min(Math.max(aleroPedido, 0), ALERO_MAX),
+    aleroPedido,
     separacion: +input.separacion || 600,
     sepCorreas: +input.sepCorreas || 1000,
     perfil: PGC[input.opciones?.pgc] ? input.opciones.pgc : "PGC 100x0.90",
@@ -109,6 +127,24 @@ function normalizar(input){
   };
 }
 
+// Validación del techo. → { errores (bloqueantes), avisos, ajustes (lo que se acomodó solo) }.
+export function validarTecho(input){
+  const c = normalizar(input);
+  const errores = [], avisos = [], ajustes = [];
+  if (c.pendiente < PEND_MIN_CHAPA)
+    errores.push(`Pendiente ${c.pendiente} %: con menos de ${PEND_MIN_CHAPA} % el agua no escurre y la ` +
+      `chapa filtra. Subila a ${PEND_REC.min} % (lo que recomienda el manual).`);
+  else if (c.pendiente < PEND_REC.min)
+    avisos.push(`Pendiente ${c.pendiente} %: por debajo del ${PEND_REC.min} % recomendado por manual. ` +
+      `Es usual en chapa (mínimo ${PEND_MIN_CHAPA} %), verificá con el proveedor de chapa y un profesional.`);
+  else if (c.pendiente > PEND_REC.max)
+    avisos.push(`Pendiente ${c.pendiente} %: por encima del ${PEND_REC.max} % (45°) que cubre el manual. ` +
+      `Consultá el anclaje de la cubierta con un profesional.`);
+  if (c.aleroPedido > ALERO_MAX)
+    ajustes.push(`Alero recortado de ${c.aleroPedido} a ${ALERO_MAX} mm (máximo del manual en alero lateral).`);
+  return { errores, avisos, ajustes };
+}
+
 export const techo = {
   id: "techo",
   nombre: "Techo",
@@ -116,7 +152,7 @@ export const techo = {
   icono: "🏚️",
 
   defaults(){
-    return { tipo: "unAgua", luz: 3000, largo: 4000, pendiente: 15, alero: 400,
+    return { tipo: "unAgua", luz: 3000, largo: 4000, pendiente: 25, alero: 400,
       separacion: 600, sepCorreas: 1000, timpanos: true, cubierta: true, caida: "frente",
       sistema: "steel", opciones: { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90" } };
   },
@@ -127,13 +163,13 @@ export const techo = {
         { k: "tipo", tipo: "cards", label: "¿Cómo cae el agua?", opciones: [
           { v: "unAgua", titulo: "Un agua", desc: "Una sola pendiente. El típico de una ampliación o un quincho." },
           { v: "dosAguas", titulo: "Dos aguas", desc: "Dos faldones con cumbrera al medio, tipo casita." }
-        ], onSet: (p, v) => { p.pendiente = v === "dosAguas" ? 30 : 15; } }
+        ], onSet: (p, v) => { p.pendiente = v === "dosAguas" ? 30 : 25; } }
       ]},
       { id: "medidas", titulo: "Medidas", campos: [
         { k: "luz", tipo: "medida", label: "Luz (lo que cruza la cabriada)", rango: [2000, 12000] },
         { k: "largo", tipo: "medida", label: "Largo del techo", rango: [1000, 20000] }
       ], avanzado: [
-        { k: "alero", tipo: "medida", label: "Alero", rango: [0, 1200] },
+        { k: "alero", tipo: "medida", label: "Alero (máximo 600 mm)", rango: [0, ALERO_MAX] },
         { k: "separacion", tipo: "seg", label: "Separación de cabriadas",
           opciones: [{ v: 400, l: "400 mm" }, { v: 600, l: "600 mm" }, { v: 1200, l: "1200 mm" }] },
         { k: "timpanos", tipo: "seg", label: "Tímpanos (cerrar los extremos)", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] },
@@ -141,9 +177,11 @@ export const techo = {
         { tipo: "perfil" }
       ]},
       { id: "pendiente", titulo: "Pendiente", campos: [
-        // Lenguaje llano: la pendiente en % con presets de obra. Bajo 7 % la chapa puede filtrar.
-        { k: "pendiente", tipo: "seg", label: "Pendiente (para chapa: mínimo 7 %, recomendado 15 %)",
-          opciones: [{ v: 7, l: "7 % (mínima)" }, { v: 15, l: "15 % (recomendada)" }, { v: 30, l: "30 %" }, { v: 50, l: "50 %" }] },
+        // Lenguaje llano: la pendiente en % con presets de obra. El manual recomienda 25–100 %;
+        // menos de 25 % se puede hacer con chapa pero avisa, y menos de 7 % no escurre (bloquea).
+        { k: "pendiente", tipo: "seg", label: "Pendiente (el manual recomienda de 25 % para arriba)",
+          opciones: [{ v: 7, l: "7 % (mínima chapa)" }, { v: 15, l: "15 %" }, { v: 25, l: "25 % (recomendada)" },
+            { v: 30, l: "30 %" }, { v: 50, l: "50 %" }] },
         { k: "caida", tipo: "seg", label: "¿Hacia dónde cae el agua?",
           opciones: [{ v: "frente", l: "Frente" }, { v: "fondo", l: "Fondo" }, { v: "izq", l: "Izq." }, { v: "der", l: "Der." }] }
       ]}
@@ -209,6 +247,17 @@ export const techo = {
       });
     });
 
+    // --- ARRIOSTRE DEL ALA INFERIOR de los cordones inferiores (= viguetas de cielo) ---
+    // El manual lo exige: fleje de 38 × 0,84 mm cada 1,20 m como mínimo, corriendo PERPENDICULAR a las
+    // cabriadas y atornillado al ala inferior de cada cordón que cruza. Es lo que impide que el ala
+    // libre pandee de costado. (Si el cielo se placa con yeso, la placa cumple la misma función.)
+    const zAlaInf = -hC - FLEJE_CIELO.esp / 2;
+    const xsCielo = posCorreas(c.luz, FLEJE_CIELO.sep);
+    xsCielo.forEach(x => P.push({ tipo: "FLEJE_CIELO", categoria: "fleje", perfil: FLEJE_CIELO_PERFIL,
+      mat: "fleje", largo: Math.round(c.largo),
+      orient: { c: [x, c.largo/2, zAlaInf], u: T, v: [1,0,0], n: [0,0,1],
+        w: FLEJE_CIELO.ancho, t: FLEJE_CIELO.esp } }));
+
     // --- CUBIERTA: capa visual por faldón (m² al cómputo, sin despiece de chapas) ---
     if (c.cubierta) faldones.forEach(f => {
       const [x, , z] = puntoFaldon(f, f.largoF / 2, hC + 20);
@@ -217,16 +266,20 @@ export const techo = {
     });
 
     // --- ADVERTENCIAS ---
-    if (c.pendiente < PEND_MIN_CHAPA)
-      avisos.push(`Pendiente ${c.pendiente} %: con menos de ${PEND_MIN_CHAPA} % la chapa puede filtrar. Revisalo antes de comprar.`);
+    const v = validarTecho(input);
+    avisos.push(...v.avisos, ...v.errores);
     if (c.moduloMuro && c.separacion !== c.moduloMuro)
       avisos.push("Cabriadas no alineadas con montantes: verificar transmisión de cargas con un profesional.");
+    // Nota informativa fija (no es una advertencia del proyecto: aplica a TODO techo).
+    const notas = ["Los anclajes del techo al muro resisten la succión del viento y deben dimensionarse " +
+      "por cálculo profesional según la zona. Bahía Blanca es una de las zonas de mayor viento del país."];
 
     const alturaCumbrera = (c.tipo === "dosAguas" ? c.luz/2 : c.luz) * p;
     return { piezas: P, metadatos: { nombre: "Techo", esquema: "cabriada", sistema: input.sistema,
       tipo: c.tipo, luz: c.luz, largo: c.largo, pendiente: c.pendiente, angulo: +ang.toFixed(2),
       alero: c.alero, alturaCumbrera: Math.round(alturaCumbrera), nCabriadas: ys.length,
-      faldones: faldones.map(f => Math.round(f.largoF)), avisos,
+      faldones: faldones.map(f => Math.round(f.largoF)),
+      avisos, notas, errores: v.errores, ajustes: v.ajustes,
       vistas: [{ id: "frontal", l: "Cabriada" }, { id: "iso", l: "Conjunto" }], vistaDefault: "iso" } };
   },
 
@@ -252,22 +305,40 @@ export const techo = {
     if (c.cubierta){
       otros.push({ key: "chapa", label: "Chapa de cubierta", unidad: "m²", cantidad: Math.ceil(m2) });
       if (c.tipo === "dosAguas") otros.push({ key: "cumbrera", label: "Cumbrera (babeta)", unidad: "m", cantidad: +(c.largo/1000).toFixed(2) });
+      // Membrana hidrófuga (tipo Tyvek): va bajo la chapa y es parte obligatoria de la envolvente.
+      // Se compra por m² de faldón MÁS el solape (15–35 cm entre paños).
+      otros.push({ key: "membrana", label: "Membrana hidrófuga (bajo chapa, con solape)", unidad: "m²",
+        cantidad: Math.ceil(m2 * MEMBRANA_SOLAPE) });
     }
-    // arriostramiento (mismos ítems que la Fase A)
-    const fl = computeFlejes(piezas);
+    // arriostramiento: cruz de San Andrés del faldón (30×0,5) y arriostre del ala inferior (38×0,84).
+    // Son dos medidas distintas de fleje → dos ítems de compra.
+    const fl = computeFlejes(piezas, { perfil: FLEJE_PERFIL });
     if (fl){
       otros.push({ key: "fleje-rollo", label: `Fleje ${FLEJE.ancho}x${FLEJE.esp} galvanizado (rollo ${FLEJE.rollo/1000} m) — ${fl.metros} m`, unidad: "rollo", cantidad: fl.rollos });
       otros.push({ key: "tensor", label: "Tensor para fleje", unidad: "u", cantidad: fl.tensores });
     }
+    const nCielo = piezas.filter(p => p.tipo === "FLEJE_CIELO").length;
+    const flC = computeFlejes(piezas, { perfil: FLEJE_CIELO_PERFIL, tornillos: nCielo * nCabriadas * FLEJE_CIELO.tornCruce });
+    if (flC) otros.push({ key: "fleje-cielo-rollo",
+      label: `Fleje ${FLEJE_CIELO.ancho}x${FLEJE_CIELO.esp} arriostre de cielo (rollo ${FLEJE_CIELO.rollo/1000} m) — ${flC.metros} m`,
+      unidad: "rollo", cantidad: flC.rollos });
+    // Anclaje anti-succión: 2 conectores por cabriada (uno por apoyo). Sin geometría: es cómputo.
+    otros.push({ key: "anclaje-cabriada", label: "Conector de anclaje cabriada-muro (clip/ángulo)",
+      unidad: "u", cantidad: nCabriadas * 2 });
 
     const t1 = nCabriadas * nodosPorCabriada * T1_POR_NODO
-      + nCorreas * nCabriadas * T1_POR_CRUCE + (fl ? fl.t1 : 0);
+      + nCorreas * nCabriadas * T1_POR_CRUCE + (fl ? fl.t1 : 0) + (flC ? flC.t1 : 0)
+      + nCabriadas * 2 * T1_POR_ANCLAJE;
 
     const kgM = PGC[c.perfil]?.kg || 0;
     const peso = piezas.reduce((a, p) => a + (p.superficie || p.categoria === "fleje" ? 0
       : (p.largo/1000) * (p.tipo === "CORREA" ? PGO.kg : kgM)), 0);
 
-    return { sistema: input.sistema, area: m2, peso: +peso.toFixed(1),
+    // Peso propio de la cubierta terminada: dato de REFERENCIA para el que verifique el cálculo
+    // (no es el peso de los perfiles, que va en `peso`).
+    const pesoCubierta = { kgm2: PESO_CUBIERTA.chapa, total: Math.round(m2 * PESO_CUBIERTA.chapa) };
+
+    return { sistema: input.sistema, area: m2, peso: +peso.toFixed(1), pesoCubierta,
       nCabriadas, nCorreas, nVanos: 0, perfiles, placas: [], aislacion: 0, otros,
       tornillos: { t1, t2: 0 }, barLen: perfiles[0]?.largoBarra || 6000 };
   }

@@ -26,6 +26,7 @@ export const TIPO_COLOR = {
   MONTANTE_CABRIADA: 0x1bb6a4, MONTANTE_TIMPANO: 0x3d9970, CORREA: 0x9b6dd6, CUBIERTA: 0x8fa3ad,
   // arriostramiento
   FLEJE:       0xd9dee2, // gris chapa galvanizada (cruz de San Andrés)
+  FLEJE_CIELO: 0xb6c2c9, // gris más oscuro (arriostre del ala inferior del cordón)
   // combinado / capas de revestimiento (superficies visuales)
   PLACA:       0xc9a66b, // madera (placa de piso OSB/fenólico)
   "REV.EXT":   0x8a6d9e, // violeta apagado (revestimiento exterior — a definir)
@@ -37,7 +38,7 @@ export const TIPO_LABEL = {
   VIGA:"Viga", VIGA_DOBLE:"Viga doble", CENEFA:"Cenefa", BLOCKING:"Blocking",
   TRIMMER:"Trimmer (borde de vano)", CABEZAL:"Cabezal", VIGA_COLA:"Viga cola",
   SOLERA:"Solera", MONTANTE:"Montante", MAESTRA:"Viga maestra", VELA:"Vela", PLACA:"Placa de piso",
-  FLEJE:"Fleje (Cruz de San Andrés)",
+  FLEJE:"Fleje (Cruz de San Andrés)", FLEJE_CIELO:"Fleje arriostre de cielo",
   CORDON_SUPERIOR:"Cordón superior", CORDON_INFERIOR:"Cordón inferior", DIAGONAL:"Diagonal (Fink)",
   MONTANTE_CABRIADA:"Montante de cabriada", MONTANTE_TIMPANO:"Montante de tímpano", CORREA:"Correa", CUBIERTA:"Chapa de cubierta",
   "REV.EXT":"Revestimiento exterior — a definir", "REV.INT":"Revestimiento interior — a definir"

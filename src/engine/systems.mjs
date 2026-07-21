@@ -48,6 +48,13 @@ export const DINTEL_SIMPLE_MAX = 1500;
 //   tramoMin    — ancho mínimo de tramo lleno para poder arriostrar (mm).
 export const FLEJE = { ancho:30, esp:0.5, rollo:25000, tornExtremo:4, angMin:30, angMax:60, tramoMin:400 };
 export const FLEJE_PERFIL = `Fleje ${FLEJE.ancho}x${FLEJE.esp}`;
+// Arriostramiento del ala inferior de las viguetas de cielo (= cordón inferior de la cabriada).
+// El manual pide fleje de 38 × 0,84 mm como MÍNIMO cada 1,20 m. Es una medida DISTINTA a la del
+// muro (30 × 0,5): se compra aparte y tiene su propio precio.
+export const FLEJE_CIELO = { ancho:38, esp:0.84, rollo:25000, sep:1200, tornCruce:1 };
+export const FLEJE_CIELO_PERFIL = `Fleje ${FLEJE_CIELO.ancho}x${FLEJE_CIELO.esp}`;
+// Largo del rollo comercial según la medida de fleje (los flejes no salen de barra: vienen en rollo).
+export const rolloDe = perfil => perfil === FLEJE_CIELO_PERFIL ? FLEJE_CIELO.rollo : FLEJE.rollo;
 export const PGC_ALA = 40, PGC_LABIO = 15, PGU_ALA = 35, WOOD_DENS = 480;
 // PGO (Omega) — perfil de cielorraso suspendido (IRAM, kg/m estimado).
 export const PGO = { a: 37, b: 22, c: 12.5, kg: 0.47 };

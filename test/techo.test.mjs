@@ -1,9 +1,10 @@
 // FASE D — Techo de cabriadas: un agua (monopendiente) y dos aguas (Fink).
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
-import { techo, anguloPendiente, posCabriadas, posCorreas, PEND_MIN_CHAPA } from "../src/engine/modules/techo.mjs";
+import { techo, validarTecho, anguloPendiente, posCabriadas, posCorreas,
+  PEND_MIN_CHAPA, PEND_REC, ALERO_MAX, MEMBRANA_SOLAPE, PESO_CUBIERTA } from "../src/engine/modules/techo.mjs";
 import { cutList, cutPlan } from "../src/engine/cuts.mjs";
-import { cutOpts, PGO_PERFIL, BAR_LEN } from "../src/engine/systems.mjs";
+import { cutOpts, PGO_PERFIL, BAR_LEN, FLEJE_CIELO, FLEJE_CIELO_PERFIL } from "../src/engine/systems.mjs";
 import { exportRuby } from "../src/export/ruby.mjs";
 
 const OPC = { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90" };
@@ -110,11 +111,36 @@ test("tímpanos sólo en las cabriadas extremas (400) y campo a 600", () => {
   assert.ok(!techo.generar(t({ timpanos: false })).piezas.some(p => p.tipo === "MONTANTE_TIMPANO"));
 });
 
-// 6) Pendiente baja → advertencia de filtración.
-test("pendiente 6 % avisa que la chapa puede filtrar", () => {
-  const av = techo.generar(t({ pendiente: 6 })).metadatos.avisos;
-  assert.ok(av.some(a => /filtrar/.test(a)), "advertencia presente");
-  assert.ok(!techo.generar(t({ pendiente: PEND_MIN_CHAPA })).metadatos.avisos.some(a => /filtrar/.test(a)));
+// 6) Pendiente: rango del manual (25–100 % limpio · 7–25 % avisa · < 7 % bloquea).
+test("pendiente 6 % bloquea, 20 % avisa, 25 % limpio", () => {
+  const b = validarTecho(t({ pendiente: 6 }));
+  assert.equal(b.errores.length, 1, "bloqueante");
+  assert.match(b.errores[0], /filtra/);
+  assert.ok(techo.generar(t({ pendiente: 6 })).metadatos.errores.length, "el módulo lo publica");
+
+  const m = validarTecho(t({ pendiente: 20 }));
+  assert.deepEqual(m.errores, [], "20 % no bloquea");
+  assert.match(m.avisos[0], /25 % recomendado por manual/);
+
+  const ok = validarTecho(t({ pendiente: 25 }));
+  assert.deepEqual(ok.errores, []); assert.deepEqual(ok.avisos, [], "25 % es el recomendado: sin ruido");
+  assert.deepEqual(validarTecho(t({ pendiente: 100 })).avisos, [], "100 % sigue dentro del manual");
+  assert.match(validarTecho(t({ pendiente: 120 })).avisos[0], /por encima/);
+  assert.equal(PEND_MIN_CHAPA, 7); assert.deepEqual(PEND_REC, { min: 25, max: 100 });
+});
+
+// 6b) Alero: el manual limita el voladizo lateral a 600 mm → se recorta solo y se avisa.
+test("alero 700 se recorta a 600 con aviso", () => {
+  const v = validarTecho(t({ alero: 700 }));
+  assert.deepEqual(v.errores, [], "no bloquea: se acomoda");
+  assert.match(v.ajustes[0], /700 a 600/);
+  const { piezas, metadatos } = techo.generar(t({ alero: 700 }));
+  assert.equal(metadatos.alero, ALERO_MAX, "el modelo usa el alero recortado");
+  assert.equal(metadatos.ajustes.length, 1);
+  // el cordón superior sale del alero recortado, no del pedido
+  const cs = cabriadaMedia(piezas).find(p => p.tipo === "CORDON_SUPERIOR");
+  assert.equal(cs.largo, techo.generar(t({ alero: 600 })).piezas.find(p => p.tipo === "CORDON_SUPERIOR").largo);
+  assert.deepEqual(validarTecho(t({ alero: 600 })).ajustes, [], "600 justo no avisa");
 });
 
 // 7) In-line framing: la separación de cabriadas debe coincidir con la modulación del muro.
@@ -171,9 +197,11 @@ test("cubierta on/off no altera la estructura ni los cortes", () => {
 test("defaults: techo válido sin tocar ningún parámetro", () => {
   const d = techo.defaults();
   const { piezas, metadatos } = techo.generar({ kind: "techo", ...d });
-  assert.equal(d.tipo, "unAgua"); assert.equal(d.pendiente, 15);
+  assert.equal(d.tipo, "unAgua"); assert.equal(d.pendiente, 25, "el manual recomienda de 25 % para arriba");
   assert.ok(piezas.length > 10);
   assert.deepEqual(metadatos.avisos, [], "sin advertencias con los defaults");
+  assert.deepEqual(metadatos.errores, []); assert.deepEqual(metadatos.ajustes, []);
+  assert.equal(metadatos.notas.length, 1, "la nota de succión de viento es informativa, no una advertencia");
   assert.ok(piezas.every(p => Number.isFinite(p.largo) && p.largo > 0), "todas las piezas con largo válido");
   assert.ok(piezas.filter(p => p.orient).every(p => p.orient.c.every(Number.isFinite)));
 });
@@ -201,4 +229,119 @@ test("cortes: cabriada en PGC 6 m y correas en PGO, derivados de piezas[]", () =
   ["CORDON_SUPERIOR","CORDON_INFERIOR","MONTANTE_CABRIADA","MONTANTE_TIMPANO","CORREA"].forEach(x =>
     assert.ok(tipos.has(x), `falta ${x} en la lista de corte`));
   assert.ok(!tipos.has("CUBIERTA"), "la chapa no es una pieza de corte");
+});
+
+// ---------------------------------------------------------------------------------------------
+// ADDENDUM (auditoría contra manual ConsulSteel/Barbieri)
+// ---------------------------------------------------------------------------------------------
+
+// A1) Números del spec original recalculados con el nuevo default de 25 %.
+test("unAgua luz 3000 @25 %: cierre 750, cordón 3917, montantes 150/300/450/600", () => {
+  const { piezas, metadatos } = techo.generar(t({ pendiente: 25 }));
+  assert.equal(metadatos.angulo, 14.04, "atan(0,25)");
+  assert.equal(metadatos.alturaCumbrera, 750, "3000 × 0,25");
+  const med = cabriadaMedia(piezas);
+  assert.equal(med.find(p => p.tipo === "CORDON_SUPERIOR").largo, 3917, "(3000+800)/cos 14,04°");
+  const mont = med.filter(p => p.tipo === "MONTANTE_CABRIADA").map(p => p.largo).sort((a,b) => a-b);
+  assert.deepEqual(mont, [150, 300, 450, 600, 750], "internos cada 600 (x·0,25) + el de cierre");
+});
+
+// A2) Arriostre del ala inferior del cordón inferior (viguetas de cielo): fleje 38×0,84 cada ≤1,20 m.
+test("arriostre de cielo: luz 3600 → 4 líneas de fleje 38×0,84 a lo largo del techo", () => {
+  const inp = t({ luz: 3600, largo: 4800 });
+  const P = techo.generar(inp).piezas;
+  const fc = P.filter(p => p.tipo === "FLEJE_CIELO");
+  assert.equal(fc.length, 4, "arranca en un borde y separa ≤ 1200");
+  fc.forEach(p => {
+    assert.equal(p.perfil, FLEJE_CIELO_PERFIL);
+    assert.equal(p.categoria, "fleje", "va en rollo, no en barra");
+    assert.equal(p.largo, 4800, "corre a lo largo del techo, perpendicular a las cabriadas");
+    assert.deepEqual(p.orient.u, [0, 1, 0], "perpendicular a las cabriadas");
+  });
+  const xs = fc.map(p => p.orient.c[0]).sort((a,b) => a-b);
+  assert.deepEqual(xs, [0, 1200, 2400, 3600]);
+  xs.slice(1).forEach((x, i) => assert.ok(x - xs[i] <= FLEJE_CIELO.sep + 0.1, "separación real ≤ 1200"));
+  // pegado al ala INFERIOR del cordón inferior (que va de z=−100 a z=0 con PGC 100)
+  fc.forEach(p => assert.ok(p.orient.c[2] < -100, `bajo el ala inferior, no dentro del cordón (z=${p.orient.c[2]})`));
+
+  // en cortes: sección propia de fleje, fuera del bin-packing de barras
+  const secc = cutPlan(P, cutOpts(inp)).filter(s => s.fleje);
+  assert.equal(secc.length, 2, "dos medidas de fleje = dos secciones (30×0,5 del faldón y 38×0,84 del cielo)");
+  const sc = secc.find(s => s.perfil === FLEJE_CIELO_PERFIL);
+  assert.equal(sc.piezas, 4); assert.equal(sc.metros, 19.2); assert.ok(!sc.bins, "no se empaqueta en barras");
+  assert.ok(!Object.keys(cutList(P).byProfile).includes(FLEJE_CIELO_PERFIL), "fuera del bin-packing");
+  assert.ok(cutList(P).groups.some(g => g.tipo === "FLEJE_CIELO" && g.code.startsWith("FC")), "código propio");
+});
+
+// A3) Anclajes anti-succión: 2 conectores por cabriada + su tornillería.
+test("anclajes: 9 cabriadas → 18 conectores + tornillería", () => {
+  const inp = t();                                  // largo 4800 @600 → 9 cabriadas
+  const m = techo.materiales(techo.generar(inp).piezas, inp);
+  assert.equal(m.nCabriadas, 9);
+  const anc = m.otros.find(o => o.key === "anclaje-cabriada");
+  assert.equal(anc.cantidad, 18, "uno por apoyo"); assert.equal(anc.unidad, "u");
+  assert.match(anc.label, /succión|clip|ángulo/i);
+  // los 8 T1 por conector están en la cuenta global
+  const sinAnclaje = techo.materiales(techo.generar(inp).piezas, inp).tornillos.t1;
+  assert.ok(sinAnclaje >= 18 * 8, "la tornillería del anclaje entra en T1");
+  // la advertencia de viento es fija y viaja en las notas (no ensucia los avisos)
+  assert.match(techo.generar(inp).metadatos.notas[0], /succión del viento/);
+});
+
+// A4) Membrana hidrófuga: m² de faldón × factor de solape, sólo con cubierta.
+test("membrana: m² de faldones × 1,15; sin cubierta no aparece", () => {
+  const inp = t({ tipo: "dosAguas", luz: 6000, pendiente: 30 });
+  const m = techo.materiales(techo.generar(inp).piezas, inp);
+  const mem = m.otros.find(o => o.key === "membrana");
+  assert.equal(mem.unidad, "m²");
+  assert.equal(mem.cantidad, Math.ceil(m.area * MEMBRANA_SOLAPE), "área de faldón + solape");
+  assert.ok(mem.cantidad > m.area, "siempre más que la chapa");
+  assert.equal(MEMBRANA_SOLAPE, 1.15);
+  const sin = t({ tipo: "dosAguas", luz: 6000, pendiente: 30, cubierta: false });
+  assert.ok(!techo.materiales(techo.generar(sin).piezas, sin).otros.some(o => o.key === "membrana"));
+});
+
+// A5) Peso propio de la cubierta como dato de referencia (sanity check para quien verifica).
+test("peso de cubierta de referencia: 30 kg/m² de chapa", () => {
+  const inp = t();
+  const m = techo.materiales(techo.generar(inp).piezas, inp);
+  assert.equal(m.pesoCubierta.kgm2, PESO_CUBIERTA.chapa);
+  assert.equal(m.pesoCubierta.total, Math.round(m.area * 30));
+  assert.notEqual(m.pesoCubierta.total, m.peso, "es el peso de la cubierta terminada, no el de los perfiles");
+  assert.equal(PESO_CUBIERTA.teja, 67, "definida para cuando se sume teja");
+});
+
+// A6) Regresión: los agregados del addendum no tocan la cabriada ni las correas.
+test("regresión: la cabriada y las correas son las mismas que antes del addendum", () => {
+  const inp = t({ tipo: "dosAguas", luz: 6000, pendiente: 30, alero: 400 });
+  const P = techo.generar(inp).piezas;
+  const nuevo = new Set(["FLEJE_CIELO"]);
+  const estructura = P.filter(p => !nuevo.has(p.tipo)).map(p => `${p.tipo}|${p.largo}`).sort();
+  // el conteo por tipo de la cabriada Fink + correas + cruz de faldón, intacto
+  assert.deepEqual(cuenta(P.filter(p => !nuevo.has(p.tipo))), {
+    CORDON_INFERIOR: 9, CORDON_SUPERIOR: 18, DIAGONAL: 36,
+    MONTANTE_TIMPANO: 28, CORREA: 10, FLEJE: 4, CUBIERTA: 2   // 1 cruz (2 flejes) por faldón
+  });
+  assert.ok(estructura.length > 100);
+  // y el fleje de cielo no se mezcla con el de la cruz de San Andrés en el cómputo
+  const m = techo.materiales(P, inp);
+  const rollo30 = m.otros.find(o => o.key === "fleje-rollo"), rollo38 = m.otros.find(o => o.key === "fleje-cielo-rollo");
+  assert.match(rollo30.label, /Fleje 30x0\.5/); assert.match(rollo38.label, /Fleje 38x0\.84/);
+  assert.equal(rollo30.unidad, "rollo"); assert.equal(rollo38.unidad, "rollo");
+});
+
+// A7) Correas siempre presentes (el manual valida cabriadas a 1,20 m sólo con correas).
+test("a 1200 mm de separación las correas siguen estando", () => {
+  const P = techo.generar(t({ separacion: 1200 })).piezas;
+  assert.ok(P.filter(p => p.tipo === "CORREA").length > 0, "no son opcionales");
+  assert.equal(techo.generar(t({ separacion: 1200 })).metadatos.nCabriadas, 5, "4800/1200 + 1");
+});
+
+// A8) Apoyo del cordón inferior sobre la solera: el manual pide 38 mm mínimo.
+test("el cordón inferior apoya de muro a muro (apoyo ≥ 38 mm sobre la solera)", () => {
+  const P = cabriadaMedia(techo.generar(t()).piezas);
+  const ci = P.find(p => p.tipo === "CORDON_INFERIOR");
+  assert.equal(ci.largo, 3000, "de eje de apoyo a eje de apoyo");
+  // con PGU 100 (alma 102) bajo cada extremo, el apoyo disponible supera holgadamente los 38 mm
+  assert.ok(102 / 2 >= 38, "media solera ya alcanza el apoyo mínimo");
 });

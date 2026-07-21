@@ -6,7 +6,7 @@
 // · Z = altura (piso z=0). El fleje es la primera pieza DIAGONAL del motor: en vez de `axis` trae
 // `orient` = { c(centro), u(eje del largo), v(eje del ancho), n(eje del espesor), w, t }, y todo lo
 // que consume geometría (pieceBoxEngine, visor, export) resuelve la caja desde esa base.
-import { resolveSystem, FLEJE, FLEJE_PERFIL } from "./systems.mjs";
+import { resolveSystem, FLEJE, FLEJE_PERFIL, rolloDe } from "./systems.mjs";
 
 const rad = g => g * Math.PI / 180;
 export const anguloGrados = (ancho, alto) => Math.atan2(alto, ancho) * 180 / Math.PI;
@@ -110,16 +110,22 @@ export function buildBraces(input){
 
 // Cómputo del fleje a partir de las PIEZAS (regla del motor: todo sale de la geometría).
 // El fleje viene en ROLLO, no en barra: metros lineales + rollos (redondeo hacia arriba).
-export function computeFlejes(piezas){
-  const fl = (piezas || []).filter(p => p.categoria === "fleje");
+// `opts.perfil` acota el cómputo a UNA medida de fleje (el techo tiene dos: 30×0,5 de cruz de San
+// Andrés y 38×0,84 de arriostre de cielo, que son ítems de compra distintos).
+// `opts.tornillos` reemplaza el conteo por extremos (el arriostre de cielo se atornilla en cada cruce).
+export function computeFlejes(piezas, opts = {}){
+  const { perfil = null, tornillos = null } = opts;
+  const fl = (piezas || []).filter(p => p.categoria === "fleje" && (!perfil || p.perfil === perfil));
   if (!fl.length) return null;
   const mm = fl.reduce((a, p) => a + p.largo, 0);
+  const rollo = rolloDe(fl[0].perfil);
   return {
     unidades: fl.length,
+    perfil: fl[0].perfil,
     metros: +(mm / 1000).toFixed(2),
-    rollos: Math.ceil(mm / FLEJE.rollo),
-    largoRollo: FLEJE.rollo,
+    rollos: Math.ceil(mm / rollo),
+    largoRollo: rollo,
     tensores: fl.length,                        // 1 tensor por fleje
-    t1: fl.length * 2 * FLEJE.tornExtremo       // 4 tornillos T1 por extremo
+    t1: tornillos != null ? tornillos : fl.length * 2 * FLEJE.tornExtremo // 4 tornillos T1 por extremo
   };
 }

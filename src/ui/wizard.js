@@ -4,6 +4,7 @@
 import { computeProject, cutPlan, cutOpts, listModules, getModule } from "../engine/index.mjs";
 import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.mjs";
+import { validarTecho } from "../engine/modules/techo.mjs";
 import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
@@ -63,6 +64,8 @@ function errCampo(c){ if (!c || c.tipo !== "medida" || !c.rango) return null; co
 function pasoValido(paso){
   // El vano de piso fuera de margen es un error BLOQUEANTE: no se avanza (ni se genera geometría inválida).
   if (paso.componente === "vanoPiso" && validarVanoPiso(toEngineInput()).errores.length) return false;
+  // Pendiente de techo por debajo del mínimo de escurrimiento: tampoco se avanza.
+  if (paso.id === "pendiente" && state.kind === "techo" && validarTecho(toEngineInput()).errores.length) return false;
   return [...(paso.campos||[]), ...(paso.avanzado||[])].every(c => c.tipo !== "medida" || !errCampo(c));
 }
 
@@ -537,10 +540,16 @@ function showInfo3d(p){
 // ---------- materiales ----------
 // Unidad de venta con el largo comercial REAL del perfil (6,00 m barra / 3,05 · 3,00 · 4,88 m tira).
 const unidadBarra = len => `${len >= 6000 ? "barra" : "tira"} ${(len/1000).toFixed(2).replace(".", ",")} m`;
-// Advertencias del proyecto (hoy: arriostramiento). Muro y Ambiente las publican en metadatos.avisos.
+// Advertencias del proyecto. Muro y Ambiente publican `avisos` (arriostramiento); Techo suma además
+// `errores` (bloqueantes), `ajustes` (lo que se acomodó solo) y `notas` (informativas fijas).
 function avisosHTML(metadatos){
-  const av = metadatos?.avisos || [];
-  return av.length ? `<div class="avisos"><b>⚠ Arriostramiento</b>${av.map(a => `<span>${a}</span>`).join("")}</div>` : "";
+  const bloque = (cls, titulo, arr) => arr?.length
+    ? `<div class="${cls}"><b>${titulo}</b>${arr.map(a => `<span>${a}</span>`).join("")}</div>` : "";
+  const av = (metadatos?.avisos || []).filter(a => !(metadatos?.errores || []).includes(a));
+  return bloque("errores", "⛔ Así no va", metadatos?.errores)
+    + bloque("avisos", "✓ Lo acomodé", metadatos?.ajustes)
+    + bloque("avisos", "⚠ Revisá", av)
+    + bloque("avisos", "ℹ Para tener en cuenta", metadatos?.notas);
 }
 function shoppingList(mat){
   const items = [];
