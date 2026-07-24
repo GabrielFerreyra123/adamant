@@ -121,6 +121,11 @@ export class Viewer {
       let geo, center = null;
       if (p.rev){ geo = this._revGeo(p.rev); } // revestimiento con vanos recortados (Shape + holes)
       else if (p.orient){ geo = this._orientGeo(p); } // pieza DIAGONAL (fleje): caja con base propia
+      else if (p.forma === "cilindro"){ // pilotín de hormigón: cilindro vertical (eje = Z del motor)
+        const box = pieceBoxEngine(p); center = box.center;
+        geo = new THREE.CylinderGeometry(p.r*MM, p.r*MM, Math.max(box.size[2]*MM, 0.001), 20);
+        geo.rotateX(Math.PI/2); // eje local Y → Z del motor (el grupo raíz hace el Y-up final)
+      }
       else {
         const box = pieceBoxEngine(p); center = box.center; // en mm, ejes del motor
         geo = new THREE.BoxGeometry(Math.max(box.size[0]*MM, 0.001), Math.max(box.size[1]*MM, 0.001), Math.max(box.size[2]*MM, 0.001));

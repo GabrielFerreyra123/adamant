@@ -24,6 +24,52 @@ const VANO_MARGEN_MOD = 1;   // margen mínimo a cada borde, en franjas de modul
 const COLA_MIN = 150;        // tramo residual de viga cola sin sentido constructivo → se elimina
 const CABEZAL_LUZ_AVISO = 1200; // luz de cabezal a partir de la cual se avisa
 
+// Apoyos/fundación DIBUJADOS (capa visual "apoyos", conmutable; no suman a materiales ni cortes).
+// El entramado tiene su cara inferior en z=0, así que todos los apoyos viven en z<0.
+const APOYO = {
+  plateaVuelo: 100,   // la platea sobresale del perímetro del entramado (mm por lado)
+  plateaEsp: 120,     // espesor visual de la platea
+  soleraAncho: 100,   // ancho de la solera de asiento (viga perimetral sobre pilotines)
+  soleraAlto: 80,     // alto de la solera de asiento
+  pilotinR: 100,      // radio del pilotín (Ø 200)
+  pilotinProf: 500,   // profundidad enterrada del pilotín (visual)
+  pilotinSep: 1600    // separación máxima entre pilotines a lo largo de cada lado
+};
+
+// Piezas de apoyo según el tipo de fundación elegido. `corrida`×`luz` = huella del entramado.
+// Todas llevan `capa:"apoyos"` + `superficie:true` (fuera de cómputo) y su AABB en `box`.
+function apoyosPiso(apoyo, corrida, luz){
+  const A = APOYO, P = [];
+  if (apoyo === "pilotines"){
+    const ins = A.soleraAncho / 2;                       // el pilotín va centrado bajo la solera
+    const zTopS = 0, zBotS = -A.soleraAlto;              // solera de asiento, pegada bajo el entramado
+    // Solera de asiento: marco perimetral (4 vigas). Los solapes de esquina no importan (es visual).
+    const solera = (sx, sy, cx, cy) => P.push({ tipo: "SOLERA_ASIENTO", superficie: true, capa: "apoyos",
+      box: { size: [sx, sy, A.soleraAlto], center: [cx, cy, (zTopS + zBotS) / 2] } });
+    solera(corrida, A.soleraAncho, corrida/2, ins);
+    solera(corrida, A.soleraAncho, corrida/2, luz - ins);
+    solera(A.soleraAncho, luz, ins, luz/2);
+    solera(A.soleraAncho, luz, corrida - ins, luz/2);
+    // Pilotines: esquinas + intermedios repartidos parejo por lado, según pilotinSep.
+    const zc = zBotS - A.pilotinProf / 2;
+    const reparto = (largoLado, ins0) => { const n = Math.max(1, Math.ceil(largoLado / A.pilotinSep));
+      return Array.from({ length: n + 1 }, (_, i) => ins0 + (largoLado - 2*ins0) * i / n); };
+    const xs = reparto(corrida, ins), ys = reparto(luz, ins);
+    const puntos = new Set();
+    xs.forEach(x => { puntos.add(`${x}|${ins}`); puntos.add(`${x}|${luz - ins}`); });
+    ys.forEach(y => { puntos.add(`${ins}|${y}`); puntos.add(`${corrida - ins}|${y}`); });
+    puntos.forEach(k => { const [x, y] = k.split("|").map(Number);
+      P.push({ tipo: "PILOTIN", superficie: true, capa: "apoyos", forma: "cilindro", r: A.pilotinR,
+        box: { size: [A.pilotinR*2, A.pilotinR*2, A.pilotinProf], center: [x, y, zc] } }); });
+  } else {
+    // Platea: losa de hormigón bajo todo el entramado, sobresaliendo del perímetro.
+    const v = A.plateaVuelo;
+    P.push({ tipo: "PLATEA", superficie: true, capa: "apoyos",
+      box: { size: [corrida + 2*v, luz + 2*v, A.plateaEsp], center: [corrida/2, luz/2, -A.plateaEsp/2] } });
+  }
+  return P;
+}
+
 // Valida el vano contra el entramado. → { vano, errores, avisos } (vano null si no aplica o si hay error:
 // nunca se genera geometría inválida).
 export function validarVanoPiso(input){
@@ -201,6 +247,9 @@ export const piso = {
       }
     }
 
+    // APOYOS/fundación (capa visual conmutable "apoyos"): platea o pilotines+solera de asiento, bajo z=0.
+    P.push(...apoyosPiso(input.apoyo || "platea", corrida, luz));
+
     const barLen = s.wood ? (+(input.opciones?.tiraLen) || 4880) : (s.barLen || 6000); // tirantes de piso más largos en wood
     const chk = validarVanoPiso(input);
     return { piezas: P, metadatos: { nombre: "Entramado de piso", esquema: "planta", barLen, sistema: input.sistema,
@@ -255,7 +304,8 @@ export const piso = {
     }
 
     const kg = p => (p.largo / 1000) * (p.tipo === "CENEFA" ? s.kgP : s.kgM);
-    const peso = piezas.reduce((a, p) => a + kg(p), 0);
+    // Las piezas de apoyo (platea/pilotines) son superficies visuales: no computan peso de perfil.
+    const peso = piezas.filter(p => !p.superficie).reduce((a, p) => a + kg(p), 0);
     return { sistema: input.sistema, nVigas: piezas.filter(p => p.tipo === "VIGA").length, nVanos: vano ? 1 : 0,
       area: +area.toFixed(2), peso: +peso.toFixed(1), perfiles, otros, placas: [], aislacion: 0, tornillos: { t1, t2: 0 }, barLen };
   }

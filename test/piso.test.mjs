@@ -4,6 +4,7 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import { piso } from "../src/engine/modules/piso.mjs";
 import { pieceBoxEngine } from "../src/viewer/geometry.js";
+import { cutList } from "../src/engine/cuts.mjs";
 
 const floor = (sistema, largo, ancho, extra = {}) => ({
   sistema, largo, ancho, separacion: 400, apoyo: "platea", placa: true,
@@ -40,7 +41,7 @@ for (const [nombre, L, W, vigas, blocking] of casos){
 // cenefas; las 2 vigas dobles van por dentro, simétricas contra las cenefas laterales.
 for (const sis of ["steel", "wood"]){
   test(`piso ${sis} 4×5: marco simétrico + bbox = dimensiones`, () => {
-    const P = piso.generar(floor(sis, 4000, 5000)).piezas;   // luz 4000 (Y), corrida 5000 (X)
+    const P = piso.generar(floor(sis, 4000, 5000)).piezas.filter(p => !p.superficie); // sin apoyos (fundación)
     const box = p => { const { size, center } = pieceBoxEngine(p); return [0,1,2].map(i => [center[i]-size[i]/2, center[i]+size[i]/2]); };
     // exactamente una cenefa por lado del rectángulo, pegada a su borde (perpendiculares a vigas en X;
     // paralelas en Y). Se identifica cada lado por eje + coordenada del borde.
@@ -137,7 +138,9 @@ function aabbOverlap(a, b, tol){
 }
 for (const sis of ["steel", "wood"]){
   test(`piso ${sis} 4×5: ningún par de piezas se superpone (AABB)`, () => {
-    const P = piso.generar(floor(sis, 4000, 5000)).piezas;
+    // Los apoyos (platea/pilotines/solera de asiento) son superficies visuales que se solapan a
+    // propósito (pilotín bajo la solera, esquinas de la solera): fuera del chequeo estructural.
+    const P = piso.generar(floor(sis, 4000, 5000)).piezas.filter(p => !p.superficie);
     const collisions = [];
     for (let i = 0; i < P.length; i++){
       for (let j = i + 1; j < P.length; j++){
@@ -149,3 +152,52 @@ for (const sis of ["steel", "wood"]){
     assert.equal(collisions.length, 0, `colisiones encontradas:\n${collisions.join("\n")}`);
   });
 }
+
+// F11 — Apoyos/fundación visibles en 3D (platea o pilotines). Piezas visuales: capa "apoyos",
+// superficie, bajo z=0; no entran a cortes ni suman peso.
+test("apoyo=platea: losa gris bajo el entramado, sobresaliendo del perímetro", () => {
+  const P = piso.generar(floor("steel", 4000, 3000, { apoyo: "platea" })).piezas;
+  const ap = P.filter(p => p.capa === "apoyos");
+  assert.equal(ap.length, 1, "una sola platea");
+  const pl = ap[0];
+  assert.equal(pl.tipo, "PLATEA");
+  assert.ok(pl.superficie && pl.capa === "apoyos", "capa conmutable, fuera de cómputo");
+  const { size, center } = pieceBoxEngine(pl);
+  // corrida 4000 (X), luz 3000 (Y); sobresale +100 por lado → +200 en cada eje
+  assert.deepEqual(size.map(Math.round), [4200, 3200, 120], "vuelo perimetral + espesor visual");
+  assert.ok(center[2] < 0 && center[2] - size[2]/2 < 0, "por debajo del entramado (z<0)");
+  assert.ok(Math.abs(center[2] + size[2]/2) < 1e-6, "su cara superior toca z=0 (base del entramado)");
+});
+
+test("apoyo=pilotines: cilindros de hormigón + solera de asiento sobre ellos", () => {
+  const P = piso.generar(floor("steel", 4000, 3000, { apoyo: "pilotines" })).piezas;
+  const pil = P.filter(p => p.tipo === "PILOTIN"), sol = P.filter(p => p.tipo === "SOLERA_ASIENTO");
+  assert.equal(sol.length, 4, "marco perimetral de solera de asiento");
+  assert.ok(pil.length >= 4, "al menos las 4 esquinas");
+  pil.forEach(p => {
+    assert.equal(p.forma, "cilindro"); assert.ok(p.r > 0, "radio definido");
+    assert.ok(p.superficie && p.capa === "apoyos");
+    const { center, size } = pieceBoxEngine(p);
+    assert.ok(center[2] + size[2]/2 <= 0, "el pilotín va enterrado, bajo z=0");
+  });
+  // esquinas presentes (dentro del inset de la solera)
+  const xs = pil.map(p => p.box.center[0]), ys = pil.map(p => p.box.center[1]);
+  assert.ok(Math.min(...xs) < 100 && Math.max(...xs) > 3900, "pilotines en los dos extremos X");
+  assert.ok(Math.min(...ys) < 100 && Math.max(...ys) > 2900, "pilotines en los dos extremos Y");
+});
+
+test("apoyos: no entran a cortes ni suman peso; cambiar el selector cambia las piezas", () => {
+  const platea = floor("steel", 4000, 3000, { apoyo: "platea" });
+  const pilotines = floor("steel", 4000, 3000, { apoyo: "pilotines" });
+  const Pp = piso.generar(platea).piezas, Pi = piso.generar(pilotines).piezas;
+  // el selector cambia la geometría de una
+  assert.notEqual(Pp.filter(p => p.capa === "apoyos").map(p => p.tipo).sort().join(),
+                  Pi.filter(p => p.capa === "apoyos").map(p => p.tipo).sort().join(), "platea ≠ pilotines");
+  // mismo entramado estructural en ambos casos (los apoyos no lo tocan)
+  const est = P => P.filter(p => !p.superficie).length;
+  assert.equal(est(Pp), est(Pi), "la estructura no depende del apoyo");
+  // no computan: mismos cortes y mismo peso con y sin platea (la estructura manda)
+  const m = piso.materiales(Pi, pilotines);
+  assert.ok(Number.isFinite(m.peso), "peso sin NaN pese a los apoyos");
+  assert.ok(!cutList(Pi).groups.some(g => ["PLATEA","PILOTIN","SOLERA_ASIENTO"].includes(g.tipo)), "los apoyos no salen en la lista de corte");
+});

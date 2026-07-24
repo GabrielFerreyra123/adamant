@@ -103,7 +103,9 @@ export const combinado = {
     // --- PISO (plataforma) --- el piso pone la corrida (lado mayor) en su X; si el ambiente tiene
     // largo < ancho queda transpuesto → rotarlo 90° para alinearlo con el ambiente (X=largo, Y=ancho).
     const pisoGen = piso.generar(d.pisoInput);
-    const hEntramado = boundsEngine(pisoGen.piezas).size[2];
+    // Sólo el entramado ESTRUCTURAL define la altura: los apoyos (platea/pilotines) son superficies
+    // que viven bajo z=0 y falsearían la cota sobre la que apoyan la placa y los muros.
+    const hEntramado = boundsEngine(pisoGen.piezas.filter(p => !p.superficie)).size[2];
     const rotPiso = d.largo < d.ancho;
     P.push(...(rotPiso
       ? reubicar(pisoGen.piezas, { rot: 90, tx: d.largo, ty: 0, tz: 0, parte: "piso" })

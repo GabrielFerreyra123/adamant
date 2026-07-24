@@ -67,7 +67,7 @@ export function exportRuby(input){
   const gen = getModule(input.kind).generar(input);
   const metadatos = gen.metadatos;
   // Los revestimientos son capas VISUALES "a definir" → no se exportan a SketchUp (la placa de piso sí).
-  const piezas = gen.piezas.filter(p => !["rev-ext", "rev-int", "cubierta"].includes(p.capa));
+  const piezas = gen.piezas.filter(p => !["rev-ext", "rev-int", "cubierta", "apoyos"].includes(p.capa));
   // Fallback de largo desde la geometría sólo si no vino input.largo: algunas piezas (combinado
   // reubicado) llevan `box` y no `pos`, así que se descartan para no romper.
   const LARGO = Math.round(+input.largo || Math.max(1, ...piezas.filter(p => Array.isArray(p.pos)).map(p => p.pos[0] + p.largo)));

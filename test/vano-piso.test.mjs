@@ -15,16 +15,18 @@ const suelo = (extra = {}) => ({ sistema: "steel", largo: 3600, ancho: 4800, sep
   apoyo: "platea", placa: true, opciones: OPC, ...extra });
 const tipos = P => P.reduce((c, p) => (c[p.tipo] = (c[p.tipo] || 0) + 1, c), {});
 const sinColision = P => {
-  const bs = P.map(p => { const { size, center } = pieceBoxEngine(p); return { t: p.tipo, b: [0,1,2].map(i => [center[i]-size[i]/2, center[i]+size[i]/2]) }; });
+  // los apoyos (fundación) son superficies que se solapan a propósito: chequeo sólo estructural
+  const bs = P.filter(p => !p.superficie).map(p => { const { size, center } = pieceBoxEngine(p); return { t: p.tipo, b: [0,1,2].map(i => [center[i]-size[i]/2, center[i]+size[i]/2]) }; });
   const eps = 0.5, sol = (a, b) => [0,1,2].every(i => a[i][0] < b[i][1]-eps && b[i][0] < a[i][1]-eps);
   for (let i = 0; i < bs.length; i++) for (let j = i+1; j < bs.length; j++)
     if (sol(bs[i].b, bs[j].b)) return `${bs[i].t} ↔ ${bs[j].t}`;
   return null;
 };
 
-// 8) REGRESIÓN CERO: sin vano, la salida es idéntica a la de antes de la fase.
+// 8) REGRESIÓN CERO: sin vano, la ESTRUCTURA es idéntica a la de antes de la fase (los apoyos de
+// fundación son superficies aparte, ver su propio test).
 test("piso sin vano: salida intacta (regresión cero)", () => {
-  const P = piso.generar(suelo()).piezas;
+  const P = piso.generar(suelo()).piezas.filter(p => !p.superficie);
   assert.deepEqual(tipos(P), { CENEFA: 4, VIGA_DOBLE: 2, VIGA: 11, BLOCKING: 12 });
   assert.equal(P.length, 29);
   assert.ok(!P.some(p => ["TRIMMER","CABEZAL","VIGA_COLA"].includes(p.tipo)), "no aparece enmarcado");
@@ -158,7 +160,7 @@ for (const [nom, sis, vano] of [
 test("export Ruby: trimmer / cabezal / viga cola emitidos", () => {
   const inp = { kind: "piso", ...suelo({ vano: { x: 1900, y: 600, ancho: 1000, largo: 2400 } }) };
   const rb = exportRuby(inp);
-  const P = piso.generar(inp).piezas;
+  const P = piso.generar(inp).piezas.filter(p => !p.superficie); // los apoyos no van al .rb (son visuales)
   // una llamada _profile por pieza (paridad motor ↔ .rb)
   assert.equal((rb.match(/_profile\(/g) || []).length - 1, P.length, "una llamada por pieza (menos la def del helper)");
   assert.match(rb, /MAP_XZ/, "los cabezales corren en X y se extruyen con su mapper");

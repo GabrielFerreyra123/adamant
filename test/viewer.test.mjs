@@ -27,7 +27,8 @@ test("montantes son verticales: largo en Z del motor (no en X)", () => {
 // F7b — el piso renderiza ACOSTADO: el alto (Y de Three) es ~el alma de la viga, no metros.
 test("piso: bounding box acostado (alto Y ≈ alma, no metros)", () => {
   const inp = { sistema:"steel", largo:4000, ancho:3000, separacion:400, apoyo:"platea", placa:true, opciones:{ pgc:"PGC 150x1.60", pgu:"PGU 150x1.60" } };
-  const { size } = boundsThree(piso.generar(inp).piezas); // [X=corrida, Y(alto)=alma, Z=luz]
+  // sin los apoyos de fundación (superficies bajo z=0 que ensanchan el bbox): mido el entramado
+  const { size } = boundsThree(piso.generar(inp).piezas.filter(p => !p.superficie)); // [X=corrida, Y(alto)=alma, Z=luz]
   assert.ok(size[0] > 3900 && size[0] < 4200, `X(corrida) = ${size[0]} (~4000)`);
   assert.ok(size[1] < 300, `alto Y = ${size[1]} debe ser ~alma de viga (PGC 150 → 150), no metros`);
   assert.ok(size[2] > 2900 && size[2] < 3200, `Z(luz) = ${size[2]} (~3000)`);

@@ -24,12 +24,15 @@ const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null };
 // Capas de revestimiento conmutables (superficies): id de capa → etiqueta y tipo (para color de leyenda).
 const CAPA_INFO = {
+  "apoyos":      { l: "Apoyos (fundación)",      tipo: "PLATEA" },
   "placa-piso":  { l: "Placa de piso",          tipo: "PLACA" },
   "rev-ext":     { l: "Rev. exterior muros",     tipo: "REV.EXT" },
   "rev-int":     { l: "Rev. interior muros",     tipo: "REV.INT" },
   "placa-cielo": { l: "Placa de cielorraso",     tipo: "PLACA" }
 };
-const CAPA_ORDEN = ["placa-piso", "rev-ext", "rev-int", "placa-cielo"];
+const CAPA_ORDEN = ["apoyos", "placa-piso", "rev-ext", "rev-int", "placa-cielo"];
+// Las capas arrancan APAGADAS salvo "apoyos": si el usuario eligió platea/pilotines, se ve de una.
+const capaOn = id => state.capas[id] ?? (id === "apoyos");
 function capasDe(piezas){
   const ids = new Set(piezas.filter(p => p.capa).map(p => p.capa));
   return CAPA_ORDEN.filter(id => ids.has(id)).map(id => ({ id, ...CAPA_INFO[id] }));
@@ -487,14 +490,14 @@ function renderTab(){
     // panel de CAPAS de revestimiento (superficies conmutables): checkboxes independientes, arrancan apagadas
     const capas = capasDe(piezas);
     const capasPanel = capas.length
-      ? `<div class="capas" id="capaspanel"><b>Capas</b>${capas.map(c => `<label><input type="checkbox" data-capa="${c.id}" ${state.capas[c.id]?'checked':''}><i style="background:${colorHex(c.tipo)}"></i>${c.l}</label>`).join("")}</div>` : "";
+      ? `<div class="capas" id="capaspanel"><b>Capas</b>${capas.map(c => `<label><input type="checkbox" data-capa="${c.id}" ${capaOn(c.id)?'checked':''}><i style="background:${colorHex(c.tipo)}"></i>${c.l}</label>`).join("")}</div>` : "";
     // Sin leyenda fija: tapaba el modelo. La identificación de cada perfil sale al TOCARLO (info3d).
     body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${selector}${partesel}${capasPanel}<div class="info hidden" id="info3d"></div>
       <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · <b>tocá una pieza para ver qué es</b></p></div>`;
     try {
       viewer = new Viewer(document.getElementById("viewer3d"), { onSelect: showInfo3d });
       const mostrar = () => (partes && state.parte3d !== "todo") ? piezas.filter(p => p.parte === state.parte3d) : piezas;
-      const aplicarCapas = () => capas.forEach(c => { if (state.capas[c.id]) viewer.setLayerVisible(c.id, true); });
+      const aplicarCapas = () => capas.forEach(c => { if (capaOn(c.id)) viewer.setLayerVisible(c.id, true); });
       viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
       const vs = document.getElementById("viewsel");
       if (vs) vs.querySelectorAll("button").forEach(b => b.onclick = () => {
@@ -535,12 +538,22 @@ function showInfo3d(p){
   const el = document.getElementById("info3d"); if (!el) return;
   if (!p){ el.classList.add("hidden"); return; }
   el.classList.remove("hidden");
+  const nombre = `<b><i class="dot" style="background:${colorHex(p.tipo)}"></i>${TIPO_LABEL[p.tipo]||p.tipo}</b>`;
+  // Superficies (apoyos de fundación, placas, revestimientos): no son un perfil de barra. Se muestran
+  // sus dimensiones desde la caja (o el Ø del pilotín), no una sección/largo que no tienen.
+  if (p.superficie){
+    const [sx, sy, sz] = (p.box?.size || []).map(Math.round);
+    const dim = p.forma === "cilindro" ? `Ø ${p.r*2} mm · ${sz} mm de profundidad`
+      : (sx != null ? `${sx} × ${sy} × ${sz} mm` : "");
+    el.innerHTML = `${nombre}<div class="row">${p.perfil || "Superficie"}</div>${dim ? `<div class="row">${dim}</div>` : ""}`;
+    return;
+  }
   // OJO: `axis` NO existe en las piezas diagonales (cabriada, flejes), que traen su base propia
   // `orient`. Además el eje no le sirve a quien construye: lo que necesita es qué perfil es y cuánto
   // mide. El punto de color reemplaza a la leyenda fija que antes tapaba el modelo.
   const s = secDims(p.perfil);
   const sec = p.categoria === "fleje" ? "" : ` · ${Math.round(s.h)} × ${Math.round(s.b)} mm`;
-  el.innerHTML = `<b><i class="dot" style="background:${colorHex(p.tipo)}"></i>${TIPO_LABEL[p.tipo]||p.tipo}</b>
+  el.innerHTML = `${nombre}
     <div class="row">${p.perfil}${sec}</div>
     <div class="row">Largo <b>${p.largo} mm</b></div>`;
 }

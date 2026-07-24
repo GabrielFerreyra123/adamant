@@ -88,7 +88,7 @@ test("combinado steel 4×3: bounding box = largo × ancho × alto total", () => 
   // envolvente ESTRUCTURAL: rev (superficie) y flejes sobresalen del frame por diseño
   const { size } = boundsEngine(piezas.filter(p => !p.superficie && p.categoria !== "fleje"));
   assert.ok(Math.abs(size[0] - 4000) < 1 && Math.abs(size[1] - 3000) < 1, `footprint ${size[0]}×${size[1]}`);
-  const hPiso = boundsEngine(piso.generar({ sistema: "steel", largo: 4000, ancho: 3000, separacion: 400, apoyo: "platea", placa: true, opciones: OPC }).piezas).size[2];
+  const hPiso = boundsEngine(piso.generar({ sistema: "steel", largo: 4000, ancho: 3000, separacion: 400, apoyo: "platea", placa: true, opciones: OPC }).piezas.filter(p => !p.superficie)).size[2];
   assert.ok(Math.abs(size[2] - (hPiso + 18 + 2600)) < 2, `alto total ${size[2]} (esperado ${hPiso + 18 + 2600})`);
   assert.deepEqual(metadatos.bbox.map(Math.round), size.map(Math.round));
 });
@@ -126,7 +126,7 @@ test("combinado: capas de revestimiento son superficies visuales (no computan)",
   assert.equal(P.filter(p => p.tipo === "PLACA").length, 1);
   assert.ok(P.filter(p => ["REV.EXT","REV.INT","PLACA"].includes(p.tipo)).every(p => p.superficie && p.capa), "todas con capa + superficie");
   // capas presentes
-  assert.deepEqual([...new Set(P.filter(p => p.capa).map(p => p.capa))].sort(), ["placa-piso", "rev-ext", "rev-int"]);
+  assert.deepEqual([...new Set(P.filter(p => p.capa).map(p => p.capa))].sort(), ["apoyos", "placa-piso", "rev-ext", "rev-int"]);
   // no afectan cortes: la lista de corte no incluye el perfil "a definir" ni "OSB…"
   const { cortes } = computeProject(inp);
   assert.ok(!cortes.grupos.some(g => g.perfil === "a definir" || g.perfil === "OSB/fenólico 18 mm"));
@@ -174,7 +174,8 @@ test("combinado: el xf del export reproduce la caja del visor", () => {
   const P = combinado.generar(amb("steel", 4000, 3000)).piezas;
   // Los flejes quedan fuera: su transform NO viaja en `xf` sino BAKEADO en su base `orient` (el
   // orquestador rota la base al reubicarlos), y el export los emite desde ahí.
-  P.filter(p => p.xf && p.categoria !== "fleje").forEach(p => { // la PLACA se emite directo desde su box (sin xf)
+  // Las superficies (placa de piso, apoyos de fundación) se emiten directo desde su box, no vía xf.
+  P.filter(p => p.xf && p.categoria !== "fleje" && !p.superficie).forEach(p => {
     const can = pieceBoxEngine({ ...p, box: undefined }); // caja canónica (local, sin reubicar)
     const t = p.xf, [sx, sy, sz] = can.size, [cx, cy, cz] = can.center;
     const box = t.rot === 90
