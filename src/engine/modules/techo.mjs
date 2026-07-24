@@ -137,11 +137,10 @@ export function validarTecho(input){
     errores.push(`Pendiente ${c.pendiente} %: con menos de ${PEND_MIN_CHAPA} % el agua no escurre y la ` +
       `chapa filtra. Subila a ${PEND_REC.min} % (lo que recomienda el manual).`);
   else if (c.pendiente < PEND_REC.min)
-    avisos.push(`Pendiente ${c.pendiente} %: por debajo del ${PEND_REC.min} % recomendado por manual. ` +
-      `Es usual en chapa (mínimo ${PEND_MIN_CHAPA} %), verificá con el proveedor de chapa y un profesional.`);
+    avisos.push(`Pendiente ${c.pendiente} %: por debajo del ${PEND_REC.min} % recomendado por manual ` +
+      `(mínimo técnico para chapa: ${PEND_MIN_CHAPA} %).`);
   else if (c.pendiente > PEND_REC.max)
-    avisos.push(`Pendiente ${c.pendiente} %: por encima del ${PEND_REC.max} % (45°) que cubre el manual. ` +
-      `Consultá el anclaje de la cubierta con un profesional.`);
+    avisos.push(`Pendiente ${c.pendiente} %: por encima del ${PEND_REC.max} % (45°) que cubre el manual.`);
   if (c.aleroPedido > ALERO_MAX)
     ajustes.push(`Alero recortado de ${c.aleroPedido} a ${ALERO_MAX} mm (máximo del manual en alero lateral).`);
   return { errores, avisos, ajustes };
@@ -284,10 +283,10 @@ export const techo = {
     const v = validarTecho(input);
     avisos.push(...v.avisos, ...v.errores);
     if (c.moduloMuro && c.separacion !== c.moduloMuro)
-      avisos.push("Cabriadas no alineadas con montantes: verificar transmisión de cargas con un profesional.");
+      avisos.push("Las cabriadas no caen sobre los montantes del muro.");
     // Nota informativa fija (no es una advertencia del proyecto: aplica a TODO techo).
-    const notas = ["Los anclajes del techo al muro resisten la succión del viento y deben dimensionarse " +
-      "por cálculo profesional según la zona. Bahía Blanca es una de las zonas de mayor viento del país."];
+    const notas = ["Los anclajes del techo al muro resisten la succión del viento; en Bahía Blanca, " +
+      "una de las zonas de mayor viento del país, conviene sobredimensionarlos."];
 
     const alturaCumbrera = (c.tipo === "dosAguas" ? c.luz/2 : c.luz) * p;
     return { piezas: P, metadatos: { nombre: "Techo", esquema: "cabriada", sistema: input.sistema,

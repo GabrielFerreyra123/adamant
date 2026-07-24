@@ -40,7 +40,7 @@ export function cruzEnPlano(ancho, alto){
   const wSub = ancho / n, angSub = anguloGrados(wSub, alto);
   if (angSub > FLEJE.angMax)
     avisos.push(`Tramo angosto: ángulo de fleje ${angSub.toFixed(1)}° fuera del rango recomendado ` +
-      `${FLEJE.angMin}–${FLEJE.angMax}°. Consultar arriostramiento con un profesional.`);
+      `${FLEJE.angMin}–${FLEJE.angMax}°.`);
   for (let i = 0; i < n; i++) zonas.push({ x0: i * wSub, ancho: wSub, alto, angulo: +angSub.toFixed(1) });
   return { zonas, avisos };
 }
@@ -69,6 +69,9 @@ function cruz(x0, ancho, alto, yCara, haciaAfuera){
 
 // Arriostramiento del muro. → { piezas, avisos, zonas }
 // `zonas` (para el PDF/esquema): [{ x0, ancho, alto, angulo }] de cada cruz colocada.
+// arriostramiento: "cruz" = Cruz de San Andrés (fleje, esta función); "placa" = la placa OSB/fenólico
+// del revestimiento hace de muro de corte (no agrega piezas acá, no depende del ancho de paño → sin
+// avisos de ángulo); "ninguno" = sin arriostrar. Sólo "cruz" materializa flejes.
 export function buildBraces(input){
   const piezas = [], avisos = [], zonas = [];
   if ((input.arriostramiento || "ninguno") !== "cruz") return { piezas, avisos, zonas };
@@ -88,7 +91,7 @@ export function buildBraces(input){
   const zona = tramos.reduce((mej, t) => (!mej || (t[1] - t[0]) > (mej[1] - mej[0]) ? t : mej), null);
   const ancho = zona ? zona[1] - zona[0] : 0;
   if (!zona || ancho < FLEJE.tramoMin){
-    avisos.push("Sin tramo lleno suficiente para arriostrar. Consultar solución con un profesional.");
+    avisos.push("Sin tramo lleno suficiente para arriostrar con Cruz de San Andrés.");
     return { piezas, avisos, zonas };
   }
 
@@ -100,7 +103,7 @@ export function buildBraces(input){
   // Zona muy angosta: se coloca igual, con advertencia (no hay subdivisión que baje el ángulo).
   if (angSub > FLEJE.angMax){
     avisos.push(`Tramo angosto: ángulo de fleje ${angSub.toFixed(1)}° fuera del rango recomendado ` +
-      `${FLEJE.angMin}–${FLEJE.angMax}°. Consultar arriostramiento con un profesional.`);
+      `${FLEJE.angMin}–${FLEJE.angMax}°.`);
   }
   for (let i = 0; i < n; i++){
     const x0 = zona[0] + i * wSub;

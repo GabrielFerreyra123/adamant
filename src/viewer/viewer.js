@@ -180,14 +180,6 @@ export class Viewer {
     this.group.children.forEach(m => { if (m.userData && m.userData.capa === capa) m.visible = !!visible; });
   }
 
-  // Cambia la vista sin reconstruir la geometría (para el selector de vistas del resultado).
-  setView(vista){
-    if (!VIEW_DIR[vista]) return;
-    this._vista = vista;
-    this._ensureCamera(ORTHO_VIEWS.has(vista));
-    if (this._box) this._frame(this._box);
-  }
-
   // Encuadra la estructura completa. "frontal": de frente (muro). "iso": isométrica (piso/planta),
   // ajustando por la esfera contenedora (un piso es casi plano: no sirve encuadrar por su alto).
   _frame(box){

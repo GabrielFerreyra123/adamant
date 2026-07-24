@@ -40,7 +40,7 @@ export const muro = {
       ], avanzado: [
         { k: "modulo", opt: true, tipo: "seg", label: "Modulación", opciones: [{ v: 400, l: "400 mm" }, { v: 600, l: "600 mm" }] },
         { k: "arriostramiento", tipo: "seg", label: "Arriostramiento",
-          opciones: [{ v: "ninguno", l: "Ninguno" }, { v: "cruz", l: "Cruz de San Andrés" }] },
+          opciones: [{ v: "ninguno", l: "Ninguno" }, { v: "cruz", l: "Cruz de San Andrés" }, { v: "placa", l: "Placa OSB" }] },
         { tipo: "perfil" }
       ]},
       { id: "aberturas", titulo: "Aberturas", componente: "vanos" }

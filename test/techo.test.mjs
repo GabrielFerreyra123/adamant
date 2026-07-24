@@ -148,9 +148,9 @@ test("alero 700 se recorta a 600 con aviso", () => {
 // 7) In-line framing: la separación de cabriadas debe coincidir con la modulación del muro.
 test("aviso si las cabriadas no caen sobre los montantes", () => {
   const conAviso = techo.generar(t({ separacion: 600, moduloMuro: 400 })).metadatos.avisos;
-  assert.ok(conAviso.some(a => /transmisión de cargas/.test(a)));
+  assert.ok(conAviso.some(a => /no caen sobre los montantes/.test(a)));
   const sinAviso = techo.generar(t({ separacion: 400, moduloMuro: 400 })).metadatos.avisos;
-  assert.ok(!sinAviso.some(a => /transmisión de cargas/.test(a)));
+  assert.ok(!sinAviso.some(a => /no caen sobre los montantes/.test(a)));
 });
 
 // 8) Sin interpenetración entre barras de una misma cabriada (cajas ORIENTADAS, ver nota arriba).

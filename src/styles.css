@@ -204,6 +204,15 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
   border:1px solid #ff6b5e; border-left-width:3px; border-radius:var(--r-lg,4px); background:rgba(255,107,94,.1); }
 .errores b{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#ff8a80; }
 .errores span{ font-size:12.5px; line-height:1.45; color:var(--paper); }
+/* tarjeta de solución: qué está mal + por qué + botón(es) que lo arreglan con un click */
+.solcard{ display:flex; flex-direction:column; gap:7px; margin-bottom:14px; padding:12px 14px;
+  border:1px solid var(--tangerine); border-left-width:3px; border-radius:var(--r-lg,4px); background:rgba(232,93,42,.08); }
+.solcard.error{ border-color:#ff6b5e; background:rgba(255,107,94,.1); }
+.solcard b{ font-size:13.5px; line-height:1.35; color:var(--paper); font-weight:600; }
+.solcard .solwhy{ font-size:12px; line-height:1.45; color:var(--muted); }
+.solcard .solacts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
+.solcard .solacts .btn{ background:var(--teal); color:var(--on-primary,#04231f); border-color:transparent; }
+.solcard.error .solacts .btn{ background:#ff8a80; }
 /* planta del vano de piso: líneas de viga + hueco arrastrable */
 .plantasvg .vpvig{ stroke:var(--outline2); stroke-width:1; }
 .plantasvg .vphole rect{ fill:rgba(232,93,42,.35); stroke:var(--tangerine); stroke-width:2; cursor:grab; }
@@ -229,9 +238,6 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .info b{ display:flex; align-items:center; gap:8px; }
 .info .dot{ width:11px; height:11px; border-radius:2px; flex:0 0 auto; }
 .info .row{ color:var(--muted); font-family:var(--mono); font-size:12.5px; } .info .row b{ display:inline; color:var(--primary-lite); }
-.viewsel{ position:absolute; top:10px; right:10px; z-index:3; display:flex; gap:3px; background:rgba(2,16,24,.88); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:3px; }
-.viewsel button{ border:0; background:transparent; color:var(--muted); font-family:var(--mono); font-size:11px; padding:6px 11px; border-radius:var(--r-default,2px); cursor:pointer; transition:background-color .15s ease, color .15s ease; }
-.viewsel button.on{ background:var(--teal); color:var(--on-primary); font-weight:700; }
 .partesel{ position:absolute; top:10px; left:10px; z-index:3; display:flex; flex-wrap:wrap; gap:3px; max-width:60%; background:rgba(2,16,24,.88); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:3px; }
 .partesel button{ border:0; background:transparent; color:var(--muted); font-family:var(--mono); font-size:10.5px; padding:5px 9px; border-radius:var(--r-default,2px); cursor:pointer; transition:background-color .15s ease, color .15s ease; }
 .partesel button.on{ background:var(--teal); color:var(--on-primary); font-weight:700; }

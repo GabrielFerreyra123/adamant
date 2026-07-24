@@ -358,7 +358,8 @@ function vanoPisoHTML(){
     ${state.vanoAjustes?.length ? `<div class="avisos"><b>✓ Lo acomodé</b>${state.vanoAjustes.map(a => `<span>${a}</span>`).join("")}</div>` : ""}
     ${errores.length ? `<div class="errores"><b>⛔ Así no entra</b>${errores.map(e => `<span>${e}</span>`).join("")}
       <button class="btn sm" id="vpFix">Acomodar</button></div>` : ""}
-    ${avisos.length ? `<div class="avisos"><b>⚠ Vano</b>${avisos.map(a => `<span>${a}</span>`).join("")}</div>` : ""}
+    ${avisos.length ? `<div class="avisos"><b>⚠ Vano</b>${avisos.map(a => `<span>${a}</span>`).join("")}
+      ${avisos.some(a => /cabezal/.test(a)) ? `<button class="btn sm" id="vpAngosto">Achicar el ancho a 1200 mm</button>` : ""}</div>` : ""}
     <div class="vgrid">
       <label>Posición X (corrida)<input type="number" data-vp="x" value="${v.x}"><i>mm</i></label>
       <label>Posición Y (luz)<input type="number" data-vp="y" value="${v.y}"><i>mm</i></label>
@@ -419,6 +420,7 @@ function wireVanoPiso(){
   }
   const del = document.getElementById("vpDel"); if (del) del.onclick = () => { state.params.vano = null; state.vanoAjustes = null; render(); };
   const fix = document.getElementById("vpFix"); if (fix) fix.onclick = () => ponerVano(state.params.vano);
+  const ang = document.getElementById("vpAngosto"); if (ang) ang.onclick = () => ponerVano({ ...state.params.vano, ancho: 1200 });
   const gir = document.getElementById("vpGirar"); if (gir) gir.onclick = () => {
     const v = state.params.vano; ponerVano({ ...v, ancho: v.largo, largo: v.ancho });
   };
@@ -480,8 +482,8 @@ function renderTab(){
     const { piezas, metadatos } = computeProject(toEngineInput());
     const vistas = vistasDe(metadatos);
     if (!state.vista3d || !vistas.some(v => v.id === state.vista3d)) state.vista3d = metadatos.vistaDefault || vistas[0].id;
-    const selector = vistas.length > 1
-      ? `<div class="viewsel" id="viewsel">${vistas.map(v => `<button data-v="${v.id}" class="${state.vista3d===v.id?'on':''}">${v.l}</button>`).join("")}</div>` : "";
+    // Sin toggle de vista: sólo cambiaba el ángulo de cámara (Conjunto/Planta/etc.), no la geometría.
+    // Cada módulo abre en su cámara por defecto (`vistaDefault`) y el usuario orbita libremente.
     // "ver por partes" (módulo combinado): Todo + cada parte (piso / muros)
     const partes = metadatos.partes || null;
     if (partes && !["todo", ...partes.map(p => p.id)].includes(state.parte3d)) state.parte3d = "todo";
@@ -492,17 +494,13 @@ function renderTab(){
     const capasPanel = capas.length
       ? `<div class="capas" id="capaspanel"><b>Capas</b>${capas.map(c => `<label><input type="checkbox" data-capa="${c.id}" ${capaOn(c.id)?'checked':''}><i style="background:${colorHex(c.tipo)}"></i>${c.l}</label>`).join("")}</div>` : "";
     // Sin leyenda fija: tapaba el modelo. La identificación de cada perfil sale al TOCARLO (info3d).
-    body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${selector}${partesel}${capasPanel}<div class="info hidden" id="info3d"></div>
+    body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${partesel}${capasPanel}<div class="info hidden" id="info3d"></div>
       <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · <b>tocá una pieza para ver qué es</b></p></div>`;
     try {
       viewer = new Viewer(document.getElementById("viewer3d"), { onSelect: showInfo3d });
       const mostrar = () => (partes && state.parte3d !== "todo") ? piezas.filter(p => p.parte === state.parte3d) : piezas;
       const aplicarCapas = () => capas.forEach(c => { if (capaOn(c.id)) viewer.setLayerVisible(c.id, true); });
       viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
-      const vs = document.getElementById("viewsel");
-      if (vs) vs.querySelectorAll("button").forEach(b => b.onclick = () => {
-        state.vista3d = b.dataset.v; vs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); viewer.setView(state.vista3d);
-      });
       const ps = document.getElementById("partesel");
       if (ps) ps.querySelectorAll("button").forEach(b => b.onclick = () => {
         state.parte3d = b.dataset.p; ps.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
@@ -561,16 +559,85 @@ function showInfo3d(p){
 // ---------- materiales ----------
 // Unidad de venta con el largo comercial REAL del perfil (6,00 m barra / 3,05 · 3,00 · 4,88 m tira).
 const unidadBarra = len => `${len >= 6000 ? "barra" : "tira"} ${(len/1000).toFixed(2).replace(".", ",")} m`;
-// Advertencias del proyecto. Muro y Ambiente publican `avisos` (arriostramiento); Techo suma además
-// `errores` (bloqueantes), `ajustes` (lo que se acomodó solo) y `notas` (informativas fijas).
+// Cada aviso/error de validación se convierte en una TARJETA DE SOLUCIÓN: (1) qué está mal en simple,
+// (2) por qué importa, (3) uno o más botones que arreglan los parámetros con un click. Premisa: nunca
+// "consultá a un profesional" como única salida — siempre una acción aplicable o alternativas válidas.
+function solucionesDe(metadatos){
+  const cards = [], p = state.params, kind = state.kind, av = metadatos?.avisos || [], err = metadatos?.errores || [];
+  const set = patch => () => Object.assign(p, patch);
+
+  // TECHO — pendiente fuera del rango del manual
+  if (kind === "techo"){
+    const pend = +p.pendiente;
+    if (pend >= 7 && pend < 25)
+      cards.push({ tono:"aviso", titulo:`La pendiente (${pend} %) es baja para el manual`,
+        porque:"Con poca pendiente el agua escurre lento y la chapa puede filtrar.",
+        acciones:[{ label:"Subir a 25 % (recomendada)", run: set({ pendiente:25 }) }] });
+    else if (pend > 100)
+      cards.push({ tono:"aviso", titulo:`La pendiente (${pend} %) es muy pronunciada`,
+        porque:"Arriba de 45° el anclaje de la cubierta se complica.",
+        acciones:[{ label:"Bajar a 100 %", run: set({ pendiente:100 }) }] });
+    // Faldón muy largo respecto de la luz: el fleje del faldón queda casi horizontal.
+    if (av.some(a => /Faldón del techo/.test(a))){
+      const cos = Math.cos(Math.atan(pend/100));
+      const largoF = Math.round((p.tipo === "dosAguas" ? (+p.luz/2 + (+p.alero||0)) : (+p.luz + 2*(+p.alero||0))) / cos);
+      cards.push({ tono:"aviso", titulo:"El techo es muy largo para arriostrar el faldón",
+        porque:"El fleje del faldón queda casi horizontal y deja de trabajar como arriostre.",
+        acciones:[{ label:`Achicar el largo a ${largoF} mm`, run: set({ largo: largoF }) }] });
+    }
+  }
+
+  // MURO / AMBIENTE — la Cruz de San Andrés no entra (paño lleno de aberturas o muy angosto)
+  const brace = av.some(a => /arriostrar|ángulo de fleje/.test(a));
+  if (brace && kind === "muro")
+    cards.push({ tono:"aviso", titulo:"No hay lugar para la Cruz de San Andrés",
+      porque:"El arriostramiento mantiene el muro a escuadra ante el viento y los empujes.",
+      acciones:[
+        { label:"Arriostrar con placa OSB", run(){ p.arriostramiento = "placa"; if (!/OSB/.test(p.opciones.revExt||"")) p.opciones.revExt = "OSB / Fenólico 10"; } },
+        { label:"Quitar el arriostramiento", run: set({ arriostramiento:"ninguno" }) }
+      ] });
+  if (brace && kind === "combinado")
+    cards.push({ tono:"aviso", titulo:"Algún muro no tiene lugar para la Cruz de San Andrés",
+      porque:"El arriostramiento mantiene el ambiente a escuadra ante el viento y los empujes.",
+      acciones:[
+        { label:"Arriostrar los muros con placa OSB", run: set({ arriostraFrente:"placa", arriostraFondo:"placa", arriostraIzq:"placa", arriostraDer:"placa" }) },
+        { label:"Quitar el arriostramiento", run: set({ arriostraFrente:"ninguno", arriostraFondo:"ninguno", arriostraIzq:"ninguno", arriostraDer:"ninguno" }) }
+      ] });
+
+  // PISO — vano de escalera/trampa
+  if (kind === "piso" && p.vano){
+    if (av.some(a => /cabezal/.test(a)))
+      cards.push({ tono:"aviso", titulo:`El vano es ancho para los cabezales (${p.vano.ancho} mm)`,
+        porque:"Un cabezal largo flexiona; conviene acotarlo para que trabaje sin refuerzos especiales.",
+        acciones:[{ label:"Achicar el ancho a 1200 mm", run(){ p.vano = encajarVano(p, { ...p.vano, ancho:1200 }).vano; } }] });
+    if (err.length)
+      cards.push({ tono:"error", titulo:"El hueco no entra donde está",
+        porque:"Los cabezales tienen que apoyar sobre un paño entero de vigas contra cada borde.",
+        acciones:[{ label:"Acomodar el vano", run(){ p.vano = encajarVano(p, p.vano).vano; } }] });
+  }
+  return cards;
+}
+let _solCards = [];
 function avisosHTML(metadatos){
-  const bloque = (cls, titulo, arr) => arr?.length
-    ? `<div class="${cls}"><b>${titulo}</b>${arr.map(a => `<span>${a}</span>`).join("")}</div>` : "";
-  const av = (metadatos?.avisos || []).filter(a => !(metadatos?.errores || []).includes(a));
-  return bloque("errores", "⛔ Así no va", metadatos?.errores)
-    + bloque("avisos", "✓ Lo acomodé", metadatos?.ajustes)
-    + bloque("avisos", "⚠ Revisá", av)
-    + bloque("avisos", "ℹ Para tener en cuenta", metadatos?.notas);
+  _solCards = solucionesDe(metadatos);
+  const cards = _solCards.map((c, i) => `<div class="solcard ${c.tono}">
+    <b>${c.tono === "error" ? "⛔" : "⚠"} ${c.titulo}</b>
+    <span class="solwhy">${c.porque}</span>
+    <div class="solacts">${c.acciones.map((a, j) => `<button type="button" class="btn sm" data-sol="${i}:${j}">${a.label}</button>`).join("")}</div>
+  </div>`).join("");
+  const info = (titulo, arr) => arr?.length
+    ? `<div class="avisos"><b>${titulo}</b>${arr.map(a => `<span>${a}</span>`).join("")}</div>` : "";
+  return cards
+    + info("✓ Lo acomodé", metadatos?.ajustes)
+    + info("ℹ Para tener en cuenta", metadatos?.notas);
+}
+// Cablea los botones "Aplicar solución": corren el fix (muta params) y regeneran todo.
+function wireSoluciones(root){
+  (root || document).querySelectorAll("[data-sol]").forEach(b => b.onclick = () => {
+    const [i, j] = b.dataset.sol.split(":").map(Number);
+    const acc = _solCards[i]?.acciones?.[j]; if (!acc) return;
+    acc.run(); render();
+  });
 }
 function shoppingList(mat){
   const items = [];
@@ -604,6 +671,7 @@ function renderMateriales(body){
   };
   body.querySelectorAll(".pinput").forEach(inp => inp.addEventListener("input", () => { setPrice(inp.dataset.key, parseNum(inp.value)); recompute(); }));
   recompute();
+  wireSoluciones(body);
 }
 
 // ---------- cortes ----------
@@ -629,6 +697,7 @@ function renderCortes(body){
     <p class="sub">Cada etiqueta es <b>código·largo(mm)</b>. Optimización First-Fit, sin descontar merma de sierra.</p>
     ${gate ? `<div class="gateoverlay"><p>La lista de cortes optimizada viene con el proyecto desbloqueado.</p><button class="btn" id="gate-pagar">Desbloquear proyecto</button></div>` : ""}</div>`;
   if (gate) document.getElementById("gate-pagar").onclick = () => { guardarProyecto(); iniciarPago().catch(e => alert(e.message)); };
+  wireSoluciones(body);
 }
 
 // ---------- export ----------

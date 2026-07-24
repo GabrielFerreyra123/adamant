@@ -1,11 +1,30 @@
 # F12 — Inventario de avisos con tono de derivación a terceros
 
-Barrido de `src/` (F10, Parte C) buscando mensajes de validación con **"profesional", "consultá",
-"verificar con", "revisá"** y similares. Este archivo es sólo el **inventario**: los mensajes NO se
-modificaron todavía. F12 los reescribe con tono de autonomía (misma premisa DIY que el resto de la
-app: la herramienta cuida la estructura, el usuario decide).
+> **RESUELTO en F12.** Se sacó el string "profesional" de todos los mensajes de validación y cada
+> aviso pasó a ser una **tarjeta de solución** con acción de un click (`solucionesDe`/`avisosHTML` en
+> `src/ui/wizard.js`). Este archivo queda como registro de lo que había. El mapeo aviso → solución:
+>
+> | Aviso | Acción de un click |
+> |---|---|
+> | Techo · pendiente 7–25 % | «Subir a 25 %» |
+> | Techo · pendiente > 100 % | «Bajar a 100 %» |
+> | Techo · faldón muy largo (fleje casi horizontal) | «Achicar el largo a N mm» |
+> | Muro · Cruz de San Andrés sin lugar / ángulo | «Arriostrar con placa OSB» · «Quitar el arriostramiento» |
+> | Ambiente · ídem por muro | «Arriostrar los muros con placa OSB» · «Quitar el arriostramiento» |
+> | Piso · vano ancho para cabezales | «Achicar el ancho a 1200 mm» |
+> | Piso · vano no entra | «Acomodar el vano» |
+>
+> La nota fija de succión de viento (techo) se reescribió sin «profesional»; es informativa, no una
+> advertencia con acción. Para agregar «Placa OSB» como arriostre se sumó esa opción al muro
+> (`arriostramiento: "placa"`): la placa de revestimiento hace de muro de corte y no depende del ancho
+> del paño, así que resuelve el aviso sin flejes.
 
-Convención de columnas: **archivo:línea** · **mensaje actual** · **cuándo se dispara**.
+---
+
+Barrido de `src/` (F10, Parte C) buscando mensajes de validación con **"profesional", "consultá",
+"verificar con", "revisá"** y similares.
+
+Convención de columnas: **archivo:línea** · **mensaje** · **cuándo se dispara**.
 
 ---
 

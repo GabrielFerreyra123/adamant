@@ -6,7 +6,7 @@
 import { resolveSystem, cutOpts } from "../systems.mjs";
 import { cutList, optimizeCuts } from "../cuts.mjs";
 
-// Luces máximas ORIENTATIVAS (verificar con profesional). C/400 mm:
+// Luces máximas ORIENTATIVAS (verificar en la tabla del fabricante). C/400 mm:
 //   steel PGC (0,9–1,6): 100→~2,8 m · 150→~3,8 m · 200→~4,8 m · 250→~5,8 m
 //   wood 2x (Douglas):   2x6→~2,6 m · 2x8→~3,4 m · 2x10→~4,3 m · 2x12→~5,2 m
 export function sugerirPerfil(luz, sistema){
@@ -97,7 +97,7 @@ export function validarVanoPiso(input){
     return { vano: null, errores, avisos };
   }
   if (ancho > CABEZAL_LUZ_AVISO)
-    avisos.push(`Vano ancho: verificar dimensionado de cabezales con un profesional (${ancho} mm entre trimmers).`);
+    avisos.push(`Vano ancho: verificar dimensionado de cabezales (${ancho} mm entre trimmers).`);
   return { vano: { x, y, ancho, largo }, errores, avisos };
 }
 
