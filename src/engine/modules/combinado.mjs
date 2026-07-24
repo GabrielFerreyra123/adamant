@@ -19,7 +19,6 @@ const REV_EXT = 12, REV_INT = 12.5; // espesores nominales de revestimiento exte
 
 // Reubica piezas de un submódulo: rot 0|90 (CCW en Z) + traslación. Setea:
 //   p.box   — AABB en coords del motor (para el visor y el test AABB),
-//   p.xf    — { rot, tx, ty, tz } el MISMO transform, para que el export Ruby lo reproduzca (paridad),
 //   p.parte — piso/frente/fondo/izq/der (para "ver por partes" y el PDF por etapas).
 function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
   // rot 90° CCW en Z: un punto (x,y) → (−y, x); lo mismo vale para los vectores de una base.
@@ -31,10 +30,10 @@ function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
       ? { size: [sy, sx, sz], center: [-cy + tx, cx + ty, cz + tz] } // (x,y) → (−y, x)
       : { size: [sx, sy, sz], center: [cx + tx, cy + ty, cz + tz] };
     // Las piezas DIAGONALES (flejes) llevan su propia base: hay que transformarla igual que la caja,
-    // si no el visor/export las dibujaría en la posición del submódulo.
+    // si no el visor las dibujaría en la posición del submódulo.
     const orient = p.orient && { ...p.orient, c: rotP(p.orient.c),
       u: rotV(p.orient.u), v: rotV(p.orient.v), n: rotV(p.orient.n) };
-    return { ...p, box, ...(orient ? { orient } : {}), xf: { rot, tx, ty, tz }, parte };
+    return { ...p, box, ...(orient ? { orient } : {}), parte };
   });
 }
 

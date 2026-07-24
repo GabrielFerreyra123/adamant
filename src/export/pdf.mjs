@@ -242,7 +242,7 @@ async function pdfCombinado(doc, input, piezas, materiales, metadatos, img3d){
   if (yf > 200){ doc.addPage(); yf = 16; }
   drawCortesTabla(doc, piezas.filter(p => !p.superficie), input, "Cortes — todo junto (optimización global)", yf);
   doc.setFontSize(7.5); doc.setTextColor(...MUT);
-  doc.text("Cómputo de estimación. El cálculo estructural definitivo lo realiza un profesional habilitado. — Adamant", M, doc.internal.pageSize.getHeight() - 8);
+  doc.text("Cómputo de estimación · reglas del steel frame (IRAM-IAS U 500-205) · verificá las medidas en obra. — Adamant", M, doc.internal.pageSize.getHeight() - 8);
 }
 
 // opts: { img: dataURL del 3D (el WebGL vive en el cliente), precios: mapa clave→$, out: "save"|"buffer" }
@@ -351,7 +351,7 @@ export async function exportPDF(input, opts = {}){
   });
 
   doc.setFontSize(7.5); doc.setTextColor(...MUT);
-  doc.text("Cómputo de estimación. El cálculo estructural definitivo lo realiza un profesional habilitado. — Adamant", M, doc.internal.pageSize.getHeight() - 8);
+  doc.text("Cómputo de estimación · reglas del steel frame (IRAM-IAS U 500-205) · verificá las medidas en obra. — Adamant", M, doc.internal.pageSize.getHeight() - 8);
 
   const tag = input.largo ? `${(input.largo/1000).toFixed(1)}x${(input.alto/1000).toFixed(1)}` : `${(input.alto/1000).toFixed(1)}`;
   const nombre = `adamant-${input.kind || "muro"}-${input.sistema}-${tag}.pdf`;

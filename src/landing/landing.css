@@ -199,6 +199,10 @@ img,svg{ max-width:100%; }
   opacity:.08; transition:opacity .5s ease, transform .5s ease; }
 .mod:hover .ghost-ico{ opacity:.24; transform:scale(1.1); }
 .mod.warm .ghost-ico{ color:var(--secondary); }
+/* Ambiente completo: banda ancha bajo los 4 módulos, el flujo que los integra. */
+.mod-wide{ min-height:0; margin-top:var(--gutter); flex-direction:row; align-items:flex-start; gap:var(--md);
+  border-color:color-mix(in srgb, var(--primary) 40%, var(--outline-variant)); }
+.mod-wide .mod-ico{ flex:0 0 auto; margin-bottom:0; }
 
 /* ============ precios ============ */
 .planes{ display:grid; gap:var(--gutter); max-width:64rem; margin-inline:auto; align-items:stretch; }

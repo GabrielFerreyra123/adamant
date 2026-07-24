@@ -8,7 +8,6 @@ import { piso, validarVanoPiso, encajarVano, zonaVano } from "../src/engine/modu
 import { combinado } from "../src/engine/modules/combinado.mjs";
 import { cutList } from "../src/engine/cuts.mjs";
 import { pieceBoxEngine } from "../src/engine/geometry.mjs";
-import { exportRuby } from "../src/export/ruby.mjs";
 
 const OPC = { pgc: "PGC 150x1.60", pgu: "PGU 150x1.60", lumber: "2x8 (38×184)", tiraLen: 4880 };
 const suelo = (extra = {}) => ({ sistema: "steel", largo: 3600, ancho: 4800, separacion: 400,
@@ -155,17 +154,6 @@ for (const [nom, sis, vano] of [
     assert.equal(sinColision(piso.generar(suelo({ sistema: sis, vano })).piezas), null);
   });
 }
-
-// 9) Export Ruby: las piezas nuevas se emiten con su eje real y sintaxis válida.
-test("export Ruby: trimmer / cabezal / viga cola emitidos", () => {
-  const inp = { kind: "piso", ...suelo({ vano: { x: 1900, y: 600, ancho: 1000, largo: 2400 } }) };
-  const rb = exportRuby(inp);
-  const P = piso.generar(inp).piezas.filter(p => !p.superficie); // los apoyos no van al .rb (son visuales)
-  // una llamada _profile por pieza (paridad motor ↔ .rb)
-  assert.equal((rb.match(/_profile\(/g) || []).length - 1, P.length, "una llamada por pieza (menos la def del helper)");
-  assert.match(rb, /MAP_XZ/, "los cabezales corren en X y se extruyen con su mapper");
-  assert.ok(!/undefined|NaN/.test(rb), "sin valores inválidos en el script");
-});
 
 // El vano se ACOMODA solo: la UI nunca deja al usuario contra el error bloqueante.
 describe("encajarVano: el hueco siempre entra", () => {

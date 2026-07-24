@@ -168,24 +168,6 @@ test("combinado steel 4×3: materiales fusionados (perfiles global + otros del p
   assert.equal(m.area, 12);
 });
 
-// 5b) Paridad export↔visor: el transform `p.xf` (que emite el Ruby) reproduce EXACTAMENTE la caja
-//     `p.box` que dibuja el visor. Si esto coincide, el script pegado en SketchUp arma lo mismo que el 3D.
-test("combinado: el xf del export reproduce la caja del visor", () => {
-  const P = combinado.generar(amb("steel", 4000, 3000)).piezas;
-  // Los flejes quedan fuera: su transform NO viaja en `xf` sino BAKEADO en su base `orient` (el
-  // orquestador rota la base al reubicarlos), y el export los emite desde ahí.
-  // Las superficies (placa de piso, apoyos de fundación) se emiten directo desde su box, no vía xf.
-  P.filter(p => p.xf && p.categoria !== "fleje" && !p.superficie).forEach(p => {
-    const can = pieceBoxEngine({ ...p, box: undefined }); // caja canónica (local, sin reubicar)
-    const t = p.xf, [sx, sy, sz] = can.size, [cx, cy, cz] = can.center;
-    const box = t.rot === 90
-      ? { size: [sy, sx, sz], center: [-cy + t.tx, cx + t.ty, cz + t.tz] }
-      : { size: [sx, sy, sz], center: [cx + t.tx, cy + t.ty, cz + t.tz] };
-    assert.deepEqual(box.size.map(Math.round), p.box.size.map(Math.round), `${p.parte}/${p.tipo} size`);
-    assert.deepEqual(box.center.map(Math.round), p.box.center.map(Math.round), `${p.parte}/${p.tipo} center`);
-  });
-});
-
 // 6) Cortes GLOBAL vs POR ETAPA: cortar todo junto usa ≤ barras que por etapa; el ahorro es el número.
 test("combinado: la optimización global ahorra barras vs por etapa", () => {
   const r = cortesPorEtapaVsGlobal(amb("steel", 4000, 3000));

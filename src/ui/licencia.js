@@ -76,19 +76,18 @@ export async function canjearSiVuelve(){
   }
 }
 
-// Genera en el servidor (única vía: los generadores no viven en este bundle).
-// tipo "pdf" → Blob; tipo "ruby" → string.
-export async function generar(tipo, input, extras = {}){
+// Genera el PDF de obra en el servidor (única vía: el generador no vive en este bundle → pared de pago).
+export async function generarPDF(input, extras = {}){
   const proy = getProyId(), lic = getLicencia();
   if (!lic) throw new Error("sin licencia");
   const r = await fetch("/api/generar", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: lic.token, proy, tipo, input, ...extras })
+    body: JSON.stringify({ token: lic.token, proy, tipo: "pdf", input, ...extras })
   });
   if (!r.ok){
     const d = await r.json().catch(() => ({}));
     if (r.status === 402) borrarLicencia(proy);
     throw new Error(d.error || `Error ${r.status}`);
   }
-  return tipo === "pdf" ? r.blob() : r.text();
+  return r.blob();
 }

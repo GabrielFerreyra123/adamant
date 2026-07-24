@@ -1,7 +1,6 @@
 // Invariantes de las piezas DIAGONALES (`orient`) en TODOS los módulos.
-// Una pieza `orient` no trae `axis`: trae su base real { c, u(largo), v(ancho), n(espesor) }, y tanto
-// el visor (Matrix4.makeBasis) como el export a SketchUp (Geom::Transformation.axes) la dibujan con
-// esa base. Si la base no es ortonormal y DERECHA, la matriz tiene determinante negativo: la pieza
+// Una pieza `orient` no trae `axis`: trae su base real { c, u(largo), v(ancho), n(espesor) } y el
+// visor la dibuja con esa base (Matrix4.makeBasis). Si la base no es ortonormal y DERECHA, la pieza
 // sale ESPEJADA y con las caras invertidas — en el visor se ve el interior del perfil en vez de la
 // cara de afuera, que es exactamente el "se ven huecos" que apareció en el techo.
 import { test } from "vitest";

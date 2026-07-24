@@ -1,15 +1,21 @@
-# Adamant · Generador de scripts Steel/Wood Frame
+# Adamant · Diseñador de estructuras en seco
 
-App HTML de una sola página que **genera scripts Ruby** para pegar en la Consola Ruby de
-SketchUp 2026 (Extensions → Developer → Ruby Console). Al correr el script, dibuja la
-estructura (steel frame o wood frame) dentro de SketchUp y calcula el cómputo de materiales.
-Objetivo: modelar muros, cielorrasos y casas completas + su presupuesto sin saber usar SketchUp.
+App web (**Vite + JS vanilla + Three.js**) para **diseñar estructuras de steel frame y wood frame
+en 3D** sin saber usar programas de diseño: muros con aberturas, pisos, cielorrasos, techos de
+cabriadas y ambientes completos. Calcula el cómputo de materiales, la lista de corte optimizada por
+barra comercial, el presupuesto (precios que carga el usuario) y arma un **PDF de obra**.
 
-Todo el código vive en un único archivo: **`adamant-generador-scripts.html`** (HTML + CSS + JS
-embebidos). No hay build ni dependencias; se abre directo en el navegador.
+El motor puro vive en `src/engine/` (módulos en `src/engine/modules/`, geometría en `geometry.mjs`,
+cortes en `cuts.mjs`); el visor 3D en `src/viewer/`; la UI del wizard en `src/ui/`; el PDF en
+`src/export/pdf.mjs`. La raíz es la landing; la herramienta vive en `/app/`. Las funciones serverless
+(`/api/*`, Mercado Pago + PDF) corren bajo `vite` en dev (ver `vite.config.js`) y como Vercel Functions
+en producción.
+
+> El archivo `adamant-generador-scripts.html` es el **monolito legacy** (referencia histórica, no se
+> edita): la app real es la de `src/`.
 
 Contexto del usuario (Gaby): negocio de construcción Adamant (steel frame + perfilería de
-aluminio con PVC para cielorrasos). Tiene SketchUp 2026 + V-Ray de escritorio.
+aluminio con PVC para cielorrasos), autoconstrucción en seco en Bahía Blanca.
 
 ---
 
@@ -34,28 +40,13 @@ aluminio con PVC para cielorrasos). Tiene SketchUp 2026 + V-Ray de escritorio.
 ## Validación (obligatoria antes de "listo")
 
 ```bash
-npm run validate      # 1) extrae el <script>, node --check (sintaxis JS)
-                      # 2) evalúa los generadores y produce .rb de muestra
-                      # 3) si hay ruby instalado: ruby -c + ejecución contra el stub de SketchUp
+npm test      # vitest: el motor y los generadores tienen cobertura de tests
+npm run build # el bundle tiene que compilar limpio
 ```
 
-- `tools/su_stub.rb` es un **stub mínimo de la API de SketchUp** (Geom, Entities, Group,
-  Transformation.axes/scaling/rotation, materials, add_text…). Permite ejecutar el Ruby generado
-  fuera de SketchUp y contar piezas / detectar errores de runtime.
-- `tools/validate.js` hace todo el pipeline. `npm run gen` sólo regenera los `.rb` de muestra en `tools/out/`.
-- Regla: **cualquier cambio al JS que genera Ruby se valida generando el Ruby y corriéndolo contra el stub**
-  (steel y wood, y para Casa los 4 tipos de techo). Si `ruby` no está instalado, al menos `node --check`.
-
----
-
-## Flujo de uso en SketchUp
-
-1. Unidades en **milímetros** (Window → Model Info → Units).
-2. Extensions → Developer → Ruby Console.
-3. Copiar el código de la app, pegar en la barra inferior → Enter.
-4. Aparece la estructura; cada perfil es un grupo en su capa/tag. Al final se hace `.explode`
-   del contenedor para que las piezas queden sueltas y editables (salvo con etiquetado activo,
-   que las deja como grupos nombrados).
+- Regla: **cualquier cambio en el motor (`src/engine/`) se valida con los tests de `test/`**. La
+  geometría (`piezas[]`) es la única fuente de verdad; cortes y materiales se derivan de ella.
+- El visor 3D no se puede manejar headless: la geometría se verifica numéricamente en los tests.
 
 ---
 
@@ -266,19 +257,21 @@ habitaciones (Casa) o columnas/estantes/barrales (Mueble vía `applyMueble`). `i
 - Plano de habitaciones: el mini-plano permite ubicar cada ambiente libremente (snap 50 mm); para que dos
   muros se fusionen en uno hay que dejarlos alineados dentro de la tolerancia de `alma` (no auto-alinea).
 - Cielorraso todavía no tiene variante wood (la carga de imagen sí funciona en Cielo).
-- Herramientas externas sugeridas para el flujo (uso, no desarrollo): Profile Builder 4, OpenCutList.
 
 ---
 
 ## Mapa de archivos
 
 ```
-adamant-generador-scripts.html   App completa (editar acá)
+index.html                       Landing (raíz)
+app/index.html                   Punto de entrada de la app
+src/engine/                      Motor puro (módulos, geometría, cortes) — sin DOM ni Three
+src/viewer/                      Visor 3D (Three.js) + paleta
+src/ui/                          Wizard, licencia, precios
+src/export/pdf.mjs               PDF de obra
+src/landing/                     Landing (CSS/JS propios)
+api/                             Vercel Functions (Mercado Pago + PDF)
+test/                            Tests (vitest)
 CLAUDE.md                        Este archivo
-README.md                        Setup humano
-package.json                     Scripts npm (validate / gen / serve)
-tools/su_stub.rb                 Stub de la API de SketchUp para testear el Ruby generado
-tools/validate.js                Pipeline de validación (node --check + genera .rb + ruby -c + run)
-tools/gen-samples.js             Genera .rb de muestra en tools/out/
-tools/out/                       Salida de muestras (git-ignored)
+adamant-generador-scripts.html   Monolito legacy (referencia histórica, no se edita)
 ```

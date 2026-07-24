@@ -9,7 +9,6 @@ import { combinado } from "../src/engine/modules/combinado.mjs";
 import { cutList, cutPlan } from "../src/engine/cuts.mjs";
 import { cutOpts, FLEJE } from "../src/engine/systems.mjs";
 import { pieceBoxEngine } from "../src/engine/geometry.mjs";
-import { exportRuby } from "../src/export/ruby.mjs";
 
 const OPC = { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90", lumber: "2x6 (38×140)", modulo: 400 };
 const pared = (largo, alto, extra = {}) => ({ sistema: "steel", largo, alto, opciones: OPC, vanos: [], arriostramiento: "cruz", ...extra });
@@ -125,21 +124,6 @@ test("ambiente completo: flejes de los 4 muros fusionados (rollos calculados glo
   assert.equal(c.rollos, Math.ceil(fl.reduce((a, p) => a + p.largo, 0) / FLEJE.rollo));
   assert.ok(c.rollos < 4, "sumar los rollos redondeados de cada muro sobre-estimaría");
   assert.equal(c.t1, 12 * 2 * FLEJE.tornExtremo, "4 tornillos T1 por extremo");
-});
-
-// 8) Export Ruby: los flejes van en el tag Estructura-Flejes, orientados con su base real.
-test("export Ruby: flejes en Estructura-Flejes, rotados por Transformation.axes", () => {
-  const rb = exportRuby({ kind: "muro", ...pared(3000, 2600) });
-  assert.match(rb, /t_fle=model\.layers\.add\("Estructura-Flejes"\)/, "declara la capa");
-  const lineas = rb.split("\n").filter(l => l.includes("t_fle,"));
-  assert.equal(lineas.length, 2, "2 flejes emitidos");
-  lineas.forEach(l => {
-    assert.match(l, /Geom::Transformation\.axes\(/, "se orienta con axes (pieza diagonal)");
-    assert.match(l, /MAP_YZ, 3970/, "sección extruida el largo de la hipotenusa");
-  });
-  // las dos diagonales tienen direcciones opuestas en Z
-  const dirZ = lineas.map(l => +l.match(/Vector3d\.new\(([-\d.]+),([-\d.]+),([-\d.]+)\)/).slice(1)[2]);
-  assert.ok(dirZ[0] * dirZ[1] < 0, "una sube y la otra baja");
 });
 
 // Selector: sin arriostramiento no hay flejes (default del muro suelto).

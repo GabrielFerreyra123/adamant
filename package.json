@@ -1,23 +1,18 @@
 {
-  "name": "adamant-generador-scripts",
+  "name": "adamant",
   "version": "1.0.0",
-  "description": "Generador de scripts Ruby para SketchUp: estructuras Steel Frame y Wood Frame + cómputo, presupuesto y lista de corte.",
+  "description": "Diseñador de estructuras en seco (Steel Frame y Wood Frame) en 3D: cómputo, presupuesto, lista de corte optimizada y PDF de obra.",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "validate": "node tools/validate.js",
-    "validate:export": "node tools/validate-export.js",
-    "gen": "node tools/gen-samples.js",
-    "serve": "node -e \"const h=require('http'),f=require('fs');h.createServer((q,s)=>{s.setHeader('content-type','text/html');s.end(f.readFileSync('adamant-generador-scripts.html'))}).listen(5173,()=>console.log('http://localhost:5173'))\""
+    "test": "vitest run"
   },
   "keywords": [
     "steel-frame",
     "wood-framing",
-    "sketchup",
-    "ruby",
+    "autoconstruccion",
     "adamant"
   ],
   "license": "UNLICENSED",

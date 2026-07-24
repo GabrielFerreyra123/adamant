@@ -27,8 +27,8 @@ export default async function handler(req, res){
     const publica = /^https:\/\//.test(base) && !/localhost|127\.0\.0\.1/.test(base);
     const body = {
       items: [{
-        title: "Adamant — Proyecto desbloqueado (PDF + cortes + SketchUp)",
-        description: "PDF completo, lista de cortes optimizada y export a SketchUp. Ediciones libres por 30 días.",
+        title: "Adamant — Proyecto desbloqueado (PDF de obra + cortes optimizados)",
+        description: "PDF de obra completo y lista de cortes optimizada por barra comercial. Ediciones libres por 30 días.",
         quantity: 1, currency_id: "ARS", unit_price: precio
       }],
       external_reference: proy,

@@ -5,7 +5,6 @@ import { techo, validarTecho, anguloPendiente, posCabriadas, posCorreas,
   PEND_MIN_CHAPA, PEND_REC, ALERO_MAX, MEMBRANA_SOLAPE, PESO_CUBIERTA } from "../src/engine/modules/techo.mjs";
 import { cutList, cutPlan } from "../src/engine/cuts.mjs";
 import { cutOpts, PGO_PERFIL, BAR_LEN, FLEJE_CIELO, FLEJE_CIELO_PERFIL } from "../src/engine/systems.mjs";
-import { exportRuby } from "../src/export/ruby.mjs";
 
 const OPC = { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90" };
 const t = (extra = {}) => ({ kind: "techo", sistema: "steel", opciones: OPC,
@@ -209,17 +208,6 @@ test("defaults: techo válido sin tocar ningún parámetro", () => {
   assert.ok(piezas.filter(p => p.orient).every(p => p.orient.c.every(Number.isFinite)));
 });
 
-// 12) Export Ruby: capa propia y piezas inclinadas orientadas con su base real.
-test("export Ruby: cabriada en Estructura-Techo, barras rotadas", () => {
-  const rb = exportRuby(t({ largo: 2400 }));
-  assert.match(rb, /t_tec=model\.layers\.add\("Estructura-Techo"\)/);
-  assert.match(rb, /t_fle=model\.layers\.add\("Estructura-Flejes"\)/, "el arriostramiento va a su capa");
-  const P = techo.generar(t({ largo: 2400 })).piezas.filter(p => !p.superficie);
-  assert.equal((rb.match(/_profile\(/g) || []).length - 1, P.length, "una llamada por pieza");
-  assert.ok(!/NaN|undefined/.test(rb), "sin valores inválidos");
-  assert.ok((rb.match(/Geom::Transformation\.axes\(/g) || []).length >= P.length - 1, "las barras se orientan con su base");
-});
-
 // Cortes: los tipos nuevos entran al bin-packing normal, cada perfil con SU barra comercial.
 test("cortes: cabriada en PGC 6 m y correas en PGO, derivados de piezas[]", () => {
   const inp = t();
@@ -332,37 +320,6 @@ test("regresión: la cabriada y las correas son las mismas que antes del addendu
   const rollo30 = m.otros.find(o => o.key === "fleje-rollo"), rollo38 = m.otros.find(o => o.key === "fleje-cielo-rollo");
   assert.match(rollo30.label, /Fleje 30x0\.5/); assert.match(rollo38.label, /Fleje 38x0\.84/);
   assert.equal(rollo30.unidad, "rollo"); assert.equal(rollo38.unidad, "rollo");
-});
-
-// A9) Secciones REALES en el export: las barras de cabriada salen como perfil C y las correas como
-// Omega, no como un rectángulo macizo (que en SketchUp se ve como una lámina/planchuela).
-test("export: perfil C en la cabriada y Omega en la correa, no rectángulos macizos", () => {
-  const rb = exportRuby(t({ largo: 2400 }));
-  const secs = [...rb.matchAll(/^_profile\(we, (\[\[[^\]]*\](?:,\[[^\]]*\])*\]), MAP_YZ.*?"(\w+)"/gm)]
-    .reduce((m, x) => (m[x[2]] = m[x[2]] || JSON.parse(x[1]), m), {});
-  const bbox = S => [Math.max(...S.map(p=>p[0])) - Math.min(...S.map(p=>p[0])),
-                     Math.max(...S.map(p=>p[1])) - Math.min(...S.map(p=>p[1]))];
-  // cordón superior (Chocolate) = PGC 100x0.90 de canto: 12 vértices, alma 100 × ala 40
-  const cs = secs.Chocolate;
-  assert.equal(cs.length, 12, "el C tiene labios: 12 vértices, no 4");
-  assert.deepEqual(bbox(cs), [100, 40], "alma en el plano de la cabriada, alas de costado");
-  // correa (MediumPurple) = Omega 37x22x12.5: ancho total 37+2·12.5, alto 22
-  const co = secs.MediumPurple;
-  assert.equal(co.length, 12, "el Omega es un contorno cerrado, no un rectángulo");
-  assert.deepEqual(bbox(co), [62, 22], "alma 37 + 2 pestañas de 12,5 · ala 22");
-  // el fleje SÍ es una planchuela: 4 vértices
-  assert.equal(secs.Gainsboro.length, 4, "el fleje es chapa plana de verdad");
-  assert.deepEqual(bbox(secs.Gainsboro), [30, 0.5]);
-
-  // ningún contorno se auto-interseca (SketchUp no crea la cara si se cruza)
-  const cruza = (p,q,r,s) => { const d=(a,b,c)=>Math.sign((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]));
-    return d(p,q,r)*d(p,q,s) < 0 && d(r,s,p)*d(r,s,q) < 0; };
-  Object.entries(secs).forEach(([col, S]) => {
-    for (let i = 0; i < S.length; i++) for (let j = i+1; j < S.length; j++){
-      if (j === i || (j+1) % S.length === i) continue;
-      assert.ok(!cruza(S[i], S[(i+1)%S.length], S[j], S[(j+1)%S.length]), `sección ${col} se cruza (${i},${j})`);
-    }
-  });
 });
 
 // A10) La correa Omega se acuesta EN EL PLANO del faldón (no a plomo).

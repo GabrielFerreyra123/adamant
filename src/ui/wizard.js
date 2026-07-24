@@ -9,7 +9,7 @@ import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
-import { getLicencia, diasRestantes, iniciarPago, generar, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
+import { getLicencia, diasRestantes, iniciarPago, generarPDF, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
 
 const VANO_DEFAULTS = {
   puerta:  { ancho:800,  alto:2050, sill:0   },
@@ -649,8 +649,8 @@ function capture3D(piezas, metadatos = {}){
 function renderExport(body){
   if (!getLicencia()){
     body.innerHTML = `<div class="pane center">
-      <p class="sub"><b>Desbloqueá este proyecto</b> y llevate el PDF completo (resumen, 3D, esquema acotado,
-      lista de compra con tus precios y lista de cortes optimizada) + el export a SketchUp.
+      <p class="sub"><b>Desbloqueá este proyecto</b> y llevate el PDF de obra completo (resumen, 3D, esquema
+      acotado, lista de compra con tus precios y lista de cortes optimizada por barra comercial).
       Ediciones libres por 30 días — rehacé el PDF las veces que quieras.</p>
       <button class="btn" id="pagar">Desbloquear con Mercado Pago</button>
       <p class="expnote">Pago único <b>por proyecto</b>: desbloquea el que estás armando y lo podés seguir
@@ -665,12 +665,8 @@ function renderExport(body){
     return;
   }
   body.innerHTML = `<div class="pane center">
-    <p class="sub">Proyecto desbloqueado ✓ (quedan ${diasRestantes()} días). Descargá el PDF completo (resumen, 3D, esquema acotado, compra y cortes).</p>
-    <button class="btn" id="dlpdf">🧾 Descargar PDF</button>
-    <div class="expsep">Llevar a SketchUp</div>
-    <button class="btn" id="cprb">📋 Copiar script Ruby</button>
-    <button class="btn ghost" id="dlrb">⬇ Descargar .rb</button>
-    <p class="expnote">Pegá el script en <b>Ventana → Consola de Ruby</b> de SketchUp y Enter. Si descargás el .rb, cargalo con <code>load "C:/ruta/al/archivo.rb"</code>.</p>
+    <p class="sub">Proyecto desbloqueado ✓ (quedan ${diasRestantes()} días). Descargá el PDF de obra completo (resumen, 3D, esquema acotado, lista de compra y cortes optimizados).</p>
+    <button class="btn" id="dlpdf">🧾 Descargar PDF de obra</button>
     <div class="expsep">Otro proyecto</div>
     <button class="btn ghost" id="nuevoproy">✚ Empezar un proyecto nuevo</button>
     <p class="expnote">El desbloqueo vale para <b>este</b> proyecto. Empezar uno nuevo requiere otro pago.</p>
@@ -691,33 +687,10 @@ function renderExport(body){
       const input = toEngineInput();
       const { piezas, metadatos } = computeProject(input);
       const img = capture3D(piezas.filter(p => !p.superficie), metadatos);
-      const blob = await generar("pdf", input, { img, precios: loadPrices() });
+      const blob = await generarPDF(input, { img, precios: loadPrices() });
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = `adamant-${state.kind}-${state.params.sistema}.pdf`; a.click(); URL.revokeObjectURL(a.href);
       msg.textContent = "✓ PDF descargado";
-    } catch (e) { fallo(e); }
-  };
-  document.getElementById("cprb").onclick = async () => {
-    msg.textContent = "Generando script…";
-    try {
-      const rb = await generar("ruby", toEngineInput());
-      const okMsg = "✓ Copiado — pegalo en la consola Ruby de SketchUp (Ventana → Consola de Ruby)";
-      try { await navigator.clipboard.writeText(rb); msg.textContent = okMsg; }
-      catch {
-        const ta = document.createElement("textarea"); ta.value = rb; ta.style.cssText = "position:fixed;left:-9999px;top:0";
-        document.body.appendChild(ta); ta.focus(); ta.select();
-        try { document.execCommand("copy"); msg.textContent = okMsg; } catch { msg.textContent = "No se pudo copiar; usá Descargar .rb"; }
-        ta.remove();
-      }
-    } catch (e) { fallo(e); }
-  };
-  document.getElementById("dlrb").onclick = async () => {
-    msg.textContent = "Generando script…";
-    try {
-      const rb = await generar("ruby", toEngineInput());
-      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([rb], { type: "text/plain" }));
-      a.download = `adamant-${state.kind}-${state.params.sistema}.rb`; a.click(); URL.revokeObjectURL(a.href);
-      msg.textContent = "✓ .rb descargado — cargalo con load \"ruta/al/archivo.rb\" o pegá su contenido";
     } catch (e) { fallo(e); }
   };
 }

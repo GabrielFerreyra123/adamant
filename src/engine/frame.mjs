@@ -1,7 +1,6 @@
-// ADAMANT · geometría del muro/tabique — port de `_wall` (Ruby) a JS puro.
-// Devuelve la lista de piezas 3D (para el visor). Cada pieza:
+// ADAMANT · geometría del muro/tabique. Devuelve la lista de piezas 3D (para el visor). Cada pieza:
 //   { tipo, perfil, largo(mm), pos:[x,y,z](mm), axis:'x'|'y'|'z', mat }
-// Coordenadas: X = largo del muro, Y = espesor, Z = altura (igual que el generador Ruby).
+// Coordenadas: X = largo del muro, Y = espesor, Z = altura.
 import { resolveSystem, DINTEL_SIMPLE_MAX } from "./systems.mjs";
 
 export function buildPieces(input){
