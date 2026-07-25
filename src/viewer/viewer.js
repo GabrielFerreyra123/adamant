@@ -133,7 +133,7 @@ export class Viewer {
       const mat = new THREE.MeshStandardMaterial({ color: p.color ?? TIPO_COLOR[p.tipo] ?? 0x888888, metalness: 0.25, roughness: 0.65, side: p.rev ? THREE.DoubleSide : THREE.FrontSide });
       const mesh = new THREE.Mesh(geo, mat);
       if (center) mesh.position.set(center[0]*MM, center[1]*MM, center[2]*MM); // el grupo hace el Y-up
-      mesh.userData = { pieza: p, capa: p.capa || null };
+      mesh.userData = { pieza: p, capa: p.capa || null, baseY: center ? center[1]*MM : 0 };
       if (p.capa) mesh.visible = false; // las capas (placa/revestimientos) arrancan APAGADAS
       this.group.add(mesh);
     });
@@ -178,6 +178,27 @@ export class Viewer {
   // Muestra/oculta una capa (placa-piso / rev-ext / rev-int / placa-cielo) sin reconstruir nada.
   setLayerVisible(capa, visible){
     this.group.children.forEach(m => { if (m.userData && m.userData.capa === capa) m.visible = !!visible; });
+  }
+
+  // Resalta una capa del muro (hover sincronizado con el corte de la UI). null = apagar.
+  hoverCapa(capa){
+    this.group.children.forEach(m => { const p = m.userData && m.userData.pieza;
+      if (!p || !p.capa || !p.capa.startsWith("cap-")) return;
+      const on = capa && p.capa === capa;
+      m.material.emissive = new THREE.Color(on ? 0x1bb6a4 : 0x000000); m.material.emissiveIntensity = on ? 0.55 : 0;
+    });
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  // DESPIECE (0..1): separa las capas del muro hacia afuera (explotado axonométrico). A 0 el muro está
+  // armado; a 1 las capas quedan flotando. Se mueven a lo largo del eje Y del motor (normal del muro).
+  setDespiece(t){
+    const GAP = 0.06; // m entre capas al máximo
+    this.group.children.forEach(m => { const p = m.userData && m.userData.pieza;
+      if (!p || !p.capa || !p.capa.startsWith("cap-")) return;
+      m.position.y = (m.userData.baseY || 0) + (t || 0) * (p.capOrden || 0) * GAP * (p.capLejos || 0);
+    });
+    this.renderer.render(this.scene, this.camera);
   }
 
   // Resalta uno o más NIVELES (partes): los demás quedan semi-transparentes (contexto sin taparlo) y la

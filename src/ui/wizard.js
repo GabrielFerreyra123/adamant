@@ -13,7 +13,7 @@ import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { getLicencia, diasRestantes, iniciarPago, generarPDF, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
 import { glossHTML, glossForTipo, glossKeyForTipo } from "../content/glosario.js";
 import { initGlosario } from "./glosario-ui.js";
-import { capasDeMuro, capasDefault, computeCapas, datoCapa, CAP_OPC } from "../engine/capas.mjs";
+import { capasDefault, computeCapas, composicion, sistemasCara, AISLA } from "../engine/capas.mjs";
 
 const VANO_DEFAULTS = {
   puerta:  { ancho:800,  alto:2050, sill:0   },
@@ -39,6 +39,7 @@ const CAPA_ORDEN = ["apoyos", "placa-piso", "rev-ext", "rev-int", "placa-cielo"]
 const capaOn = id => state.capas[id] ?? (id === "apoyos");
 // Color del swatch de una capa (las capas del muro traen su color en la pieza; el resto por tipo).
 const capaSwatch = c => c.color != null ? "#" + c.color.toString(16).padStart(6, "0") : colorHex(c.tipo);
+const capasCap = piezas => [...new Set(piezas.filter(p => p.capa && p.capa.startsWith("cap-")).map(p => p.capa))];
 function capasDe(piezas){
   const ids = new Set(piezas.filter(p => p.capa).map(p => p.capa));
   const base = CAPA_ORDEN.filter(id => ids.has(id)).map(id => ({ id, ...CAPA_INFO[id] }));
@@ -237,7 +238,10 @@ function renderNivelPreview(paso){
     // aparecer/desaparecer en vivo; en el resto del recorrido sólo la estructura.
     const enCapas = paso.id === "capas";
     lvlViewer.setPieces(enCapas ? piezas : piezas.filter(p => !p.superficie), { vista: metadatos.vistaDefault || "iso", elevacion: metadatos.elevacion || 0 });
-    if (enCapas) [...new Set(piezas.filter(p => p.capa && p.capa.startsWith("cap-")).map(p => p.capa))].forEach(c => lvlViewer.setLayerVisible(c, true));
+    if (enCapas){
+      [...new Set(piezas.filter(p => p.capa && p.capa.startsWith("cap-")).map(p => p.capa))].forEach(c => lvlViewer.setLayerVisible(c, true));
+      despieceSlider(host.closest(".ws-view") || host, lvlViewer);
+    }
     if (partes){
       lvlViewer.highlight(partes);
       // Momento maravilla: sólo al ENTRAR al nivel (no en cada toque de campo del mismo nivel).
@@ -544,49 +548,91 @@ function wireVanoPiso(){
   drawVanoPlanta();
 }
 
-// ---------- muro: capas (corte esquemático del sándwich, de afuera hacia adentro) ----------
-const capHex = c => "#" + c.color.toString(16).padStart(6, "0");
-const capOn = c => datoCapa(c, state.params.capas[c.id]).esp > 0;
+// ---------- muro: composición de capas (sistema por cara + corte vivo que ES el control) ----------
+const hex6 = n => "#" + n.toString(16).padStart(6, "0");
+// Costo estimado de una capa con los precios cargados: misma clave que la lista de compra (así el
+// precio que carga el usuario en Materiales se refleja acá). Placa = placa:<material>; resto = cap-<id>.
+const capCosto = l => l.m2 * (getPrice(l.t2 ? "placa:" + l.label : "cap-" + l.id) || 0);
 function capasMuroHTML(){
   const p = state.params;
   if (!p.capas) p.capas = capasDefault(p.tipoMuro);
-  const caps = capasDeMuro(p.tipoMuro);
-  const { espesorTotal } = computeCapas(toEngineInput());
-  const dato = c => datoCapa(c, p.capas[c.id]);
-  const espLayers = caps.filter(c => c.lado !== "cav").reduce((a, c) => a + dato(c).esp, 0);
-  const frameEsp = Math.max(0, espesorTotal - espLayers);
-  const w = mm => Math.max(8, Math.min(64, 9 + mm * 0.85));       // ancho visual del strip
-  const ext = caps.filter(c => c.lado === "ext").slice().reverse(); // afuera→frame
-  const int = caps.filter(c => c.lado === "int");                   // frame→adentro
-  const aisla = caps.find(c => c.lado === "cav");
-  const strip = c => { const on = capOn(c);
-    return `<button type="button" class="capstrip ${on?'on':'off'}" data-capstrip="${c.id}" title="${c.label}${on?' · '+Math.round(dato(c).esp)+' mm':' (apagada)'}"
-      style="--c:${capHex(c)}; width:${on ? w(dato(c).esp) : 14}px"></button>`; };
-  const frame = `<div class="capframe" title="Estructura (${Math.round(frameEsp)} mm)" style="width:${w(frameEsp)}px">
-    ${aisla && capOn(aisla) ? `<i style="background:${capHex(aisla)}" title="${aisla.label}"></i>` : ""}</div>`;
-  const corte = `<div class="corte"><span class="corte-lbl">Afuera</span>${ext.map(strip).join("")}${frame}${int.map(strip).join("")}<span class="corte-lbl">Adentro</span></div>`;
-  const fila = c => {
-    if (c.kind === "toggle")
-      return `<label class="caprow"><input type="checkbox" data-captoggle="${c.id}" ${capOn(c)?"checked":""}><span>${glossHTML(c.label)}</span><i>${capOn(c)?Math.round(dato(c).esp)+" mm":"—"}</i></label>`;
-    const opts = Object.keys(CAP_OPC[c.opc]).map(k => `<option ${p.capas[c.id]===k?"selected":""}>${k}</option>`).join("");
-    return `<div class="caprow"><span>${glossHTML(c.label)}</span><select data-capsel="${c.id}">${opts}</select></div>`;
-  };
-  return `<p class="sub">El sándwich del muro, de afuera hacia adentro. Prendé o apagá cada capa y elegí el material; el 3D y el espesor se actualizan solos.</p>
-    <div class="esptot">Espesor total del muro: <b id="esptot">${espesorTotal} mm</b></div>
-    ${corte}
-    <div class="caplist">${caps.map(fila).join("")}</div>`;
+  const { espesorTotal, detalle } = computeCapas(toEngineInput());
+  const exterior = p.tipoMuro === "exterior";
+  const nomA = exterior ? "Cara exterior" : "Cara A", nomB = exterior ? "Cara interior" : "Cara B";
+  const sA = sistemasCara(p.tipoMuro, "A"), sB = sistemasCara(p.tipoMuro, "B");
+  // grilla de tarjetas de sistema para una cara
+  const grid = (sis, sel, key) => `<div class="sistgrid">${Object.entries(sis).map(([id, s]) =>
+    `<button type="button" class="sistcard ${sel===id?'on':''}" data-sist="${key}:${id}"><b>${s.label}</b><span>${s.desc}</span></button>`).join("")}</div>`;
+  // --- CORTE VIVO: franja proporcional (afuera→adentro) + espesor grande ---
+  const ext = detalle.filter(l => l.lado === "ext").slice().reverse();  // afuera→frame
+  const int = detalle.filter(l => l.lado === "int");                     // frame→adentro
+  const aisla = detalle.find(l => l.lado === "cav");
+  const frameEsp = espesorTotal - detalle.filter(l => l.lado !== "cav").reduce((a, l) => a + l.esp, 0);
+  const px = mm => Math.max(5, mm * 0.85);                               // proporcional, mínimo 5 px
+  const franja = l => `<div class="cstrip" data-caphi="${l.id}" title="${l.label} · ${Math.round(l.esp)} mm" style="width:${px(l.esp)}px; background:${hex6(l.color)}"></div>`;
+  const frame = `<div class="cstrip cframe" title="Estructura (${Math.round(frameEsp)} mm)" style="width:${px(frameEsp)}px">${aisla?`<i style="background:${hex6(aisla.color)}"></i>`:""}<span class="replant" title="Cara de replanteo (eje estructural)"></span></div>`;
+  const corte = `<div class="corte2">${ext.map(franja).join("")}${frame}${int.map(franja).join("")}</div>
+    <div class="corte-ejes"><span>Afuera</span><span>Adentro</span></div>`;
+  // --- filas de capa: chip + nombre + mm + ojo/candado + kg + $ ---
+  const fila = l => `<div class="caprow2 ${l.locked?'lock':''}" data-caphi="${l.id}">
+    <i class="cchip" style="background:${hex6(l.color)}"></i>
+    <span class="cname">${glossHTML(l.label)}</span><span class="cmm">${Math.round(l.esp)} mm</span>
+    <span class="cimpact">${l.kg} kg · ${money(capCosto(l))}</span>
+    ${l.locked ? `<span class="ceye lock" title="Estructura / barrera de vapor: no se apaga">🔒</span>`
+               : `<button type="button" class="ceye" data-capoff="${l.id}" title="Quitar esta capa">${(p.capas.off||[]).includes(l.id)?'○':'👁'}</button>`}</div>`;
+  const nota = state.capNota ? `<div class="avisos"><b>✓ Ajustado</b><span>${state.capNota}</span></div>` : "";
+  return `<p class="sub">Elegí cómo terminás cada cara. Adamant arma el paquete completo (${glossHTML("membrana hidrófuga")}, ${glossHTML("barrera de vapor")} y ${glossHTML("rastrel")} los pone solo). Movés el visor con el slider <b>Despiece</b>.</p>
+    ${nota}
+    <div class="corteviva">${corte}<div class="esptotbig">${espesorTotal}<small>mm</small><span>espesor total — el dato de replanteo</span></div></div>
+    <label class="lbl">${nomA} · sistema${p.capas.custom?' <em class="perso">Personalizado</em>':''}</label>${grid(sA, p.capas.caraA, "caraA")}
+    <label class="lbl">${nomB} · sistema</label>${grid(sB, p.capas.caraB, "caraB")}
+    <label class="lbl">${p.tipoMuro==="tabique"?glossHTML("Aislación")+" acústica":glossHTML("Aislación")}</label>
+    ${segHTML("capAisla", p.capas.aislacion, Object.entries(AISLA).map(([v,o]) => ({ v, l: o.label })))}
+    <div class="caplist2">${detalle.map(fila).join("")}</div>
+    <div class="addrow"><button class="btn ghost sm" id="capsave">💾 Guardar esta composición</button></div>`;
 }
 function wireCapasMuro(){
-  const caps = capasDeMuro(state.params.tipoMuro);
-  const primerMat = c => Object.keys(CAP_OPC[c.opc]).find(k => k !== "Ninguna");
-  document.querySelectorAll("[data-capstrip]").forEach(b => b.onclick = () => {
-    const c = caps.find(x => x.id === b.dataset.capstrip);
-    if (c.kind === "toggle") state.params.capas[c.id] = !state.params.capas[c.id];
-    else state.params.capas[c.id] = capOn(c) ? "Ninguna" : primerMat(c);  // el strip prende/apaga
+  const p = state.params;
+  document.querySelectorAll("[data-sist]").forEach(b => b.onclick = () => {
+    const [key, id] = b.dataset.sist.split(":");
+    p.capas[key] = id; p.capas.custom = false; p.capas.off = []; state.capNota = null; render();
+  });
+  document.querySelectorAll('[data-seg="capAisla"] button').forEach(b => b.onclick = () => { p.capas.aislacion = b.dataset.v; render(); });
+  document.querySelectorAll("[data-capoff]").forEach(b => b.onclick = () => {
+    const id = b.dataset.capoff, off = new Set(p.capas.off || []);
+    off.has(id) ? off.delete(id) : off.add(id);
+    p.capas.off = [...off]; p.capas.custom = true;
+    state.capNota = "Editaste las capas a mano: el sistema quedó en «Personalizado». Podés volver a elegir un sistema cuando quieras.";
     render();
   });
-  document.querySelectorAll("[data-captoggle]").forEach(chk => chk.onchange = () => { state.params.capas[chk.dataset.captoggle] = chk.checked; render(); });
-  document.querySelectorAll("[data-capsel]").forEach(sel => sel.onchange = () => { state.params.capas[sel.dataset.capsel] = sel.value; render(); });
+  const save = document.getElementById("capsave");
+  if (save) save.onclick = () => {
+    const nombre = prompt("Nombre de la composición (ej. «Mi muro exterior estándar»):");
+    if (nombre){ guardarComposicion(nombre.trim(), p.tipoMuro, p.capas); alert(`Guardada «${nombre.trim()}». La vas a poder aplicar a los 4 muros de un ambiente.`); }
+  };
+  // hover sincronizado corte ↔ 3D
+  document.querySelectorAll("[data-caphi]").forEach(el => {
+    el.onmouseenter = () => lvlViewer && lvlViewer.hoverCapa && lvlViewer.hoverCapa("cap-" + el.dataset.caphi);
+    el.onmouseleave = () => lvlViewer && lvlViewer.hoverCapa && lvlViewer.hoverCapa(null);
+  });
+}
+// Slider "Despiece": separa las capas del muro en el 3D (explotado). Se inyecta sobre el visor.
+function despieceSlider(host, viewer){
+  if (!host || host.querySelector(".despiece")) return;
+  const box = document.createElement("div");
+  box.className = "despiece";
+  box.innerHTML = `<label>Despiece</label><input type="range" min="0" max="100" value="0"><span>armado</span>`;
+  host.appendChild(box);
+  const inp = box.querySelector("input"), lbl = box.querySelector("span");
+  inp.oninput = () => { const t = +inp.value / 100; viewer.setDespiece(t); lbl.textContent = t === 0 ? "armado" : t === 1 ? "explotado" : "…"; };
+}
+// composiciones guardadas (localStorage) — para reusar en el ambiente (F13).
+const COMP_KEY = "adamant_composiciones";
+function composicionesGuardadas(){ try { return JSON.parse(localStorage.getItem(COMP_KEY)) || []; } catch { return []; } }
+function guardarComposicion(nombre, tipoMuro, capas){
+  const all = composicionesGuardadas().filter(c => c.nombre !== nombre);
+  all.push({ nombre, tipoMuro, capas: JSON.parse(JSON.stringify(capas)) });
+  try { localStorage.setItem(COMP_KEY, JSON.stringify(all)); } catch {}
 }
 
 // ---------- combinado: aberturas por muro (esquema en planta) ----------
@@ -596,7 +642,15 @@ function murosPlantaHTML(){
     return `<div class="muroedit"><button class="btn ghost sm" id="volverPlanta">← Planta</button>
       <b>${m.l} · ${(m.largo/1000).toFixed(2)} m</b></div>${vanosHTML()}`;
   }
-  return `<p class="sub">Tocá un muro para agregarle puertas, ventanas o arcadas.</p><div class="planta4" id="planta4"></div>`;
+  return `<p class="sub">Tocá un muro para agregarle puertas, ventanas o arcadas.</p><div class="planta4" id="planta4"></div>${composicionApplyHTML()}`;
+}
+// Aplicar una composición de capas guardada a los 4 muros del ambiente, de un click.
+function composicionApplyHTML(){
+  const comps = composicionesGuardadas().filter(c => c.tipoMuro !== "tabique"); // el ambiente lleva muros portantes/exteriores
+  if (!comps.length) return `<p class="sub" style="font-size:12px;opacity:.8">Guardá una composición de capas en el módulo <b>Muro</b> y acá la aplicás a los 4 muros de una.</p>`;
+  const sel = state.params.muroCompNombre;
+  return `<div class="compapply"><label class="lbl">Composición de capas de los 4 muros</label>
+    <select id="compsel"><option value="">Revestimiento estándar del ambiente</option>${comps.map((c, i) => `<option value="${i}" ${sel===c.nombre?"selected":""}>${c.nombre}</option>`).join("")}</select></div>`;
 }
 function wireMurosPlanta(){
   if (state.muroSel){
@@ -604,6 +658,14 @@ function wireMurosPlanta(){
     wireVanos(); return;
   }
   drawPlanta4();
+  const cs = document.getElementById("compsel");
+  if (cs) cs.onchange = () => {
+    const comps = composicionesGuardadas().filter(c => c.tipoMuro !== "tabique");
+    const c = comps[+cs.value];
+    if (c){ state.params.muroCapas = c.capas; state.params.muroTipo = c.tipoMuro; state.params.muroCompNombre = c.nombre; }
+    else { delete state.params.muroCapas; delete state.params.muroTipo; delete state.params.muroCompNombre; }
+    render();
+  };
 }
 function nVanosMuro(parte){ return (state.params["vano" + cap(parte)] || []).length; }
 function drawPlanta4(){
@@ -674,6 +736,13 @@ function renderTab(){
       const qb = document.getElementById("qbtn");
       if (qb) qb.onclick = () => { state.quePieza = !state.quePieza; qb.classList.toggle("on", state.quePieza);
         if (!state.quePieza) viewer.clearSelection(); };
+      // Despiece: sólo si el modelo tiene capas de muro; al mover, las revela y las separa.
+      if (piezas.some(p => p.capa && p.capa.startsWith("cap-"))){
+        const host = document.getElementById("viewer3d");
+        despieceSlider(host, viewer);
+        const inp = host.querySelector(".despiece input");
+        if (inp) inp.addEventListener("input", () => { if (+inp.value > 0) capasCap(piezas).forEach(c => viewer.setLayerVisible(c, true)); });
+      }
     } catch (e) {
       // Sin WebGL / aceleración por hardware: no romper la app, avisar y dejar el resto funcionando.
       if (viewer){ try { viewer.dispose(); } catch {} viewer = null; }

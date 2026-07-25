@@ -35,7 +35,10 @@ function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
     // si no el visor las dibujaría en la posición del submódulo.
     const orient = p.orient && { ...p.orient, c: rotP(p.orient.c),
       u: rotV(p.orient.u), v: rotV(p.orient.v), n: rotV(p.orient.n) };
-    return { ...p, box, ...(orient ? { orient } : {}), parte };
+    // Las capas del muro (superficies con Shape+holes) traen `rev` (base eu/ev/en + origin): se rota y
+    // traslada igual, para que el visor las dibuje ubicadas en el ambiente (no en el frame local).
+    const rev = p.rev && { ...p.rev, eu: rotV(p.rev.eu), ev: rotV(p.rev.ev), en: rotV(p.rev.en), origin: rotP(p.rev.origin) };
+    return { ...p, box, ...(orient ? { orient } : {}), ...(rev ? { rev } : {}), parte };
   });
 }
 
@@ -44,6 +47,9 @@ function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
 function descomponer(input){
   const largo = +input.largo, ancho = +input.ancho, alto = +input.alto || 2600, placa = input.placa !== false;
   const muroBase = { sistema: input.sistema, alto, opciones: input.opciones, tipo: input.tipo || "tabique" };
+  // F11-bis.2: composición de capas aplicada a los 4 muros de una vez (desde una guardada). Los muros
+  // pasan a llevar su sándwich real en vez del revestimiento ext/int simplificado del ambiente.
+  if (input.muroCapas){ muroBase.tipoMuro = input.muroTipo || "exterior"; muroBase.capas = input.muroCapas; }
   // `arriostraFrente/Fondo/Izq/Der`: selector por muro (default 'cruz', son perimetrales portantes).
   const arr = lado => input["arriostra" + lado] || "cruz";
   const front = muro.generar({ ...muroBase, largo, vanos: input.vanoFrente || [], arriostramiento: arr("Frente") });
@@ -229,7 +235,9 @@ export const combinado = {
         parte, superficie: true, perfil: "a definir", largo: Math.round(u), axis: "z",
         box: { size, center }, rev: { u, v, esp, holes, eu, ev, en, origin } };
     };
-    for (const parte of ["frente", "fondo", "izq", "der"])
+    // Revestimiento simplificado del ambiente SÓLO si no se aplicó una composición de capas por muro
+    // (con composición, cada muro ya trae sus capas reales, reubicadas más arriba).
+    if (!input.muroCapas) for (const parte of ["frente", "fondo", "izq", "der"])
       P.push(revPieza(parte, "ext"), revPieza(parte, "int"));
 
     // --- CIELORRASO (opcional) --- grilla interior que cuelga hasta su cota. La referencia de cuelgue
