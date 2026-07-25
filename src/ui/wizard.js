@@ -37,7 +37,8 @@ function capasDe(piezas){
   const ids = new Set(piezas.filter(p => p.capa).map(p => p.capa));
   return CAPA_ORDEN.filter(id => ids.has(id)).map(id => ({ id, ...CAPA_INFO[id] }));
 }
-let root, viewer = null;
+let root, viewer = null, lvlViewer = null;
+function disposeLvlViewer(){ if (lvlViewer){ try { lvlViewer.dispose(); } catch {} lvlViewer = null; } }
 
 // El proyecto en curso vive sólo en memoria (state); al ir a pagar, la vuelta desde Mercado Pago
 // recarga la página y lo borraría. Lo persistimos en localStorage y lo reponemos al cargar, así al
@@ -70,7 +71,9 @@ function pasoValido(paso){
   if (paso.componente === "vanoPiso" && validarVanoPiso(toEngineInput()).errores.length) return false;
   // Pendiente de techo por debajo del mínimo de escurrimiento: tampoco se avanza.
   if (paso.id === "medidas" && state.kind === "techo" && validarTecho(toEngineInput()).errores.length) return false;
-  return [...(paso.campos||[]), ...(paso.avanzado||[])].every(c => c.tipo !== "medida" || !errCampo(c));
+  return [...(paso.campos||[]), ...(paso.avanzado||[])]
+    .filter(c => !c.soloSi || c.soloSi(state.params))          // los campos ocultos no bloquean
+    .every(c => c.tipo !== "medida" || !errCampo(c));
 }
 
 // Vanos del wizard {tipo,ancho,alto,sill,pos} → formato del motor {tipo,x1,x2,h,sill}.
@@ -109,6 +112,7 @@ export function startWizard(el){
 
 function render(){
   guardarProyecto();
+  disposeLvlViewer();
   const nPasos = state.kind ? pasosOf().length : 0;
   const enResultado = state.kind && state.step === nPasos + 1;
   if (viewer && !enResultado){ viewer.dispose(); viewer = null; }
@@ -131,7 +135,9 @@ function renderProgress(){
     const nPasos = state.kind ? pasosOf().length : 0;
     const enResultado = state.kind && state.step === nPasos + 1;
     const compo = state.step >= 1 && state.step <= nPasos ? pasosOf()[state.step - 1].componente : null;
-    const fase = state.step === 0 ? 0 : enResultado ? 3 : (compo === "vanos" || compo === "murosPlanta") ? 2 : 1;
+    // En el Ambiente, los niveles después del Suelo (muros/cielo/techo) son la fase de "Plano".
+    const fase = state.step === 0 ? 0 : enResultado ? 3
+      : (compo === "vanos" || compo === "murosPlanta" || (state.kind === "combinado" && state.step >= 2)) ? 2 : 1;
     nav.querySelectorAll("a").forEach(a => a.classList.toggle("on", +a.dataset.phase === fase));
   }
 }
@@ -178,17 +184,46 @@ function wireGrid(){
 }
 
 // ---------- pasos autogenerados ----------
+// Niveles del Ambiente → qué partes resalta el visor en cada paso.
+const NIVEL_PARTES = { suelo: ["piso"], muros: ["frente","fondo","izq","der"], cielo: ["cielo"], techo: ["techo"] };
+// Vista 3D en vivo del ambiente mientras se recorren los niveles: el nivel activo resaltado, los ya
+// armados semi-transparentes. Se regenera con cada cambio (el paso se re-renderiza al tocar un campo).
+function renderNivelPreview(paso){
+  const host = document.getElementById("lvlview"); if (!host) return;
+  const partes = NIVEL_PARTES[paso.id]; if (!partes) return;
+  try {
+    const { piezas, metadatos } = computeProject(toEngineInput());
+    lvlViewer = new Viewer(host, { onSelect: () => {} });
+    lvlViewer.setPieces(piezas.filter(p => !p.superficie), { vista: metadatos.vistaDefault || "iso", elevacion: metadatos.elevacion || 0 });
+    lvlViewer.highlight(partes);
+  } catch (e) { console.warn("preview de nivel no disponible (WebGL):", e && e.message); host.remove(); }
+}
 function stepPaso(paso){
-  let html = `<h2>${paso.titulo}</h2>`;
-  if (paso.componente === "vanos") return html + vanosHTML();
-  if (paso.componente === "murosPlanta") return html + murosPlantaHTML();
-  if (paso.componente === "vanoPiso") return html + vanoPisoHTML();
-  html += (paso.campos || []).map(campoHTML).join("");
-  if (paso.avanzado){
-    html += `<button class="adv-toggle" id="advt">${state.adv?"▾":"▸"} Opciones avanzadas</button>
-      <div class="adv ${state.adv?'':'hide'}">${paso.avanzado.map(campoHTML).join("")}</div>`;
+  let html = `<h2>${paso.titulo}</h2>` + nivelesBar();
+  if (paso.componente === "vanos") html += vanosHTML();
+  else if (paso.componente === "murosPlanta") html += murosPlantaHTML();
+  else if (paso.componente === "vanoPiso") html += vanoPisoHTML();
+  else {
+    html += (paso.campos || []).map(campoHTML).join("");
+    const adv = (paso.avanzado || []).map(campoHTML).join("");   // vacío si todos los avanzados están ocultos
+    if (adv.trim())
+      html += `<button class="adv-toggle" id="advt">${state.adv?"▾":"▸"} Opciones avanzadas</button>
+        <div class="adv ${state.adv?'':'hide'}">${adv}</div>`;
   }
+  // Vista en vivo del ambiente por niveles: el nivel activo resaltado, los ya armados semi-transparentes.
+  if (state.kind === "combinado" && NIVEL_PARTES[paso.id]) html += `<div class="lvlview" id="lvlview"></div>`;
   return html;
+}
+// Stepper vertical de niveles (sólo Ambiente completo): muestra los pasos como niveles; los ya
+// completados (o el actual) son clickeables para volver. Es funcionalidad real (navegación), no decorado.
+function nivelesBar(){
+  if (state.kind !== "combinado") return "";
+  const pasos = pasosOf(), cur = state.step;
+  return `<div class="niveles" id="niveles">${pasos.map((ps, i) => {
+    const n = i + 1, active = n === cur, done = n < cur;
+    return `<button type="button" class="nivel ${active?'on':''} ${done?'done':''}" ${n<=cur?`data-nivel="${n}"`:"disabled"}>
+      <i>${done?"✓":n}</i><span>${ps.titulo}</span></button>`;
+  }).join("")}</div>`;
 }
 function segHTML(key, val, opciones){
   return `<div class="seg" data-seg="${key}">${opciones.map(o => `<button data-v="${o.v}" class="${String(val)===String(o.v)?'on':''}">${o.l}</button>`).join("")}</div>`;
@@ -202,6 +237,7 @@ function perfilHTML(){
        <label class="lbl">Perfil solera / cenefa (PGU)</label><select data-opt="pgu">${opt(["PGU 90x0.90","PGU 100x0.90","PGU 140x0.90","PGU 150x1.60","PGU 200x1.60"], p.pgu)}</select>`;
 }
 function campoHTML(c){
+  if (c.soloSi && !c.soloSi(state.params)) return ""; // campo condicional (p. ej. sólo si el ambiente lleva techo)
   const v = getVal(c);
   if (c.tipo === "sistema") return `<label class="lbl">Sistema</label>${segHTML("sistema", state.params.sistema, [{v:"steel",l:"Steel frame"},{v:"wood",l:"Wood frame"}])}`;
   if (c.tipo === "cards")   return `<label class="lbl">${c.label}</label><div class="cards" data-cards="${c.k}">${c.opciones.map(o => `<button class="card ${v===o.v?'on':''}" data-v="${o.v}"><b>${o.titulo}</b><span>${o.desc}</span></button>`).join("")}</div>`;
@@ -211,6 +247,8 @@ function campoHTML(c){
   return "";
 }
 function wirePaso(paso){
+  document.querySelectorAll("[data-nivel]").forEach(b => b.onclick = () => { state.step = +b.dataset.nivel; render(); });
+  renderNivelPreview(paso);
   if (paso.componente === "vanos"){ wireVanos(); return; }
   if (paso.componente === "murosPlanta"){ wireMurosPlanta(); return; }
   if (paso.componente === "vanoPiso"){ wireVanoPiso(); return; }
@@ -707,7 +745,7 @@ function capture3D(piezas, metadatos = {}){
   div.style.cssText = "position:fixed;left:-10000px;top:0;width:900px;height:560px;";
   document.body.appendChild(div);
   let url = null;
-  const vista = (metadatos.vistas && metadatos.vistas[0] && (metadatos.vistaDefault || metadatos.vistas[0].id))
+  const vista = metadatos.vistaDefault || metadatos.vistas?.[0]?.id
     || (metadatos.esquema === "planta" ? "planta" : "frontal");
   try { const v = new Viewer(div, { snapshot: true }); v.setPieces(piezas, { vista, elevacion: metadatos.elevacion || 0 }); v.resize(); url = v.toDataURL(); v.dispose(); }
   catch (e) { console.warn("snapshot 3D falló", e); }

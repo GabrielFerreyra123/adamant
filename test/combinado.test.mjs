@@ -176,3 +176,81 @@ test("combinado: la optimización global ahorra barras vs por etapa", () => {
   assert.equal(r.porEtapa, 36); assert.equal(r.global, 34);
   assert.equal(r.ahorro, 2, "cortando todo junto se ahorran 2 barras (36 → 34)");
 });
+
+// ============ F13 — Ambiente por niveles: cielorraso + techo integrados ============
+const ambN = (largo, ancho, extra = {}) => amb("steel", largo, ancho, {
+  llevaCielo: true, cieloSusp: 400, cieloPerfil: "Solera/montante 70",
+  llevaTecho: true, techoTipo: "dosAguas", techoPendiente: 30, techoAlero: 400, techoTimpanos: true, techoCubierta: true, ...extra });
+
+// OBB (SAT) que sirve para cajas alineadas Y para piezas diagonales (orient): la caja alineada usa la
+// base canónica. Es una verificación más fuerte que la AABB — necesaria porque el techo es todo
+// piezas diagonales, cuya AABB desbordaría y daría falsos positivos contra muros y cielo.
+const OBB = p => p.orient
+  ? { c: p.orient.c, ejes: [p.orient.u, p.orient.v, p.orient.n], h: [p.largo/2, p.orient.w/2, p.orient.t/2] }
+  : (() => { const { size, center } = pieceBoxEngine(p); return { c: center, ejes: [[1,0,0],[0,1,0],[0,0,1]], h: [size[0]/2, size[1]/2, size[2]/2] }; })();
+function obbChoca(a, b, eps){
+  const ejes = [...a.ejes, ...b.ejes];
+  for (const A of a.ejes) for (const B of b.ejes){
+    const c = [A[1]*B[2]-A[2]*B[1], A[2]*B[0]-A[0]*B[2], A[0]*B[1]-A[1]*B[0]];
+    if (Math.hypot(...c) > 1e-6) ejes.push(c.map(v => v/Math.hypot(...c)));
+  }
+  const d = [0,1,2].map(i => b.c[i] - a.c[i]);
+  for (const e of ejes){
+    const proy = o => o.ejes.reduce((s, ax, k) => s + Math.abs(ax[0]*e[0]+ax[1]*e[1]+ax[2]*e[2]) * o.h[k], 0);
+    if (Math.abs(d[0]*e[0]+d[1]*e[1]+d[2]*e[2]) >= proy(a) + proy(b) - eps) return false;
+  }
+  return true;
+}
+
+// 7) Niveles opcionales: sin llevar → sin piezas de ese nivel; con llevar → aparecen y se listan.
+test("F13: cielorraso y techo son opcionales dentro del ambiente", () => {
+  const sin = combinado.generar(amb("steel", 4000, 3000));
+  assert.ok(!sin.piezas.some(p => p.parte === "cielo" || p.parte === "techo"), "por default no llevan");
+  assert.deepEqual(sin.metadatos.partes.map(p => p.id), ["piso","frente","fondo","izq","der"]);
+  const con = combinado.generar(ambN(4000, 3000));
+  assert.ok(con.piezas.some(p => p.parte === "cielo"), "cielo presente");
+  assert.ok(con.piezas.some(p => p.parte === "techo"), "techo presente");
+  assert.deepEqual(con.metadatos.partes.map(p => p.id), ["piso","frente","fondo","izq","der","cielo","techo"]);
+  assert.deepEqual(con.metadatos.niveles, { cielo: true, techo: true });
+});
+
+// 8) Elevación: el techo apoya sobre la solera superior de los muros; el cielo cuelga por debajo.
+test("F13: el techo apoya sobre los muros y el cielo cuelga de la cota correcta", () => {
+  const { piezas, metadatos } = combinado.generar(ambN(4000, 3000));
+  const tope = metadatos.hMuro + 2600;                 // cara superior de los muros
+  const zBot = arr => Math.min(...arr.map(p => pieceBoxEngine(p).center[2] - pieceBoxEngine(p).size[2]/2));
+  const zTop = arr => Math.max(...arr.map(p => pieceBoxEngine(p).center[2] + pieceBoxEngine(p).size[2]/2));
+  const cordonInf = piezas.filter(p => p.tipo === "CORDON_INFERIOR");
+  assert.ok(Math.abs(zBot(cordonInf) - tope) <= 1, "el cordón inferior apoya en la cara superior de los muros");
+  const velas = piezas.filter(p => p.tipo === "VELA");
+  assert.ok(Math.abs(zTop(velas) - tope) <= 1, "las velas del cielo llegan hasta la cota de cuelgue");
+  assert.ok(zBot(piezas.filter(p => p.parte === "cielo")) < tope - 300, "la grilla del cielo queda por debajo");
+});
+
+// 9) AABB/OBB con TECHO incluido: ninguna pieza de un nivel interpenetra otro (contacto permitido).
+test("F13: sin interpenetración entre niveles con el techo incluido (OBB)", () => {
+  const P = combinado.generar(ambN(5000, 4000)).piezas.filter(p => !p.superficie && p.categoria !== "fleje");
+  const bs = P.map(p => ({ parte: p.parte, tipo: p.tipo, obb: OBB(p) }));
+  const eps = 6; // tolera el contacto entre niveles (apoyo, cuelgue) y el inglete de las cabriadas
+  const choques = [];
+  for (let i = 0; i < bs.length; i++) for (let j = i+1; j < bs.length; j++)
+    if (bs[i].parte !== bs[j].parte && obbChoca(bs[i].obb, bs[j].obb, eps))
+      choques.push(`${bs[i].parte}/${bs[i].tipo} ↔ ${bs[j].parte}/${bs[j].tipo}`);
+  assert.deepEqual(choques, [], "sin interpenetración entre niveles");
+});
+
+// 10) Cómputo y cortes UNIFICADOS: los materiales del techo y del cielo entran al listado global.
+test("F13: materiales y cortes absorben techo y cielorraso", () => {
+  const inp = ambN(5000, 4000);
+  const { piezas } = combinado.generar(inp);
+  const m = combinado.materiales(piezas, inp);
+  const keys = m.otros.map(o => o.key);
+  assert.ok(keys.includes("chapa"), "la chapa del techo entra al cómputo");
+  assert.ok(keys.includes("fija-perim"), "la fijación perimetral del cielo entra al cómputo");
+  assert.ok(m.perfiles.some(x => x.perfil === "PGO 37x22x12.5"), "las correas Omega del techo entran a cortes");
+  assert.ok(m.perfiles.some(x => x.perfil === "Solera/montante 70"), "el perfil del cielo entra a cortes");
+  assert.ok(m.peso > combinado.materiales(combinado.generar(amb("steel",5000,4000)).piezas, amb("steel",5000,4000)).peso, "el ambiente con niveles pesa más");
+  // por etapa vs global: agregar niveles no rompe la relación (global ≤ por etapa)
+  const r = cortesPorEtapaVsGlobal(inp);
+  assert.ok(r.global <= r.porEtapa && r.ahorro === r.porEtapa - r.global);
+});

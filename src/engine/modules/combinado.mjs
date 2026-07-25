@@ -9,7 +9,9 @@
 // el del encajado), sin superponerse.  Montaje platform framing: los muros apoyan SOBRE la placa de piso.
 import { piso } from "./piso.mjs";
 import { muro } from "./muro.mjs";
-import { resolveSystem, cutOpts, FLEJE, FLEJE_PERFIL } from "../systems.mjs";
+import { cielo } from "./cielo.mjs";
+import { techo } from "./techo.mjs";
+import { resolveSystem, cutOpts, FLEJE, FLEJE_PERFIL, FLEJE_CIELO, FLEJE_CIELO_PERFIL, CIELO } from "../systems.mjs";
 import { computeFlejes } from "../brace.mjs";
 import { pieceBoxEngine, boundsEngine } from "../geometry.mjs";
 import { cutList, optimizeCuts } from "../cuts.mjs";
@@ -49,8 +51,34 @@ function descomponer(input){
   // van apoyados por fuera de la cara y falsearían el espesor (y con él la posición de los 4 muros).
   const e = Math.round(boundsEngine(front.piezas.filter(p => p.categoria !== "fleje")).size[1]);
   const encaj = Math.max(ancho - 2 * e, 1);
+  const modulo = +input.opciones?.modulo || 400;
+
+  // NIVELES OPCIONALES (F13): cielorraso y techo se integran como submódulos (el orquestador llama, no
+  // reimplementa). Sólo se arman si el ambiente los "lleva" (checkbox del wizard).
+  //   TECHO: la cabriada salva por DEFECTO la luz MENOR del ambiente; `techoInvertir` la cambia. Su
+  //   separación toma la modulación del muro (cabriadas sobre los montantes). `luzEnX` = la luz corre
+  //   sobre el eje X del ambiente → no hay que rotar el techo al reubicarlo.
+  let techoInput = null, techoMap = null;
+  if (input.llevaTecho){
+    const invert = !!input.techoInvertir;
+    const luz = invert ? Math.max(largo, ancho) : Math.min(largo, ancho);
+    const largoTecho = invert ? Math.min(largo, ancho) : Math.max(largo, ancho);
+    techoInput = { sistema: input.sistema, tipo: input.techoTipo === "unAgua" ? "unAgua" : "dosAguas",
+      luz, largo: largoTecho, pendiente: +input.techoPendiente || 30,
+      alero: input.techoAlero == null ? 400 : +input.techoAlero, separacion: modulo,
+      timpanos: input.techoTimpanos !== false, cubierta: input.techoCubierta !== false,
+      moduloMuro: modulo, opciones: input.opciones };
+    techoMap = { luzEnX: luz === largo };
+  }
+  //   CIELORRASO: grilla suspendida en el INTERIOR (largo/ancho − 2·espesor), cuelga de la estructura
+  //   de techo (o de la losa) hasta su cota. Sólo steel/aluminio.
+  const cieloInput = input.llevaCielo
+    ? { sistema: "steel", largo: Math.max(largo - 2*e, 100), ancho: Math.max(ancho - 2*e, 100),
+        alt: 0, suspension: +input.cieloSusp || 400, modulo, opciones: { perfil: input.cieloPerfil || "Solera/montante 70" } }
+    : null;
+
   return {
-    largo, ancho, alto, placa, e, encaj, front,
+    largo, ancho, alto, placa, e, encaj, front, modulo, techoInput, techoMap, cieloInput,
     // `vano`: passthrough del vano de escalera/trampa del piso (mismas coords que el entramado).
     pisoInput: { sistema: input.sistema, largo, ancho, separacion: input.separacion || 400,
       apoyo: input.apoyo || "platea", placa, opciones: input.opciones, vano: input.vano || null },
@@ -76,13 +104,19 @@ export const combinado = {
     return { sistema: "steel", largo: 4000, ancho: 3000, alto: 2600, apoyo: "platea", placa: true,
       opciones: { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90", lumber: "2x6 (38×140)", modulo: 400 },
       vanoFrente: [], vanoFondo: [], vanoIzq: [], vanoDer: [],
-      arriostraFrente: "cruz", arriostraFondo: "cruz", arriostraIzq: "cruz", arriostraDer: "cruz" };
+      arriostraFrente: "cruz", arriostraFondo: "cruz", arriostraIzq: "cruz", arriostraDer: "cruz",
+      // niveles opcionales (F13)
+      llevaCielo: false, cieloSusp: 400, cieloPerfil: "Solera/montante 70",
+      llevaTecho: false, techoTipo: "dosAguas", techoPendiente: 30, techoAlero: 400,
+      techoInvertir: false, techoTimpanos: true, techoCubierta: true };
   },
 
-  // schema básico (el wizard con selector de muros en planta es F9c).
+  // Flujo por NIVELES (F13): Suelo → Muros y vanos → Cielorraso → Techo. Cielo y techo son opcionales
+  // (checkbox "¿lleva…?") pero viven dentro del mismo flujo. El wizard es genérico: `soloSi` oculta los
+  // campos de un nivel apagado.
   schema: {
     pasos: [
-      { id: "medidas", titulo: "Medidas", campos: [
+      { id: "suelo", titulo: "Suelo", campos: [
         { k: "sistema", tipo: "sistema" },
         { k: "largo", tipo: "medida", label: "Largo", rango: [2000, 12000] },
         { k: "ancho", tipo: "medida", label: "Ancho", rango: [2000, 12000] },
@@ -91,7 +125,27 @@ export const combinado = {
         { k: "apoyo", tipo: "seg", label: "Apoyo", opciones: [{ v: "platea", l: "Platea" }, { v: "pilotines", l: "Pilotines" }] },
         { k: "placa", tipo: "seg", label: "Placa de piso", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] }
       ] },
-      { id: "aberturas", titulo: "Aberturas", componente: "murosPlanta" }
+      { id: "muros", titulo: "Muros y vanos", componente: "murosPlanta" },
+      { id: "cielo", titulo: "Cielorraso", campos: [
+        { k: "llevaCielo", tipo: "seg", label: "¿Este ambiente lleva cielorraso?", opciones: [{ v: false, l: "No" }, { v: true, l: "Sí" }] },
+        { k: "cieloSusp", tipo: "medida", label: "Cuánto cuelga de la estructura", rango: [50, 1500], soloSi: p => p.llevaCielo }
+      ], avanzado: [
+        { k: "cieloPerfil", tipo: "seg", label: "Perfil del cielorraso", opciones: Object.keys(CIELO).map(k => ({ v: k, l: k })), soloSi: p => p.llevaCielo }
+      ] },
+      { id: "techo", titulo: "Techo", campos: [
+        { k: "llevaTecho", tipo: "seg", label: "¿Este ambiente lleva techo?", opciones: [{ v: false, l: "No" }, { v: true, l: "Sí" }] },
+        { k: "techoTipo", tipo: "cards", label: "¿Cómo cae el agua?", soloSi: p => p.llevaTecho, opciones: [
+          { v: "dosAguas", titulo: "Dos aguas", desc: "Dos faldones con cumbrera al medio, tipo casita." },
+          { v: "unAgua", titulo: "Un agua", desc: "Una sola pendiente. Típico de ampliación o quincho." }
+        ] },
+        { k: "techoPendiente", tipo: "seg", label: "Pendiente", soloSi: p => p.llevaTecho,
+          opciones: [{ v: 15, l: "15 %" }, { v: 25, l: "25 %" }, { v: 30, l: "30 %" }, { v: 50, l: "50 %" }] }
+      ], avanzado: [
+        { k: "techoInvertir", tipo: "seg", label: "Las cabriadas salvan", soloSi: p => p.llevaTecho, opciones: [{ v: false, l: "La luz menor" }, { v: true, l: "La luz mayor" }] },
+        { k: "techoAlero", tipo: "medida", label: "Alero", rango: [0, 600], soloSi: p => p.llevaTecho },
+        { k: "techoTimpanos", tipo: "seg", label: "Cerrar los tímpanos", soloSi: p => p.llevaTecho, opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] },
+        { k: "techoCubierta", tipo: "seg", label: "Chapa de cubierta", soloSi: p => p.llevaTecho, opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] }
+      ] }
     ]
   },
 
@@ -171,18 +225,41 @@ export const combinado = {
     for (const parte of ["frente", "fondo", "izq", "der"])
       P.push(revPieza(parte, "ext"), revPieza(parte, "int"));
 
+    // --- CIELORRASO (opcional) --- grilla interior que cuelga hasta su cota. La referencia de cuelgue
+    // es el tope de los muros (cara inferior del cordón de la cabriada si hay techo, o la losa): las
+    // velas llegan ahí y la grilla queda `2·alma + suspensión` más abajo.
+    const nivelAvisos = [], nivelNotas = [];
+    if (d.cieloInput){
+      const cieloGen = cielo.generar(d.cieloInput);
+      const alma = cieloGen.metadatos.planoSuperior, susp = +d.cieloInput.suspension;
+      const ref = hp + d.alto, elev = ref - (2 * alma + susp);
+      P.push(...reubicar(cieloGen.piezas, { rot: 0, tx: e, ty: e, tz: elev, parte: "cielo" }));
+    }
+
+    // --- TECHO (opcional) --- el cordón inferior apoya sobre la solera superior de los muros (z = tope
+    // de muros). Si la luz corre en Y (ancho), el techo se rota 90° igual que el piso transpuesto.
+    if (d.techoInput){
+      const techoGen = techo.generar(d.techoInput), tz = hp + d.alto;
+      P.push(...(d.techoMap.luzEnX
+        ? reubicar(techoGen.piezas, { rot: 0,  tx: 0,       ty: 0, tz, parte: "techo" })
+        : reubicar(techoGen.piezas, { rot: 90, tx: d.largo, ty: 0, tz, parte: "techo" })));
+      nivelAvisos.push(...(techoGen.metadatos.avisos || []).map(a => `Techo: ${a}`));
+      nivelNotas.push(...(techoGen.metadatos.notas || []));
+    }
+
     // envolvente ESTRUCTURAL: los rev (superficie) y los flejes van apoyados por FUERA del frame
     const bb = boundsEngine(P.filter(p => !p.superficie && p.categoria !== "fleje"));
     // Avisos de arriostramiento de los 4 muros, prefijados con el lado (los consume la UI y el PDF).
     const LADO = { frente: "Frente", fondo: "Fondo", izq: "Lateral izq.", der: "Lateral der." };
-    const avisos = Object.entries(gens).flatMap(([k, g]) => (g.metadatos.avisos || []).map(a => `${LADO[k]}: ${a}`));
+    const avisos = [...Object.entries(gens).flatMap(([k, g]) => (g.metadatos.avisos || []).map(a => `${LADO[k]}: ${a}`)), ...nivelAvisos];
+    const partes = [{ id: "piso", l: "Piso" }, { id: "frente", l: "Frente" }, { id: "fondo", l: "Fondo" }, { id: "izq", l: "Lateral izq." }, { id: "der", l: "Lateral der." }];
+    if (d.cieloInput) partes.push({ id: "cielo", l: "Cielorraso" });
+    if (d.techoInput) partes.push({ id: "techo", l: "Techo" });
 
-    return { piezas: P, metadatos: { nombre: "Ambiente completo", esquema: "planta", avisos,
+    return { piezas: P, metadatos: { nombre: "Ambiente completo", esquema: "planta", avisos, notas: nivelNotas,
       sistema: input.sistema, planta: { x: d.largo, y: d.ancho }, elevacion: 0,
-      barLen: pisoGen.metadatos.barLen, espesorMuro: e, hMuro: hp,
-      partes: [{ id: "piso", l: "Piso" }, { id: "frente", l: "Frente" }, { id: "fondo", l: "Fondo" }, { id: "izq", l: "Lateral izq." }, { id: "der", l: "Lateral der." }],
-      vistas: [{ id: "iso", l: "Conjunto" }, { id: "planta", l: "Planta" }], vistaDefault: "iso",
-      bbox: bb.size } };
+      barLen: pisoGen.metadatos.barLen, espesorMuro: e, hMuro: hp, niveles: { cielo: !!d.cieloInput, techo: !!d.techoInput },
+      partes, vistaDefault: "iso", bbox: bb.size } };
   },
 
   materiales(piezas, input){
@@ -192,6 +269,8 @@ export const combinado = {
     const pisoMat = piso.materiales(sub("piso"), d.pisoInput);
     const muroMats = d.muros.map(m => muro.materiales(sub(m.parte), m.input));
     const all = [pisoMat, ...muroMats];
+    if (d.cieloInput) all.push(cielo.materiales(sub("cielo"), d.cieloInput));
+    if (d.techoInput) all.push(techo.materiales(sub("techo"), d.techoInput));
 
     // perfiles: First-Fit GLOBAL sobre el conjunto (comparte sobrantes entre muros y con el piso).
     const { byProfile } = cutList(piezas);
@@ -213,15 +292,20 @@ export const combinado = {
     all.flatMap(m => m.otros || []).forEach(o => {
       (om[o.key] = om[o.key] || { ...o, cantidad: 0 }).cantidad += o.cantidad;
     });
-    // El FLEJE viene en rollo: sumar los rollos ya redondeados de cada muro sobre-estima (4×1 rollo
-    // para 47 m que entran en 2). Se recalcula GLOBAL desde todas las piezas, igual que los perfiles.
-    const flejes = computeFlejes(piezas);
-    const otros = Object.values(om).filter(o => o.key !== "fleje-rollo" && o.key !== "tensor");
+    // El FLEJE viene en rollo: sumar los rollos ya redondeados de cada submódulo sobre-estima (4×1 rollo
+    // para 47 m que entran en 2). Se recalcula GLOBAL desde todas las piezas, por MEDIDA de fleje: el
+    // 30×0,5 (cruz de San Andrés de muros + faldón de techo) y el 38×0,84 (arriostre de cielo del techo).
+    const otros = Object.values(om).filter(o => !["fleje-rollo", "tensor", "fleje-cielo-rollo"].includes(o.key));
+    const flejes = computeFlejes(piezas, { perfil: FLEJE_PERFIL });
     if (flejes){
       otros.push({ key:"fleje-rollo", label:`${FLEJE_PERFIL} galvanizado (rollo ${FLEJE.rollo/1000} m) — ${flejes.metros} m`,
         unidad:"rollo", cantidad: flejes.rollos });
       otros.push({ key:"tensor", label:"Tensor para fleje", unidad:"u", cantidad: flejes.tensores });
     }
+    const flejeCielo = computeFlejes(piezas, { perfil: FLEJE_CIELO_PERFIL });
+    if (flejeCielo)
+      otros.push({ key:"fleje-cielo-rollo", label:`Fleje ${FLEJE_CIELO.ancho}x${FLEJE_CIELO.esp} arriostre de cielo (rollo ${FLEJE_CIELO.rollo/1000} m) — ${flejeCielo.metros} m`,
+        unidad:"rollo", cantidad: flejeCielo.rollos });
     const aislacion = +all.reduce((a, m) => a + (m.aislacion || 0), 0).toFixed(2);
     const tornillos = { t1: all.reduce((a, m) => a + (m.tornillos?.t1 || 0), 0), t2: all.reduce((a, m) => a + (m.tornillos?.t2 || 0), 0) };
     const peso = +all.reduce((a, m) => a + (m.peso || 0), 0).toFixed(1);
@@ -252,7 +336,9 @@ export function cortesPorEtapaVsGlobal(input){
   const d = descomponer(input);
   const etapas = [
     { parte: "piso", piezas: piso.generar(d.pisoInput).piezas },
-    ...d.muros.map(m => ({ parte: m.parte, piezas: muro.generar(m.input).piezas }))
+    ...d.muros.map(m => ({ parte: m.parte, piezas: muro.generar(m.input).piezas })),
+    ...(d.cieloInput ? [{ parte: "cielo", piezas: cielo.generar(d.cieloInput).piezas }] : []),
+    ...(d.techoInput ? [{ parte: "techo", piezas: techo.generar(d.techoInput).piezas }] : [])
   ];
   const opts = cutOpts(input);
   const barsDe = piezas => optimizeCuts(cutList(piezas).byProfile, opts).reduce((a, o) => a + o.bars, 0);

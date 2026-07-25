@@ -180,6 +180,23 @@ export class Viewer {
     this.group.children.forEach(m => { if (m.userData && m.userData.capa === capa) m.visible = !!visible; });
   }
 
+  // Resalta uno o más NIVELES (partes): los demás quedan semi-transparentes (contexto sin taparlo) y la
+  // cámara se reencuadra sobre el nivel activo. Sin argumento (o set vacío) restaura todo a opaco.
+  highlight(partes){
+    const act = new Set(partes || []);
+    const meshes = this.group.children.filter(m => m.userData && m.userData.pieza);
+    // Si el nivel activo todavía no tiene piezas (p. ej. "Techo" con el checkbox en No), no se atenúa
+    // nada: se muestra el ambiente armado tal cual.
+    const hayActivo = act.size && meshes.some(m => act.has(m.userData.pieza.parte));
+    const foco = new THREE.Box3();
+    meshes.forEach(m => {
+      const on = !hayActivo || act.has(m.userData.pieza.parte);
+      m.material.transparent = !on; m.material.opacity = on ? 1 : 0.1; m.material.depthWrite = on;
+      if (on && hayActivo) foco.expandByObject(m);
+    });
+    if (hayActivo && !foco.isEmpty()) this._frame(foco);
+  }
+
   // Encuadra la estructura completa. "frontal": de frente (muro). "iso": isométrica (piso/planta),
   // ajustando por la esfera contenedora (un piso es casi plano: no sirve encuadrar por su alto).
   _frame(box){
