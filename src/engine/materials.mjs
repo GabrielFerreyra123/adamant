@@ -2,16 +2,19 @@
 // (B) Todo lo cuantitativo sale de la geometría (`buildPieces`): conteos, metros, peso y
 // la lista de corte. El área de revestimiento es lo único que no es una pieza (se calcula
 // como superficie de muro menos vanos).
-import { resolveSystem, PGC, PGU, LUMBER, REVEST, lumberKg, cutOpts, FLEJE, FLEJE_PERFIL } from "./systems.mjs";
+import { resolveSystem, PGC, PGU, LUMBER, REVEST, lumberKg, cutOpts, FLEJE, FLEJE_PERFIL, MONT_PLACA, SOL_PLACA } from "./systems.mjs";
 import { buildPieces } from "./frame.mjs";
 import { computeFlejes } from "./brace.mjs";
 import { cutList, optimizeCuts } from "./cuts.mjs";
+import { buildCapas, computeCapas } from "./capas.mjs";
 
 const MONT_FAM = new Set(["MONTANTE","KING","JACK","DINTEL","CRIPPLE"]); // familia montante (perfil vertical/dintel)
 
 function kgPerfil(perfil){
   if (PGC[perfil]) return PGC[perfil].kg;
   if (PGU[perfil]) return PGU[perfil].kg;
+  if (MONT_PLACA[perfil]) return MONT_PLACA[perfil].kg;
+  if (SOL_PLACA[perfil]) return SOL_PLACA[perfil].kg;
   if (LUMBER[perfil]) return lumberKg(perfil);
   return 0;
 }

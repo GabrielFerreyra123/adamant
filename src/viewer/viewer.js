@@ -130,7 +130,7 @@ export class Viewer {
         const box = pieceBoxEngine(p); center = box.center; // en mm, ejes del motor
         geo = new THREE.BoxGeometry(Math.max(box.size[0]*MM, 0.001), Math.max(box.size[1]*MM, 0.001), Math.max(box.size[2]*MM, 0.001));
       }
-      const mat = new THREE.MeshStandardMaterial({ color: TIPO_COLOR[p.tipo] ?? 0x888888, metalness: 0.25, roughness: 0.65, side: p.rev ? THREE.DoubleSide : THREE.FrontSide });
+      const mat = new THREE.MeshStandardMaterial({ color: p.color ?? TIPO_COLOR[p.tipo] ?? 0x888888, metalness: 0.25, roughness: 0.65, side: p.rev ? THREE.DoubleSide : THREE.FrontSide });
       const mesh = new THREE.Mesh(geo, mat);
       if (center) mesh.position.set(center[0]*MM, center[1]*MM, center[2]*MM); // el grupo hace el Y-up
       mesh.userData = { pieza: p, capa: p.capa || null };

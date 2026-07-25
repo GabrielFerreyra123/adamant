@@ -19,6 +19,13 @@
 > (`arriostramiento: "placa"`): la placa de revestimiento hace de muro de corte y no depende del ancho
 > del paño, así que resuelve el aviso sin flejes.
 
+> **F11-bis.2 — efecto colateral (registrado).** Al agregar el tipo de muro, el **tabique divisorio**
+> oculta el arriostramiento (`soloSi: p => p.tipoMuro !== "tabique"` en el schema del muro) y arranca con
+> `arriostramiento: "ninguno"`. Con eso **desaparece toda la familia de avisos de brace** (`brace.mjs`
+> «Sin tramo lleno…», «Tramo angosto: ángulo de fleje…») que hoy se disparaba en tabiques sin motivo —
+> un tabique no portante no se arriostra con Cruz de San Andrés. Los avisos y su auto-solución siguen
+> vigentes para muros **exterior/interior portante**, que sí arriostran.
+
 ---
 
 Barrido de `src/` (F10, Parte C) buscando mensajes de validación con **"profesional", "consultá",

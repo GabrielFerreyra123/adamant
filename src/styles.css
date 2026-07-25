@@ -239,6 +239,28 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .intro-h .ico{ font-size:11px; }
 .intro-b{ margin:8px 0 0; font-size:13px; line-height:1.5; color:var(--paper); }
 .intro.off .intro-b{ display:none; }
+/* muro · capas: corte esquemático del sándwich (afuera → adentro) + controles */
+.esptot{ font-family:var(--mono); font-size:13px; color:var(--paper); margin:0 0 14px; padding:9px 12px;
+  border:1px solid var(--hair-teal); border-left-width:3px; border-radius:var(--r-lg,4px); background:rgba(27,182,164,.06); }
+.esptot b{ color:var(--teal); font-size:15px; }
+.corte{ display:flex; align-items:stretch; gap:2px; height:120px; margin:0 0 16px; padding:8px;
+  border:1px solid var(--outline2); border-radius:var(--r-lg,4px); background:var(--su-lowest);
+  background-image:linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,.04) 49.5% 50.5%, transparent 50.5%); overflow-x:auto; }
+.corte-lbl{ align-self:center; writing-mode:vertical-rl; transform:rotate(180deg); font-family:var(--mono); font-size:9px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--muted); flex:0 0 auto; padding:0 2px; }
+.capstrip{ flex:0 0 auto; border:0; border-radius:2px; background:var(--c); cursor:pointer; padding:0;
+  transition:width .2s ease, opacity .15s ease, filter .15s ease; align-self:stretch; }
+.capstrip.off{ background:transparent; border:1px dashed var(--outline2); opacity:.5; }
+.capstrip:hover{ filter:brightness(1.15); }
+.capframe{ flex:0 0 auto; align-self:stretch; background:repeating-linear-gradient(0deg, var(--teal) 0 3px, transparent 3px 9px);
+  border-radius:2px; position:relative; opacity:.9; }
+.capframe i{ position:absolute; inset:2px; border-radius:2px; opacity:.55; }
+.caplist{ display:flex; flex-direction:column; gap:6px; }
+.caprow{ display:flex; align-items:center; gap:10px; font-size:13px; color:var(--paper); }
+.caprow > span:first-child, .caprow > span{ flex:1 1 auto; min-width:0; }
+.caprow input[type=checkbox]{ flex:0 0 auto; }
+.caprow i{ flex:0 0 auto; font-style:normal; font-family:var(--mono); font-size:11px; color:var(--muted); }
+.caprow select{ flex:0 0 auto; max-width:180px; }
 /* vista 3D en vivo del nivel activo dentro del wizard del Ambiente */
 .lvlview{ position:relative; width:100%; height:240px; margin-top:16px; border:1px solid var(--line);
   border-radius:var(--r-lg,4px); overflow:hidden; background:var(--su-lowest,#05151d); touch-action:none; }

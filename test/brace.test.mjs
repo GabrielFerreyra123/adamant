@@ -130,7 +130,9 @@ test("ambiente completo: flejes de los 4 muros fusionados (rollos calculados glo
 test("arriostramiento 'ninguno' (default del muro) no agrega piezas", () => {
   assert.equal(flejesDe(muro.generar({ ...pared(3000, 2600), arriostramiento: "ninguno" }).piezas).length, 0);
   assert.equal(flejesDe(muro.generar({ sistema: "steel", largo: 3000, alto: 2600, vanos: [], opciones: OPC }).piezas).length, 0);
-  assert.equal(muro.defaults().arriostramiento, "ninguno");
+  // El muro por default es EXTERIOR (portante) → arriostrado; el tabique divisorio → sin arriostrar.
+  assert.equal(muro.defaults().arriostramiento, "cruz");
+  assert.equal(muro.defaults().tipoMuro, "exterior");
 });
 
 // Wood usa el mismo fleje metálico y la misma lógica.

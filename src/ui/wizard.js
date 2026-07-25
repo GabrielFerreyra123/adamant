@@ -13,6 +13,7 @@ import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { getLicencia, diasRestantes, iniciarPago, generarPDF, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
 import { glossHTML, glossForTipo, glossKeyForTipo } from "../content/glosario.js";
 import { initGlosario } from "./glosario-ui.js";
+import { capasDeMuro, capasDefault, computeCapas, datoCapa, CAP_OPC } from "../engine/capas.mjs";
 
 const VANO_DEFAULTS = {
   puerta:  { ancho:800,  alto:2050, sill:0   },
@@ -36,9 +37,16 @@ const CAPA_INFO = {
 const CAPA_ORDEN = ["apoyos", "placa-piso", "rev-ext", "rev-int", "placa-cielo"];
 // Las capas arrancan APAGADAS salvo "apoyos": si el usuario eligió platea/pilotines, se ve de una.
 const capaOn = id => state.capas[id] ?? (id === "apoyos");
+// Color del swatch de una capa (las capas del muro traen su color en la pieza; el resto por tipo).
+const capaSwatch = c => c.color != null ? "#" + c.color.toString(16).padStart(6, "0") : colorHex(c.tipo);
 function capasDe(piezas){
   const ids = new Set(piezas.filter(p => p.capa).map(p => p.capa));
-  return CAPA_ORDEN.filter(id => ids.has(id)).map(id => ({ id, ...CAPA_INFO[id] }));
+  const base = CAPA_ORDEN.filter(id => ids.has(id)).map(id => ({ id, ...CAPA_INFO[id] }));
+  // Capas del muro (cap-<id>): etiqueta y color desde la propia pieza.
+  const muro = [...ids].filter(id => id.startsWith("cap-")).map(id => {
+    const p = piezas.find(x => x.capa === id); return { id, l: p.capaLabel || id, color: p.color };
+  });
+  return [...base, ...muro];
 }
 let root, viewer = null, lvlViewer = null, _codeOf = new Map();
 function disposeLvlViewer(){ if (lvlViewer){ try { lvlViewer.dispose(); } catch {} lvlViewer = null; } }
@@ -225,7 +233,11 @@ function renderNivelPreview(paso){
   try {
     const { piezas, metadatos } = computeProject(toEngineInput());
     lvlViewer = new Viewer(host, { onSelect: () => {} });
-    lvlViewer.setPieces(piezas.filter(p => !p.superficie), { vista: metadatos.vistaDefault || "iso", elevacion: metadatos.elevacion || 0 });
+    // En el paso "Capas" se muestran las superficies de las capas (y se prenden), para ver el sándwich
+    // aparecer/desaparecer en vivo; en el resto del recorrido sólo la estructura.
+    const enCapas = paso.id === "capas";
+    lvlViewer.setPieces(enCapas ? piezas : piezas.filter(p => !p.superficie), { vista: metadatos.vistaDefault || "iso", elevacion: metadatos.elevacion || 0 });
+    if (enCapas) [...new Set(piezas.filter(p => p.capa && p.capa.startsWith("cap-")).map(p => p.capa))].forEach(c => lvlViewer.setLayerVisible(c, true));
     if (partes){
       lvlViewer.highlight(partes);
       // Momento maravilla: sólo al ENTRAR al nivel (no en cada toque de campo del mismo nivel).
@@ -254,6 +266,7 @@ function stepPaso(paso){
   if (paso.componente === "vanos") html += vanosHTML();
   else if (paso.componente === "murosPlanta") html += murosPlantaHTML();
   else if (paso.componente === "vanoPiso") html += vanoPisoHTML();
+  else if (paso.componente === "capasMuro") html += capasMuroHTML();
   else {
     html += (paso.campos || []).map(campoHTML).join("");
     const adv = (paso.avanzado || []).map(campoHTML).join("");   // vacío si todos los avanzados están ocultos
@@ -280,10 +293,13 @@ function segHTML(key, val, opciones){
 function perfilHTML(){
   const p = state.params.opciones, wood = state.params.sistema === "wood";
   const opt = (arr, sel) => arr.map(o => `<option ${o===sel?'selected':''}>${o}</option>`).join("");
-  return wood
-    ? `<label class="lbl">Escuadría</label><select data-opt="lumber">${opt(["2x4 (38×89)","2x6 (38×140)","2x8 (38×184)","2x10 (38×235)"], p.lumber)}</select>`
-    : `<label class="lbl">Perfil montante / viga (PGC)</label><select data-opt="pgc">${opt(["PGC 90x0.90","PGC 100x0.90","PGC 140x0.90","PGC 150x1.60","PGC 200x1.60"], p.pgc)}</select>
-       <label class="lbl">Perfil solera / cenefa (PGU)</label><select data-opt="pgu">${opt(["PGU 90x0.90","PGU 100x0.90","PGU 140x0.90","PGU 150x1.60","PGU 200x1.60"], p.pgu)}</select>`;
+  if (wood)
+    return `<label class="lbl">Escuadría</label><select data-opt="lumber">${opt(["2x3 (38×64)","2x4 (38×89)","2x6 (38×140)","2x8 (38×184)","2x10 (38×235)"], p.lumber)}</select>`;
+  // Tabique steel: perfilería de placa de yeso (montante/solera 70 o 90), no PGC/PGU estructural.
+  if (state.params.tipoMuro === "tabique")
+    return `<label class="lbl">${glossHTML("Montante")} de placa</label><select data-opt="montPlaca">${opt(["Montante 70","Montante 90"], p.montPlaca || "Montante 70")}</select>`;
+  return `<label class="lbl">Perfil montante / viga (PGC)</label><select data-opt="pgc">${opt(["PGC 90x0.90","PGC 100x0.90","PGC 100x1.25","PGC 140x0.90","PGC 150x1.60","PGC 200x1.60"], p.pgc)}</select>
+       <label class="lbl">Perfil solera / cenefa (PGU)</label><select data-opt="pgu">${opt(["PGU 90x0.90","PGU 100x0.90","PGU 100x1.25","PGU 140x0.90","PGU 150x1.60","PGU 200x1.60"], p.pgu)}</select>`;
 }
 function campoHTML(c){
   if (c.soloSi && !c.soloSi(state.params)) return ""; // campo condicional (p. ej. sólo si el ambiente lleva techo)
@@ -307,6 +323,7 @@ function wirePaso(paso){
   if (paso.componente === "vanos"){ wireVanos(); return; }
   if (paso.componente === "murosPlanta"){ wireMurosPlanta(); return; }
   if (paso.componente === "vanoPiso"){ wireVanoPiso(); return; }
+  if (paso.componente === "capasMuro"){ wireCapasMuro(); return; }
   document.querySelectorAll("[data-seg]").forEach(seg => seg.querySelectorAll("button").forEach(b => b.onclick = () => {
     const key = seg.dataset.seg, raw = b.dataset.v;
     const val = raw === "true" ? true : raw === "false" ? false : (isNaN(+raw) ? raw : +raw);
@@ -527,6 +544,51 @@ function wireVanoPiso(){
   drawVanoPlanta();
 }
 
+// ---------- muro: capas (corte esquemático del sándwich, de afuera hacia adentro) ----------
+const capHex = c => "#" + c.color.toString(16).padStart(6, "0");
+const capOn = c => datoCapa(c, state.params.capas[c.id]).esp > 0;
+function capasMuroHTML(){
+  const p = state.params;
+  if (!p.capas) p.capas = capasDefault(p.tipoMuro);
+  const caps = capasDeMuro(p.tipoMuro);
+  const { espesorTotal } = computeCapas(toEngineInput());
+  const dato = c => datoCapa(c, p.capas[c.id]);
+  const espLayers = caps.filter(c => c.lado !== "cav").reduce((a, c) => a + dato(c).esp, 0);
+  const frameEsp = Math.max(0, espesorTotal - espLayers);
+  const w = mm => Math.max(8, Math.min(64, 9 + mm * 0.85));       // ancho visual del strip
+  const ext = caps.filter(c => c.lado === "ext").slice().reverse(); // afuera→frame
+  const int = caps.filter(c => c.lado === "int");                   // frame→adentro
+  const aisla = caps.find(c => c.lado === "cav");
+  const strip = c => { const on = capOn(c);
+    return `<button type="button" class="capstrip ${on?'on':'off'}" data-capstrip="${c.id}" title="${c.label}${on?' · '+Math.round(dato(c).esp)+' mm':' (apagada)'}"
+      style="--c:${capHex(c)}; width:${on ? w(dato(c).esp) : 14}px"></button>`; };
+  const frame = `<div class="capframe" title="Estructura (${Math.round(frameEsp)} mm)" style="width:${w(frameEsp)}px">
+    ${aisla && capOn(aisla) ? `<i style="background:${capHex(aisla)}" title="${aisla.label}"></i>` : ""}</div>`;
+  const corte = `<div class="corte"><span class="corte-lbl">Afuera</span>${ext.map(strip).join("")}${frame}${int.map(strip).join("")}<span class="corte-lbl">Adentro</span></div>`;
+  const fila = c => {
+    if (c.kind === "toggle")
+      return `<label class="caprow"><input type="checkbox" data-captoggle="${c.id}" ${capOn(c)?"checked":""}><span>${glossHTML(c.label)}</span><i>${capOn(c)?Math.round(dato(c).esp)+" mm":"—"}</i></label>`;
+    const opts = Object.keys(CAP_OPC[c.opc]).map(k => `<option ${p.capas[c.id]===k?"selected":""}>${k}</option>`).join("");
+    return `<div class="caprow"><span>${glossHTML(c.label)}</span><select data-capsel="${c.id}">${opts}</select></div>`;
+  };
+  return `<p class="sub">El sándwich del muro, de afuera hacia adentro. Prendé o apagá cada capa y elegí el material; el 3D y el espesor se actualizan solos.</p>
+    <div class="esptot">Espesor total del muro: <b id="esptot">${espesorTotal} mm</b></div>
+    ${corte}
+    <div class="caplist">${caps.map(fila).join("")}</div>`;
+}
+function wireCapasMuro(){
+  const caps = capasDeMuro(state.params.tipoMuro);
+  const primerMat = c => Object.keys(CAP_OPC[c.opc]).find(k => k !== "Ninguna");
+  document.querySelectorAll("[data-capstrip]").forEach(b => b.onclick = () => {
+    const c = caps.find(x => x.id === b.dataset.capstrip);
+    if (c.kind === "toggle") state.params.capas[c.id] = !state.params.capas[c.id];
+    else state.params.capas[c.id] = capOn(c) ? "Ninguna" : primerMat(c);  // el strip prende/apaga
+    render();
+  });
+  document.querySelectorAll("[data-captoggle]").forEach(chk => chk.onchange = () => { state.params.capas[chk.dataset.captoggle] = chk.checked; render(); });
+  document.querySelectorAll("[data-capsel]").forEach(sel => sel.onchange = () => { state.params.capas[sel.dataset.capsel] = sel.value; render(); });
+}
+
 // ---------- combinado: aberturas por muro (esquema en planta) ----------
 function murosPlantaHTML(){
   if (state.muroSel){
@@ -585,7 +647,7 @@ function renderTab(){
     // panel de CAPAS de revestimiento (superficies conmutables): checkboxes independientes, arrancan apagadas
     const capas = capasDe(piezas);
     const capasPanel = capas.length
-      ? `<div class="capas" id="capaspanel"><b>Capas</b>${capas.map(c => `<label><input type="checkbox" data-capa="${c.id}" ${capaOn(c.id)?'checked':''}><i style="background:${colorHex(c.tipo)}"></i>${c.l}</label>`).join("")}</div>` : "";
+      ? `<div class="capas" id="capaspanel"><b>Capas</b>${capas.map(c => `<label><input type="checkbox" data-capa="${c.id}" ${capaOn(c.id)?'checked':''}><i style="background:${capaSwatch(c)}"></i>${c.l}</label>`).join("")}</div>` : "";
     // Mapa código de corte por pieza (tipo|perfil|largo → código J1/K1/D1…), para el "¿Qué es esto?".
     _codeOf = new Map(); cutList(piezas).groups.forEach(g => _codeOf.set(g.tipo + "|" + g.perfil + "|" + g.largo, g.code));
     // Botón "¿Qué es esto?": modo educativo. Al tocar una pieza, además del nombre muestra para qué
@@ -768,8 +830,9 @@ function renderMateriales(body){
       <td class="n"><input class="pinput" type="text" inputmode="decimal" autocomplete="off" name="precio-unitario-${sku}" id="precio-unitario-${sku}" aria-label="Precio ${it.label}" data-key="${it.key}" data-cant="${it.cant}" value="${getPrice(it.key) || ""}" placeholder="0"></td>
       <td class="n" data-sub>${money(it.cant * getPrice(it.key))}</td></tr>`;
   }).join("");
+  const espesor = metadatos.espesorTotal ? `<div class="esptot">Espesor total del muro: <b>${metadatos.espesorTotal} mm</b> — el número para replantear en obra.</div>` : "";
   body.innerHTML = `<form class="pane" autocomplete="off" onsubmit="return false">
-    ${avisosHTML(metadatos)}
+    ${avisosHTML(metadatos)}${espesor}
     <table class="mtable"><thead><tr><th>Material</th><th>Unidad</th><th class="n">Cant</th><th class="n">$ unit.</th><th class="n">Subtotal</th></tr></thead>
     <tbody>${rows}</tbody><tfoot><tr><td colspan="4" class="n"><b>TOTAL</b></td><td class="n"><b data-total></b></td></tr></tfoot></table>
     <p class="sub">Perfiles/maderas en barras comerciales (6 m steel · 3,05 m wood); placas 1,20×2,40. Cargá el precio de tu corralón — se guarda en este navegador. Sólo materiales.</p>

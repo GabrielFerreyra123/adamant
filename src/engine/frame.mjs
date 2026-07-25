@@ -58,7 +58,8 @@ export function buildPieces(input){
     add("JACK", hj, [x2-2*cf,0,zb], "z", MON);
     // Dintel: simple hasta DINTEL_SIMPLE_MAX; si el vano es más ancho, se REFUERZA doblándolo (2 pisos
     // de dintel apilados = 2 perfiles/tirantes espejados extra). Aplica a puerta/ventana/arcada por igual.
-    const nply = (x2 - x1) > DINTEL_SIMPLE_MAX ? 2 : 1;
+    // Un TABIQUE no portante lleva dintel SIMPLE siempre: sólo cierra el vano (no baja carga de arriba).
+    const nply = (!s.drywall && (x2 - x1) > DINTEL_SIMPLE_MAX) ? 2 : 1;
     if (wd > 10){
       for (let k = 0; k < nply; k++){
         const zk = hv + k*headH;

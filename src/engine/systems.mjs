@@ -61,6 +61,17 @@ export const PGC_ALA = 40, PGC_LABIO = 15, PGU_ALA = 35, WOOD_DENS = 480;
 // `e` sale del kg/m de la tabla: desarrollo (a + 2b + 2c) = 106 mm × e × 7,85 g/cm³ ≈ 0,47 kg/m.
 export const PGO = { a: 37, b: 22, c: 12.5, e: 0.56, kg: 0.47 };
 
+// Perfilería de PLACA DE YESO (tabique NO portante, steel). Montante (C) + Solera (U), chapa 0,52 mm.
+// Barra comercial 2,60 / 3,00 m (default 3,00), no 6 m. Un tabique no lleva PGC/PGU estructural.
+export const MONT_PLACA = {
+  "Montante 70": { a: 70, ala: 35, labio: 7, e: 0.52, kg: 0.54, sol: "Solera 70" },
+  "Montante 90": { a: 90, ala: 35, labio: 7, e: 0.52, kg: 0.62, sol: "Solera 90" }
+};
+export const SOL_PLACA = {
+  "Solera 70": { a: 70, ala: 30, e: 0.52, kg: 0.50 },
+  "Solera 90": { a: 90, ala: 30, e: 0.52, kg: 0.58 }
+};
+
 export function lumberKg(sz){ const L = LUMBER[sz]; return L.e * L.a * WOOD_DENS / 1e6; } // kg/m
 
 // Largo de barra/tira COMERCIAL por familia de perfil (mm). No es global: la optimización de cortes
@@ -69,10 +80,11 @@ export function lumberKg(sz){ const L = LUMBER[sz]; return L.e * L.a * WOOD_DENS
 //   riel/portante cielorraso  → 2,60 / 3,00 m  (default 3,00)
 //   tirante de madera         → 3,05 / 3,66 / 4,88 m (default 3,05; el piso usa 4,88)
 // `opts` permite override por proyecto: { barLen, cieloLen, tiraLen }.
-export const BAR_LEN = { steel: 6000, cielo: 3000, wood: 3050, pgo: 6000 };
+export const BAR_LEN = { steel: 6000, cielo: 3000, wood: 3050, pgo: 6000, drywall: 3000 };
 export const PGO_PERFIL = "PGO 37x22x12.5";
 export function barLenOf(perfil, opts = {}){
   if (perfil === PGO_PERFIL) return +opts.pgoLen || BAR_LEN.pgo;
+  if (MONT_PLACA[perfil] || SOL_PLACA[perfil]) return +opts.drywallLen || BAR_LEN.drywall; // tabique: 2,60/3,00 m
   if (CIELO[perfil])  return +opts.cieloLen || BAR_LEN.cielo;
   if (LUMBER[perfil]) return +opts.tiraLen  || BAR_LEN.wood;
   return +opts.barLen || BAR_LEN.steel; // PGC / PGU (y perfiles desconocidos)
@@ -80,7 +92,7 @@ export function barLenOf(perfil, opts = {}){
 // Overrides de largo comercial que declara el proyecto (desde input.opciones), para pasar a cortes.
 export function cutOpts(input){
   const o = (input && input.opciones) || {};
-  return { barLen: o.barLen, cieloLen: o.cieloLen, tiraLen: o.tiraLen, pgoLen: o.pgoLen };
+  return { barLen: o.barLen, cieloLen: o.cieloLen, tiraLen: o.tiraLen, pgoLen: o.pgoLen, drywallLen: o.drywallLen };
 }
 
 export const DEFAULTS = { modulo:400, pgc:"PGC 100x0.90", pgu:"PGU 100x0.90", lumber:"2x6 (38×140)",
@@ -98,6 +110,15 @@ export function resolveSystem(input){
       te:L.e, a:L.a, cf:L.e, headH:L.a,
       tS:L.e, ntop:2, kgM:lumberKg(lumber), kgP:lumberKg(lumber),
       barLen:+o.tiraLen || 3050, opt:o };
+  }
+  // TABIQUE divisorio (steel, no portante): perfilería de placa de yeso en vez de PGC/PGU estructural.
+  if (input.tipoMuro === "tabique"){
+    const mp = MONT_PLACA[o.montPlaca] ? o.montPlaca : "Montante 70", M = MONT_PLACA[mp];
+    const U = SOL_PLACA[M.sol];
+    return { wood:false, drywall:true, modulo, perfilMont:mp, perfilSol:M.sol,
+      a:U.a, fl:U.ala, t:U.e, cf:M.ala, ca:M.a, cl:M.labio, ct:M.e, headH:M.a,
+      tS:U.e, ntop:1, kgM:M.kg, kgP:U.kg,
+      barLen:+o.drywallLen || BAR_LEN.drywall, opt:o };
   }
   const pgc = PGC[o.pgc] ? o.pgc : "PGC 100x0.90";
   const pgu = PGU[o.pgu] ? o.pgu : "PGU 100x0.90";

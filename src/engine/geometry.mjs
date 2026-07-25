@@ -4,12 +4,14 @@
 // Acá se calcula la caja (size + center) de cada pieza EN COORDENADAS DEL MOTOR, respetando su eje.
 // Una pieza puede traer `p.box` (AABB ya resuelto en coords del motor): se usa tal cual — así el módulo
 // combinado puede reubicar (rotar/trasladar/elevar) piezas de submódulos sin reimplementar secciones.
-import { PGC, PGU, LUMBER, CIELO, PGC_ALA, PGU_ALA, PGO, PGO_PERFIL } from "./systems.mjs";
+import { PGC, PGU, LUMBER, CIELO, PGC_ALA, PGU_ALA, PGO, PGO_PERFIL, MONT_PLACA, SOL_PLACA } from "./systems.mjs";
 
 // Sección aproximada del perfil (mm): { b: ala/espesor, h: alma/ancho }.
 export function secDims(perfil){
   if (PGC[perfil]) return { b: PGC_ALA, h: PGC[perfil].a };
   if (PGU[perfil]) return { b: PGU_ALA, h: PGU[perfil].a };
+  if (MONT_PLACA[perfil]) return { b: MONT_PLACA[perfil].ala, h: MONT_PLACA[perfil].a };  // montante de placa (C)
+  if (SOL_PLACA[perfil]) return { b: SOL_PLACA[perfil].ala, h: SOL_PLACA[perfil].a };      // solera de placa (U)
   if (LUMBER[perfil]) return { b: LUMBER[perfil].e, h: LUMBER[perfil].a };
   if (CIELO[perfil]) return { b: CIELO[perfil].fl, h: CIELO[perfil].a };
   if (perfil === PGO_PERFIL) return { b: PGO.b, h: PGO.a };   // correa Omega
