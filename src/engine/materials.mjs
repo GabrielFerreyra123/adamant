@@ -1,12 +1,10 @@
 // ADAMANT · cómputo de materiales en unidades de venta (corralón).
-// (B) Todo lo cuantitativo sale de la geometría (`buildPieces`): conteos, metros, peso y
-// la lista de corte. El área de revestimiento es lo único que no es una pieza (se calcula
-// como superficie de muro menos vanos).
-import { resolveSystem, PGC, PGU, LUMBER, REVEST, lumberKg, cutOpts, FLEJE, FLEJE_PERFIL, MONT_PLACA, SOL_PLACA } from "./systems.mjs";
+// (B) Todo lo cuantitativo sale de la geometría (`buildPieces`): conteos, metros, peso y la lista de
+// corte. Adamant calcula SÓLO estructura: perfilería, tornillos T1 (unión de perfiles) y anclajes.
+import { resolveSystem, PGC, PGU, LUMBER, lumberKg, cutOpts, FLEJE, FLEJE_PERFIL, MONT_PLACA, SOL_PLACA } from "./systems.mjs";
 import { buildPieces } from "./frame.mjs";
 import { computeFlejes } from "./brace.mjs";
 import { cutList, optimizeCuts } from "./cuts.mjs";
-import { buildCapas, computeCapas } from "./capas.mjs";
 
 const MONT_FAM = new Set(["MONTANTE","KING","JACK","DINTEL","CRIPPLE"]); // familia montante (perfil vertical/dintel)
 
@@ -34,11 +32,6 @@ export function computeMaterials(input, piezas){
     const m = p.largo/1000; if (MONT_FAM.has(p.tipo)) mMont += m; else mSol += m; peso += m * kgPerfil(p.perfil);
   });
 
-  // área de muro menos vanos (no es una pieza)
-  let area = (larg/1000) * (ALT/1000);
-  vanos.forEach(v => { area -= ((v.x2 - v.x1)/1000) * ((v.h - v.sill)/1000); });
-  area = Math.max(0, area);
-
   // unidades de venta: barras por perfil, desde la lista de corte (que sale de las piezas)
   const { byProfile } = cutList(piezas);
   const opt = optimizeCuts(byProfile, cutOpts(input)); // largo de barra por perfil (PGC/PGU 6 m, madera 3,05 m)
@@ -51,23 +44,12 @@ export function computeMaterials(input, piezas){
     sobrantes: o.over
   }));
 
-  // placas de revestimiento (1,20 × 2,40 m = 2,88 m²)
-  const o = { ...(input.opciones||{}) };
-  const placas = [];
-  [["interior", o.revInt], ["exterior", o.revExt]].forEach(([cara, rev]) => {
-    if (rev && rev !== "Ninguno" && REVEST[rev] !== undefined)
-      placas.push({ cara, material: rev, m2: +area.toFixed(2), unidades: Math.ceil(area / 2.88) });
-  });
-  const aislacion = o.aislacion ? +area.toFixed(2) : 0;
-
   // arriostramiento: el fleje viene en rollo (metros lineales + rollos), 1 tensor por fleje y
   // 4 tornillos T1 por extremo (se suman a los T1 de estructura).
   const flejes = computeFlejes(piezas);
 
-  // fijaciones (estimación): T1 estructura (perfil-perfil) + T2 placa
+  // fijaciones (estimación): T1 estructura (perfil-perfil). Adamant no computa tornillos de placa.
   const t1 = Math.round(nMont * 2 + nVanos * 12) + (flejes ? flejes.t1 : 0);
-  const m2placa = placas.reduce((a,p) => a + p.m2, 0);
-  const t2 = Math.round(m2placa * 14);
 
   // carpintería (hoja) según el tipo de vano: puerta y ventana son ítems "a definir" (sin precio
   // default); la arcada (paso libre) NO lleva carpintería. El dintel reforzado ya está en `perfiles`.
@@ -83,11 +65,10 @@ export function computeMaterials(input, piezas){
   }
 
   return {
-    sistema: input.sistema, larg, alto: ALT, modulo: s.modulo,
-    area: +area.toFixed(2), nMont, nVanos,
+    sistema: input.sistema, larg, alto: ALT, modulo: s.modulo, nMont, nVanos,
     mMont: +mMont.toFixed(2), mSol: +mSol.toFixed(2), peso: +peso.toFixed(1),
-    perfiles, placas, aislacion, otros, flejes,
-    tornillos: { t1, t2 },
+    perfiles, otros, flejes,
+    tornillos: { t1 },
     barLen: s.barLen
   };
 }

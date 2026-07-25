@@ -119,8 +119,7 @@ export class Viewer {
     this.group.position.y = (+elevacion || 0) * MM; // el grupo está rotado −90° X → Y es la vertical del mundo
     (piezas || []).forEach(p => {
       let geo, center = null;
-      if (p.rev){ geo = this._revGeo(p.rev); } // revestimiento con vanos recortados (Shape + holes)
-      else if (p.orient){ geo = this._orientGeo(p); } // pieza DIAGONAL (fleje): caja con base propia
+      if (p.orient){ geo = this._orientGeo(p); } // pieza DIAGONAL (fleje): caja con base propia
       else if (p.forma === "cilindro"){ // pilotín de hormigón: cilindro vertical (eje = Z del motor)
         const box = pieceBoxEngine(p); center = box.center;
         geo = new THREE.CylinderGeometry(p.r*MM, p.r*MM, Math.max(box.size[2]*MM, 0.001), 20);
@@ -130,35 +129,17 @@ export class Viewer {
         const box = pieceBoxEngine(p); center = box.center; // en mm, ejes del motor
         geo = new THREE.BoxGeometry(Math.max(box.size[0]*MM, 0.001), Math.max(box.size[1]*MM, 0.001), Math.max(box.size[2]*MM, 0.001));
       }
-      const mat = new THREE.MeshStandardMaterial({ color: p.color ?? TIPO_COLOR[p.tipo] ?? 0x888888, metalness: 0.25, roughness: 0.65, side: p.rev ? THREE.DoubleSide : THREE.FrontSide });
+      const mat = new THREE.MeshStandardMaterial({ color: p.color ?? TIPO_COLOR[p.tipo] ?? 0x888888, metalness: 0.25, roughness: 0.65, side: THREE.FrontSide });
       const mesh = new THREE.Mesh(geo, mat);
       if (center) mesh.position.set(center[0]*MM, center[1]*MM, center[2]*MM); // el grupo hace el Y-up
-      mesh.userData = { pieza: p, capa: p.capa || null, baseY: center ? center[1]*MM : 0 };
-      if (p.capa) mesh.visible = false; // las capas (placa/revestimientos) arrancan APAGADAS
+      mesh.userData = { pieza: p, capa: p.capa || null };
+      if (p.capa) mesh.visible = false; // la placa de piso (diafragma) arranca APAGADA
       this.group.add(mesh);
     });
     this.group.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(this.group); // ya en mundo Y-up, con la elevación aplicada
     this._box = box.isEmpty() ? null : box;
     if (this._box) this._frame(this._box);
-  }
-
-  // Geometría de un revestimiento con vanos recortados: rectángulo del muro (u×v) + un hueco por vano,
-  // extruido el espesor. Se orienta con la base (eu,ev,en) y se posiciona en `origin` (coords del motor).
-  _revGeo(rev){
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0); shape.lineTo(rev.u, 0); shape.lineTo(rev.u, rev.v); shape.lineTo(0, rev.v); shape.lineTo(0, 0);
-    (rev.holes || []).forEach(h => {
-      const path = new THREE.Path();
-      path.moveTo(h.u0, h.v0); path.lineTo(h.u1, h.v0); path.lineTo(h.u1, h.v1); path.lineTo(h.u0, h.v1); path.lineTo(h.u0, h.v0);
-      shape.holes.push(path);
-    });
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: rev.esp, bevelEnabled: false });
-    const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(...rev.eu), new THREE.Vector3(...rev.ev), new THREE.Vector3(...rev.en));
-    m.setPosition(rev.origin[0], rev.origin[1], rev.origin[2]);
-    geo.applyMatrix4(m);        // local (u,v,esp) → coords del motor (mm)
-    geo.scale(MM, MM, MM);      // mm → m, como el resto del grupo
-    return geo;
   }
 
   // Geometría de una pieza DIAGONAL (fleje de arriostramiento). El motor no la describe con un `axis`
@@ -175,30 +156,9 @@ export class Viewer {
     return geo;
   }
 
-  // Muestra/oculta una capa (placa-piso / rev-ext / rev-int / placa-cielo) sin reconstruir nada.
+  // Muestra/oculta la placa de piso (diafragma) sin reconstruir nada.
   setLayerVisible(capa, visible){
     this.group.children.forEach(m => { if (m.userData && m.userData.capa === capa) m.visible = !!visible; });
-  }
-
-  // Resalta una capa del muro (hover sincronizado con el corte de la UI). null = apagar.
-  hoverCapa(capa){
-    this.group.children.forEach(m => { const p = m.userData && m.userData.pieza;
-      if (!p || !p.capa || !p.capa.startsWith("cap-")) return;
-      const on = capa && p.capa === capa;
-      m.material.emissive = new THREE.Color(on ? 0x1bb6a4 : 0x000000); m.material.emissiveIntensity = on ? 0.55 : 0;
-    });
-    this.renderer.render(this.scene, this.camera);
-  }
-
-  // DESPIECE (0..1): separa las capas del muro hacia afuera (explotado axonométrico). A 0 el muro está
-  // armado; a 1 las capas quedan flotando. Se mueven a lo largo del eje Y del motor (normal del muro).
-  setDespiece(t){
-    const GAP = 0.06; // m entre capas al máximo
-    this.group.children.forEach(m => { const p = m.userData && m.userData.pieza;
-      if (!p || !p.capa || !p.capa.startsWith("cap-")) return;
-      m.position.y = (m.userData.baseY || 0) + (t || 0) * (p.capOrden || 0) * GAP * (p.capLejos || 0);
-    });
-    this.renderer.render(this.scene, this.camera);
   }
 
   // Resalta uno o más NIVELES (partes): los demás quedan semi-transparentes (contexto sin taparlo) y la

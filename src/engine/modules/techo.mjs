@@ -19,16 +19,14 @@ export const PEND_REC = { min: 25, max: 100 };
 // Voladizos en proyección horizontal. El alero LATERAL (prolongación del cordón superior) es el que
 // modelamos. El alero FRONTAL (voladizo del tímpano, límite 300 mm) no está en el modelo.
 export const ALERO_MAX = 600, ALERO_FRENTE_MAX = 300;
-// Peso propio de la cubierta terminada (kg/m², incluye perfilería, aislación y cielo de yeso).
-// Dato de referencia para quien verifique el cálculo; hoy sólo se emite chapa.
+// Peso propio de la cubierta terminada (kg/m², estimación de referencia para verificar el cálculo).
 export const PESO_CUBIERTA = { chapa: 30, teja: 67 };
-export const MEMBRANA_SOLAPE = 1.15;  // factor por solapes (15–35 cm) de la membrana hidrófuga
 export const PERFIL_CORREA = "PGO 37x22x12.5";
 const T1_POR_NODO = 4;                // tornillos por nodo de cabriada
 const T1_POR_CRUCE = 2;               // correa ↔ cordón
 const T1_POR_ANCLAJE = 8;             // conector cabriada ↔ muro (anti-succión)
 // FUERA DE ALCANCE (sistema de CABIOS, no de cabriadas): cabio individual con puntal a 45° y viga de
-// cumbrera tipo cajón. Acá todo es CABRIADA (reticulado). El diafragma de OSB en el plano de cubierta
+// cumbrera tipo cajón. Acá todo es CABRIADA (reticulado). El diafragma de placa en el plano de cubierta
 // tampoco se despieza todavía (Fase F); su clavado sería cada 150 mm en bordes y 300 mm en el campo.
 
 const rad = g => g * Math.PI / 180;
@@ -256,7 +254,7 @@ export const techo = {
     // --- ARRIOSTRE DEL ALA INFERIOR de los cordones inferiores (= viguetas de cielo) ---
     // El manual lo exige: fleje de 38 × 0,84 mm cada 1,20 m como mínimo, corriendo PERPENDICULAR a las
     // cabriadas y atornillado al ala inferior de cada cordón que cruza. Es lo que impide que el ala
-    // libre pandee de costado. (Si el cielo se placa con yeso, la placa cumple la misma función.)
+    // libre pandee de costado.
     const zAlaInf = -hC - FLEJE_CIELO.esp / 2;
     const xsCielo = posCorreas(c.luz, FLEJE_CIELO.sep);
     xsCielo.forEach(x => P.push({ tipo: "FLEJE_CIELO", categoria: "fleje", perfil: FLEJE_CIELO_PERFIL,
@@ -319,10 +317,6 @@ export const techo = {
     if (c.cubierta){
       otros.push({ key: "chapa", label: "Chapa de cubierta", unidad: "m²", cantidad: Math.ceil(m2) });
       if (c.tipo === "dosAguas") otros.push({ key: "cumbrera", label: "Cumbrera (babeta)", unidad: "m", cantidad: +(c.largo/1000).toFixed(2) });
-      // Membrana hidrófuga (tipo Tyvek): va bajo la chapa y es parte obligatoria de la envolvente.
-      // Se compra por m² de faldón MÁS el solape (15–35 cm entre paños).
-      otros.push({ key: "membrana", label: "Membrana hidrófuga (bajo chapa, con solape)", unidad: "m²",
-        cantidad: Math.ceil(m2 * MEMBRANA_SOLAPE) });
     }
     // arriostramiento: cruz de San Andrés del faldón (30×0,5) y arriostre del ala inferior (38×0,84).
     // Son dos medidas distintas de fleje → dos ítems de compra.
@@ -353,7 +347,7 @@ export const techo = {
     const pesoCubierta = { kgm2: PESO_CUBIERTA.chapa, total: Math.round(m2 * PESO_CUBIERTA.chapa) };
 
     return { sistema: input.sistema, area: m2, peso: +peso.toFixed(1), pesoCubierta,
-      nCabriadas, nCorreas, nVanos: 0, perfiles, placas: [], aislacion: 0, otros,
-      tornillos: { t1, t2: 0 }, barLen: perfiles[0]?.largoBarra || 6000 };
+      nCabriadas, nCorreas, nVanos: 0, perfiles, otros,
+      tornillos: { t1 }, barLen: perfiles[0]?.largoBarra || 6000 };
   }
 };

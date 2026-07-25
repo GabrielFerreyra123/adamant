@@ -13,10 +13,6 @@ export const PGU = {
   "PGU 140x0.90":{a:142,e:0.9,kg:1.46},"PGU 140x1.25":{a:143,e:1.25,kg:2.04},"PGU 140x1.60":{a:144,e:1.6,kg:2.6},"PGU 140x2.00":{a:145,e:2.0,kg:3.25},
   "PGU 150x1.60":{a:154,e:1.6,kg:2.73},"PGU 200x1.60":{a:204,e:1.6,kg:3.35},"PGU 250x2.00":{a:255,e:2.0,kg:4.98}
 };
-export const REVEST = {
-  "Ninguno":0,"Durlock 12.5":8.9,"Durlock 9.5":7.0,"OSB / Fenólico 10":7.0,
-  "Placa cementicia 12":15.97,"Placa cementicia 8":13.19,"Siding cementicio 12":13.91,"PVC (aprox)":3.5
-};
 export const LUMBER = {
   "2x3 (38×64)":{e:38,a:64},"2x4 (38×89)":{e:38,a:89},"2x6 (38×140)":{e:38,a:140},
   "2x8 (38×184)":{e:38,a:184},"2x10 (38×235)":{e:38,a:235},"2x12 (38×286)":{e:38,a:286}
@@ -61,7 +57,7 @@ export const PGC_ALA = 40, PGC_LABIO = 15, PGU_ALA = 35, WOOD_DENS = 480;
 // `e` sale del kg/m de la tabla: desarrollo (a + 2b + 2c) = 106 mm × e × 7,85 g/cm³ ≈ 0,47 kg/m.
 export const PGO = { a: 37, b: 22, c: 12.5, e: 0.56, kg: 0.47 };
 
-// Perfilería de PLACA DE YESO (tabique NO portante, steel). Montante (C) + Solera (U), chapa 0,52 mm.
+// Perfilería LIVIANA de tabique (tabique NO portante, steel). Montante (C) + Solera (U), chapa 0,52 mm.
 // Barra comercial 2,60 / 3,00 m (default 3,00), no 6 m. Un tabique no lleva PGC/PGU estructural.
 export const MONT_PLACA = {
   "Montante 70": { a: 70, ala: 35, labio: 7, e: 0.52, kg: 0.54, sol: "Solera 70" },
@@ -96,7 +92,7 @@ export function cutOpts(input){
 }
 
 export const DEFAULTS = { modulo:400, pgc:"PGC 100x0.90", pgu:"PGU 100x0.90", lumber:"2x6 (38×140)",
-  revInt:"Durlock 12.5", revExt:"Ninguno", aislacion:false, barLen:6000, tiraLen:3050 };
+  barLen:6000, tiraLen:3050 };
 
 // Devuelve los parámetros de sección/altura de un muro según el sistema.
 // La geometría (montantes, soleras, vanos) es idéntica; solo cambian secciones, nombres y fijaciones.
@@ -111,7 +107,7 @@ export function resolveSystem(input){
       tS:L.e, ntop:2, kgM:lumberKg(lumber), kgP:lumberKg(lumber),
       barLen:+o.tiraLen || 3050, opt:o };
   }
-  // TABIQUE divisorio (steel, no portante): perfilería de placa de yeso en vez de PGC/PGU estructural.
+  // TABIQUE divisorio (steel, no portante): perfilería liviana de tabique en vez de PGC/PGU estructural.
   if (input.tipoMuro === "tabique"){
     const mp = MONT_PLACA[o.montPlaca] ? o.montPlaca : "Montante 70", M = MONT_PLACA[mp];
     const U = SOL_PLACA[M.sol];

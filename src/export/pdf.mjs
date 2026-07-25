@@ -148,10 +148,7 @@ function drawCompra(doc, materiales, y){
   const rows = []; let total = 0;
   const push = (label, unidad, cant, key) => { const pu = getPrice(key), st = cant * pu; total += st; rows.push([label, unidad, String(cant), pu ? money(pu) : "—", st ? money(st) : "—"]); };
   materiales.perfiles.forEach(p => push(p.perfil, unidadBarra(p.largoBarra), p.barras, `perf:${p.perfil}`));
-  (materiales.placas || []).forEach(p => push(`Placa ${p.material} · ${p.cara}`, "placa 1,20×2,40", p.unidades, `placa:${p.material}`));
-  if (materiales.aislacion > 0) push("Aislación (lana)", "m²", Math.ceil(materiales.aislacion), "aislacion");
   if (materiales.tornillos?.t1) push("Tornillo T1 (estructura)", "u", materiales.tornillos.t1, "t1");
-  if (materiales.tornillos?.t2) push("Tornillo T2 (placa)", "u", materiales.tornillos.t2, "t2");
   (materiales.otros || []).forEach(o => push(o.label, o.unidad, o.cantidad, o.key));
   autoTable(doc, { startY: y + 2, head: [["Material", "Unidad", "Cant", "$ unit.", "Subtotal"]], body: rows, foot: [["", "", "", "TOTAL", money(total)]],
     styles: { fontSize: 8.5, cellPadding: 1.6 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 }, footStyles: { fillColor: [255,255,255], textColor: TEAL, fontStyle: "bold" },
@@ -285,8 +282,8 @@ export async function exportPDF(input, opts = {}){
     ["Sistema", sis, "Piezas", String(materiales.nMont ?? piezas.length)],
     ["Medidas", medidas, "Peso", `${materiales.peso ?? 0} kg`]
   ];
-  if (input.tipo) body.splice(1, 0, ["Tipo", input.tipo === "muro" ? "Muro exterior" : "Tabique interior", "Aberturas", String(materiales.nVanos ?? 0)]);
-  if (materiales.area) body.push(["Superficie", `${materiales.area} m²`, "Aislación", materiales.aislacion ? `${materiales.aislacion} m²` : "—"]);
+  const NOM_TIPO = { exterior: "Muro exterior", interior: "Muro interior portante", tabique: "Tabique divisorio" };
+  if (input.tipoMuro) body.splice(1, 0, ["Tipo", NOM_TIPO[input.tipoMuro] || input.tipoMuro, "Aberturas", String(materiales.nVanos ?? 0)]);
   autoTable(doc, {
     startY: y, theme: "plain", styles: { fontSize: 9, cellPadding: 1.2 }, body,
     columnStyles: { 0: { textColor: MUT, cellWidth: 26 }, 2: { textColor: MUT, cellWidth: 30 } },
@@ -321,10 +318,7 @@ export async function exportPDF(input, opts = {}){
   const rows = []; let total = 0;
   const push = (label, unidad, cant, key) => { const pu = getPrice(key), st = cant * pu; total += st; rows.push([label, unidad, String(cant), pu ? money(pu) : "—", st ? money(st) : "—"]); };
   materiales.perfiles.forEach(p => push(p.perfil, unidadBarra(p.largoBarra), p.barras, `perf:${p.perfil}`));
-  materiales.placas.forEach(p => push(`Placa ${p.material} · ${p.cara}`, "placa 1,20×2,40", p.unidades, `placa:${p.material}`));
-  if (materiales.aislacion > 0) push("Aislación (lana)", "m²", Math.ceil(materiales.aislacion), "aislacion");
   if (materiales.tornillos?.t1) push("Tornillo T1 (estructura)", "u", materiales.tornillos.t1, "t1");
-  if (materiales.tornillos?.t2) push("Tornillo T2 (placa)", "u", materiales.tornillos.t2, "t2");
   (materiales.otros || []).forEach(o => push(o.label, o.unidad, o.cantidad, o.key));
   autoTable(doc, {
     startY: y + 1, head: [["Material", "Unidad", "Cant", "$ unit.", "Subtotal"]],

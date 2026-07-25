@@ -53,7 +53,7 @@ export const GLOSARIO = {
 
   arriostramiento: { t: "Arriostramiento", alias: ["arriostrar", "arriostrado"],
     def: "Lo que evita que el muro se deforme de costado (que se \"acueste\") con el viento o un empuje.",
-    fn: "Le da rigidez al paño: puede ser una cruz de fleje o una placa de OSB.",
+    fn: "Le da rigidez al paño: una cruz de fleje atornillada en las esquinas.",
     svg: ico(`<rect x="10" y="6" width="44" height="32"/><path d="M10 6l44 32M54 6L10 38"/>`) },
 
   fleje: { t: "Fleje (Cruz de San Andrés)", alias: ["fleje", "flejes", "cruz de san andrés", "cruz de san andres"], tipos: ["FLEJE", "FLEJE_CIELO"],
@@ -136,14 +136,9 @@ export const GLOSARIO = {
     fn: "Apoyan la estructura en el terreno firme, salteando el relleno.",
     svg: ico(`<path d="M8 20h48"/><rect x="14" y="20" width="8" height="18" rx="4" fill="currentColor" fill-opacity="0.15"/><rect x="42" y="20" width="8" height="18" rx="4" fill="currentColor" fill-opacity="0.15"/>`) },
 
-  revestimiento: { t: "Revestimiento", alias: ["revestimientos", "placa de revestimiento"], tipos: ["REV.EXT", "REV.INT", "PLACA"],
-    def: "Las placas que cierran el muro por fuera y por dentro (yeso, OSB, cementicia…).",
-    fn: "Cierran la estructura, dan la terminación y ayudan a arriostrar.",
-    svg: ico(`<rect x="10" y="8" width="44" height="28"/><path d="M10 8l44 28" stroke-opacity="0.3"/>`) },
-
   modulacion: { t: "Modulación", alias: ["modulación", "modular", "O.C."],
     def: "La distancia fija entre montantes (o vigas): 40 cm o 60 cm, de eje a eje.",
-    fn: "Ordena la estructura y hace que las placas caigan justas sobre los perfiles.",
+    fn: "Ordena la estructura y define dónde cae cada perfil.",
     svg: ico(`<path d="M14 8v28M32 8v28M50 8v28"/><path d="M14 22h18M32 22h18"/><path d="M20 19v6M26 19v6M38 19v6M44 19v6" stroke-opacity="0.5"/>`) },
 
   alero: { t: "Alero", alias: ["aleros"],

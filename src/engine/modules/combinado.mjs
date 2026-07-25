@@ -11,13 +11,12 @@ import { piso } from "./piso.mjs";
 import { muro } from "./muro.mjs";
 import { cielo } from "./cielo.mjs";
 import { techo } from "./techo.mjs";
-import { resolveSystem, cutOpts, FLEJE, FLEJE_PERFIL, FLEJE_CIELO, FLEJE_CIELO_PERFIL, CIELO } from "../systems.mjs";
+import { cutOpts, FLEJE, FLEJE_PERFIL, FLEJE_CIELO, FLEJE_CIELO_PERFIL, CIELO } from "../systems.mjs";
 import { computeFlejes } from "../brace.mjs";
 import { pieceBoxEngine, boundsEngine } from "../geometry.mjs";
 import { cutList, optimizeCuts } from "../cuts.mjs";
 
-const PLACA_ESP = 18;        // espesor de la placa de piso (mm); el muro apoya sobre ella (default)
-const REV_EXT = 12, REV_INT = 12.5; // espesores nominales de revestimiento exterior / interior (mm)
+const PLACA_ESP = 18;        // espesor de la placa de piso (diafragma) (mm); el muro apoya sobre ella
 
 // Reubica piezas de un submódulo: rot 0|90 (CCW en Z) + traslación. Setea:
 //   p.box   — AABB en coords del motor (para el visor y el test AABB),
@@ -35,10 +34,7 @@ function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
     // si no el visor las dibujaría en la posición del submódulo.
     const orient = p.orient && { ...p.orient, c: rotP(p.orient.c),
       u: rotV(p.orient.u), v: rotV(p.orient.v), n: rotV(p.orient.n) };
-    // Las capas del muro (superficies con Shape+holes) traen `rev` (base eu/ev/en + origin): se rota y
-    // traslada igual, para que el visor las dibuje ubicadas en el ambiente (no en el frame local).
-    const rev = p.rev && { ...p.rev, eu: rotV(p.rev.eu), ev: rotV(p.rev.ev), en: rotV(p.rev.en), origin: rotP(p.rev.origin) };
-    return { ...p, box, ...(orient ? { orient } : {}), ...(rev ? { rev } : {}), parte };
+    return { ...p, box, ...(orient ? { orient } : {}), parte };
   });
 }
 
@@ -47,9 +43,6 @@ function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
 function descomponer(input){
   const largo = +input.largo, ancho = +input.ancho, alto = +input.alto || 2600, placa = input.placa !== false;
   const muroBase = { sistema: input.sistema, alto, opciones: input.opciones, tipo: input.tipo || "tabique" };
-  // F11-bis.2: composición de capas aplicada a los 4 muros de una vez (desde una guardada). Los muros
-  // pasan a llevar su sándwich real en vez del revestimiento ext/int simplificado del ambiente.
-  if (input.muroCapas){ muroBase.tipoMuro = input.muroTipo || "exterior"; muroBase.capas = input.muroCapas; }
   // `arriostraFrente/Fondo/Izq/Der`: selector por muro (default 'cruz', son perimetrales portantes).
   const arr = lado => input["arriostra" + lado] || "cruz";
   const front = muro.generar({ ...muroBase, largo, vanos: input.vanoFrente || [], arriostramiento: arr("Frente") });
@@ -177,10 +170,10 @@ export const combinado = {
       ? reubicar(pisoGen.piezas, { rot: 90, tx: d.largo, ty: 0, tz: 0, parte: "piso" })
       : reubicar(pisoGen.piezas, { parte: "piso" })));
 
-    // Placa de piso (OSB/fenólico 18 mm) como SUPERFICIE sobre el entramado, si el toggle está activo.
-    // Es una CAPA visual conmutable (arranca apagada); su geometría igual eleva los muros. El cómputo lo
-    // lleva piso.materiales en `otros`; no entra en cortes (skip en cutList por `superficie`).
-    if (d.placa) P.push({ tipo: "PLACA", perfil: "OSB/fenólico 18 mm", largo: d.largo, axis: "z", parte: "piso",
+    // Placa de piso (diafragma estructural, 18 mm) como SUPERFICIE sobre el entramado, si el toggle está
+    // activo. Es una CAPA visual conmutable (arranca apagada); su geometría igual eleva los muros. El
+    // cómputo lo lleva piso.materiales en `otros`; no entra en cortes (skip en cutList por `superficie`).
+    if (d.placa) P.push({ tipo: "PLACA", perfil: "Placa de piso (diafragma) 18 mm", largo: d.largo, axis: "z", parte: "piso",
       capa: "placa-piso", superficie: true,
       box: { size: [d.largo, d.ancho, PLACA_ESP], center: [d.largo/2, d.ancho/2, hEntramado + PLACA_ESP/2] } });
 
@@ -194,51 +187,6 @@ export const combinado = {
     P.push(...reubicar(gens.fondo.piezas,  { rot: 0,  tx: 0,      ty: d.ancho-e, tz: hp, parte: "fondo" }));  // Y ∈ [ancho−e, ancho]
     P.push(...reubicar(gens.izq.piezas,    { rot: 90, tx: e,      ty: e,         tz: hp, parte: "izq" }));    // X ∈ [0, e], Y ∈ [e, ancho−e]
     P.push(...reubicar(gens.der.piezas,    { rot: 90, tx: d.largo, ty: e,        tz: hp, parte: "der" }));    // X ∈ [largo−e, largo]
-
-    // REVESTIMIENTOS de muros como CAPAS visuales (arrancan apagadas), con los VANOS RECORTADOS al PASO
-    // LIBRE y las ESQUINAS CERRADAS. Cada rev lleva su plano u×v + huecos, para que el visor lo construya
-    // con THREE.Shape + holes + ExtrudeGeometry. Sólo visual (no computa; ver TODO.md).
-    //   Hueco = paso libre: lateral = cara interior del jack (x1+2·cf … x2−2·cf), techo = cara inferior
-    //   del dintel (v=h), piso en ventana = cara superior de la solera de antepecho (sill + espesor).
-    //   Esquinas EXTERIOR: pasantes (frente/fondo) cubren la envolvente total en X ([−esp, largo+esp]);
-    //   encajados (izq/der) van entre ellos, cubriendo el largo completo en Y ([0, ancho]) → tapan el
-    //   canto del pasante. INTERIOR: cada muro cubre sólo su cara interna, entre esquinas interiores.
-    const s = resolveSystem(input), cf = s.cf, tSill = s.wood ? s.te : s.fl;
-    const vanosDe = parte => (d.muros.find(m => m.parte === parte)?.input.vanos) || [];
-    const revPieza = (parte, cara) => {
-      const ext = cara === "ext", esp = ext ? REV_EXT : REV_INT;
-      const horiz = parte === "frente" || parte === "fondo";
-      const eu = horiz ? [1, 0, 0] : [0, 1, 0], ev = [0, 0, 1], en = horiz ? [0, -1, 0] : [1, 0, 0];
-      const v = d.alto;
-      let u, uOrigin, origin;
-      if (horiz){
-        u = ext ? d.largo + 2 * REV_EXT : d.largo - 2 * e;   // pasante ext = envolvente total; int = entre esquinas
-        uOrigin = ext ? -REV_EXT : e;
-        const bandY = parte === "frente" ? (ext ? 0 : e + REV_INT) : (ext ? d.ancho + REV_EXT : d.ancho - e);
-        origin = [uOrigin, bandY, hp];
-      } else {
-        u = ext ? d.ancho : d.ancho - 2 * e;                 // encajado ext = largo completo (tapa cantos); int = entre esquinas
-        uOrigin = ext ? 0 : e;
-        const bandX = parte === "izq" ? (ext ? -REV_EXT : e) : (ext ? d.largo : d.largo - e - REV_INT);
-        origin = [bandX, uOrigin, hp];
-      }
-      // huecos al paso libre, en coords del plano (u desde uOrigin; el muro encajado arranca en engine y=e)
-      const eBase = horiz ? 0 : e;
-      const holes = vanosDe(parte).map(vn => {
-        const g0 = eBase + vn.x1 + 2 * cf, g1 = eBase + vn.x2 - 2 * cf; // caras interiores de los jacks
-        return { u0: Math.max(0, g0 - uOrigin), u1: Math.min(u, g1 - uOrigin),
-          v0: Math.max(0, vn.sill > 0 ? vn.sill + tSill : 0), v1: Math.min(v, vn.h) };
-      }).filter(h => h.u1 - h.u0 > 5 && h.v1 - h.v0 > 5);
-      const center = [0,1,2].map(i => origin[i] + eu[i]*u/2 + ev[i]*v/2 + en[i]*esp/2);
-      const size = [0,1,2].map(i => Math.abs(eu[i])*u + Math.abs(ev[i])*v + Math.abs(en[i])*esp);
-      return { tipo: ext ? "REV.EXT" : "REV.INT", capa: ext ? "rev-ext" : "rev-int",
-        parte, superficie: true, perfil: "a definir", largo: Math.round(u), axis: "z",
-        box: { size, center }, rev: { u, v, esp, holes, eu, ev, en, origin } };
-    };
-    // Revestimiento simplificado del ambiente SÓLO si no se aplicó una composición de capas por muro
-    // (con composición, cada muro ya trae sus capas reales, reubicadas más arriba).
-    if (!input.muroCapas) for (const parte of ["frente", "fondo", "izq", "der"])
-      P.push(revPieza(parte, "ext"), revPieza(parte, "int"));
 
     // --- CIELORRASO (opcional) --- grilla interior que cuelga hasta su cota. La referencia de cuelgue
     // es el tope de los muros (cara inferior del cordón de la cabriada si hay techo, o la losa): las
@@ -279,8 +227,8 @@ export const combinado = {
 
   materiales(piezas, input){
     const d = descomponer(input);
-    const sub = p => piezas.filter(x => x.parte === p && !x.superficie); // las superficies (placa/rev) no computan
-    // materiales por submódulo (placas / aislación / tornillos / otros); los perfiles se optimizan GLOBAL.
+    const sub = p => piezas.filter(x => x.parte === p && !x.superficie); // la placa de piso (superficie) no computa acá
+    // materiales por submódulo (tornillos T1 / otros); los perfiles se optimizan GLOBAL. Sólo estructura.
     const pisoMat = piso.materiales(sub("piso"), d.pisoInput);
     const muroMats = d.muros.map(m => muro.materiales(sub(m.parte), m.input));
     const all = [pisoMat, ...muroMats];
@@ -293,14 +241,6 @@ export const combinado = {
       perfil: o.perfil, metros: +(byProfile[o.perfil].reduce((a, b) => a + b, 0) / 1000).toFixed(2),
       piezas: o.piezas, barras: o.bars, largoBarra: o.barLen, sobrantes: o.over
     }));
-
-    // placas: sumar por material+cara → unidades de venta al final
-    const pm = {};
-    all.forEach(m => (m.placas || []).forEach(pl => {
-      const k = pl.material + "|" + pl.cara;
-      (pm[k] = pm[k] || { material: pl.material, cara: pl.cara, m2: 0 }).m2 += pl.m2;
-    }));
-    const placas = Object.values(pm).map(pl => ({ material: pl.material, cara: pl.cara, m2: +pl.m2.toFixed(2), unidades: Math.ceil(pl.m2 / 2.88) }));
 
     // otros (implantación del piso + carpintería de los muros): fusionar por key sumando cantidades
     const om = {};
@@ -321,14 +261,13 @@ export const combinado = {
     if (flejeCielo)
       otros.push({ key:"fleje-cielo-rollo", label:`Fleje ${FLEJE_CIELO.ancho}x${FLEJE_CIELO.esp} arriostre de cielo (rollo ${FLEJE_CIELO.rollo/1000} m) — ${flejeCielo.metros} m`,
         unidad:"rollo", cantidad: flejeCielo.rollos });
-    const aislacion = +all.reduce((a, m) => a + (m.aislacion || 0), 0).toFixed(2);
-    const tornillos = { t1: all.reduce((a, m) => a + (m.tornillos?.t1 || 0), 0), t2: all.reduce((a, m) => a + (m.tornillos?.t2 || 0), 0) };
+    const tornillos = { t1: all.reduce((a, m) => a + (m.tornillos?.t1 || 0), 0) };
     const peso = +all.reduce((a, m) => a + (m.peso || 0), 0).toFixed(1);
     const nMont = muroMats.reduce((a, m) => a + (m.nMont || 0), 0);
     const nVanos = d.muros.reduce((a, m) => a + (m.input.vanos?.length || 0), 0);
 
     return { sistema: input.sistema, area: +(d.largo * d.ancho / 1e6).toFixed(2), peso, nMont, nVanos,
-      perfiles, placas, aislacion, tornillos, otros, flejes, barLen: perfiles[0]?.largoBarra || 6000 };
+      perfiles, tornillos, otros, flejes, barLen: perfiles[0]?.largoBarra || 6000 };
   }
 };
 

@@ -124,13 +124,14 @@ test("Cripple: el largo del corte = el de la pieza (steel 380 / wood 334)", () =
   }
 });
 
-// Placas y área
-test("Placas: revestimiento interior descuenta el vano", () => {
-  const v = [{ x1:1000, x2:1900, h:2050, sill:0 }];
-  const mat = computeMaterials(wall("steel", 3000, 2600, v, { revInt:"Durlock 12.5" }));
-  // área = 3*2.6 - 0.9*2.05 = 5.955 m² → placas = ceil(5.955/2.88)=3
-  assert.equal(mat.area, 5.96);
-  assert.equal(mat.placas.find(p => p.cara === "interior").unidades, 3);
+// Adamant calcula sólo estructura: el cómputo no trae placas de revestimiento ni tornillos T2.
+test("materiales: sólo estructura (perfilería + T1), sin revestimiento", () => {
+  const mat = computeMaterials(wall("steel", 3000, 2600, [{ x1:1000, x2:1900, h:2050, sill:0 }]));
+  assert.equal(mat.placas, undefined, "no hay placas de revestimiento");
+  assert.equal(mat.aislacion, undefined, "no hay aislación");
+  assert.equal(mat.tornillos.t2, undefined, "no hay tornillos T2");
+  assert.ok(mat.tornillos.t1 > 0, "sí hay T1 de estructura");
+  assert.ok(mat.perfiles.length >= 1);
 });
 
 // (F6) Registro de módulos: dispatch por kind, default muro

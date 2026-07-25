@@ -31,21 +31,18 @@ export const TIPO_COLOR = {
   PLATEA:         0x8a9299, // gris hormigón
   PILOTIN:        0x7d858c, // gris hormigón (algo más oscuro)
   SOLERA_ASIENTO: 0x9aa2a8, // gris claro (viga de asiento sobre pilotines)
-  // combinado / capas de revestimiento (superficies visuales)
-  PLACA:       0xc9a66b, // madera (placa de piso OSB/fenólico)
-  "REV.EXT":   0x8a6d9e, // violeta apagado (revestimiento exterior — a definir)
-  "REV.INT":   0x6d8a9e  // azul apagado (revestimiento interior — a definir)
+  // placa de piso (diafragma estructural) — superficie visual conmutable
+  PLACA:       0xc9a66b
 };
 export const TIPO_LABEL = {
   MONTANTE:"Montante", KING:"King", JACK:"Jack", DINTEL:"Dintel", CRIPPLE:"Cripple",
   "SOL.PANEL":"Solera panel", "SOL.VANO":"Solera de vano", "SOL.DINTEL":"Solera de dintel",
   VIGA:"Viga", VIGA_DOBLE:"Viga doble", CENEFA:"Cenefa", BLOCKING:"Blocking",
   TRIMMER:"Trimmer (borde de vano)", CABEZAL:"Cabezal", VIGA_COLA:"Viga cola",
-  SOLERA:"Solera", MONTANTE:"Montante", MAESTRA:"Viga maestra", VELA:"Vela", PLACA:"Placa de piso",
+  SOLERA:"Solera", MONTANTE:"Montante", MAESTRA:"Viga maestra", VELA:"Vela", PLACA:"Placa de piso (diafragma)",
   PLATEA:"Platea de hormigón", PILOTIN:"Pilotín de hormigón", SOLERA_ASIENTO:"Solera de asiento",
   FLEJE:"Fleje (Cruz de San Andrés)", FLEJE_CIELO:"Fleje arriostre de cielo",
   CORDON_SUPERIOR:"Cordón superior", CORDON_INFERIOR:"Cordón inferior", DIAGONAL:"Diagonal (Fink)",
-  MONTANTE_CABRIADA:"Montante de cabriada", MONTANTE_TIMPANO:"Montante de tímpano", CORREA:"Correa", CUBIERTA:"Chapa de cubierta",
-  "REV.EXT":"Revestimiento exterior — a definir", "REV.INT":"Revestimiento interior — a definir"
+  MONTANTE_CABRIADA:"Montante de cabriada", MONTANTE_TIMPANO:"Montante de tímpano", CORREA:"Correa", CUBIERTA:"Chapa de cubierta"
 };
 export const colorHex = tipo => "#" + (TIPO_COLOR[tipo] ?? 0x888888).toString(16).padStart(6, "0");

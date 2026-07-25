@@ -115,6 +115,6 @@ export const cielo = {
     // T1 estructurales: cruces montante↔maestra + velas (a maestra + a losa) + montante↔solera
     const t1 = nMont * nMaestra + nVela + nMont * 2;
     return { sistema: "steel", nVanos: 0, area: +area.toFixed(2), peso: +peso.toFixed(1),
-      perfiles, otros, placas: [], aislacion: 0, tornillos: { t1, t2: 0 }, barLen: perfiles[0]?.largoBarra || 3000 };
+      perfiles, otros, tornillos: { t1 }, barLen: perfiles[0]?.largoBarra || 3000 };
   }
 };

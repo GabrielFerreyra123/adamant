@@ -9,15 +9,17 @@
 > | Techo · pendiente 7–25 % | «Subir a 25 %» |
 > | Techo · pendiente > 100 % | «Bajar a 100 %» |
 > | Techo · faldón muy largo (fleje casi horizontal) | «Achicar el largo a N mm» |
-> | Muro · Cruz de San Andrés sin lugar / ángulo | «Arriostrar con placa OSB» · «Quitar el arriostramiento» |
-> | Ambiente · ídem por muro | «Arriostrar los muros con placa OSB» · «Quitar el arriostramiento» |
+> | Muro · Cruz de San Andrés sin lugar / ángulo | «Quitar el arriostramiento» |
+> | Ambiente · ídem por muro | «Quitar el arriostramiento» |
 > | Piso · vano ancho para cabezales | «Achicar el ancho a 1200 mm» |
 > | Piso · vano no entra | «Acomodar el vano» |
 >
 > La nota fija de succión de viento (techo) se reescribió sin «profesional»; es informativa, no una
-> advertencia con acción. Para agregar «Placa OSB» como arriostre se sumó esa opción al muro
-> (`arriostramiento: "placa"`): la placa de revestimiento hace de muro de corte y no depende del ancho
-> del paño, así que resuelve el aviso sin flejes.
+> advertencia con acción.
+>
+> **Nota (F11-bis.2, solo estructura):** la acción «Arriostrar con placa OSB» se eliminó junto con los
+> revestimientos — Adamant no modela placas. El aviso de brace se resuelve sólo con «Quitar el
+> arriostramiento» (un tabique no portante no lo necesita).
 
 > **F11-bis.2 — efecto colateral (registrado).** Al agregar el tipo de muro, el **tabique divisorio**
 > oculta el arriostramiento (`soloSi: p => p.tipoMuro !== "tabique"` en el schema del muro) y arranca con

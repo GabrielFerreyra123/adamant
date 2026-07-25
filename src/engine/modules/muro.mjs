@@ -1,11 +1,10 @@
-// Módulo constructivo: Muro / Tabique con vanos.
+// Módulo constructivo: Muro / Tabique con vanos. Adamant calcula y dibuja ESTRUCTURA.
 // El TIPO de muro (exterior / interior portante / tabique) define perfilería, barra comercial,
-// arriostramiento, dintel y capas: un tabique no portante va con perfilería de placa de yeso, no PGC/PGU.
+// arriostramiento y dintel: un tabique no portante va con perfilería liviana, no PGC/PGU.
 import { buildPieces } from "../frame.mjs";
 import { buildBraces } from "../brace.mjs";
 import { computeMaterials } from "../materials.mjs";
 import { resolveSystem } from "../systems.mjs";
-import { buildCapas, computeCapas, capasDefault } from "../capas.mjs";
 
 // Defaults completos por tipo: elegir el tipo deja el muro listo para armar sin tocar nada más.
 const TIPO_DEFAULTS = {
@@ -25,8 +24,7 @@ export const muro = {
     return {
       sistema: "steel", tipoMuro, largo: 3000, alto: 2600, vanos: [],
       arriostramiento: TIPO_DEFAULTS[tipoMuro].arriostramiento,
-      opciones: { lumber: "2x6 (38×140)", ...TIPO_DEFAULTS[tipoMuro].opciones },
-      capas: capasDefault(tipoMuro)
+      opciones: { lumber: "2x6 (38×140)", ...TIPO_DEFAULTS[tipoMuro].opciones }
     };
   },
 
@@ -40,7 +38,7 @@ export const muro = {
           { v: "exterior", titulo: "Muro exterior", desc: "Cierra la casa hacia afuera. Aguanta viento, lluvia y frío." },
           { v: "interior", titulo: "Muro interior portante", desc: "Divide adentro, pero sostiene el piso o el techo de arriba." },
           { v: "tabique",  titulo: "Tabique divisorio", desc: "Solo divide ambientes. No sostiene nada más que a sí mismo." }
-        ], onSet: (p, v) => { const d = TIPO_DEFAULTS[v]; p.arriostramiento = d.arriostramiento; Object.assign(p.opciones, d.opciones); p.capas = capasDefault(v); } }
+        ], onSet: (p, v) => { const d = TIPO_DEFAULTS[v]; p.arriostramiento = d.arriostramiento; Object.assign(p.opciones, d.opciones); } }
       ]},
       { id: "medidas", titulo: "Medidas", campos: [
         { k: "largo", tipo: "medida", label: "Largo", rango: [500, 12000] },
@@ -51,10 +49,9 @@ export const muro = {
           opciones: [{ v: 400, l: "400 mm" }, { v: 600, l: "600 mm" }] },
         // Arriostramiento: sólo en muros portantes. En un tabique no aplica → se oculta.
         { k: "arriostramiento", tipo: "seg", label: "Arriostramiento", soloSi: p => p.tipoMuro !== "tabique",
-          opciones: [{ v: "ninguno", l: "Ninguno" }, { v: "cruz", l: "Cruz de San Andrés" }, { v: "placa", l: "Placa OSB" }] },
+          opciones: [{ v: "ninguno", l: "Ninguno" }, { v: "cruz", l: "Cruz de San Andrés" }] },
         { tipo: "perfil" }
       ]},
-      { id: "capas", titulo: "Capas", componente: "capasMuro" },
       { id: "aberturas", titulo: "Aberturas", componente: "vanos" }
     ]
   },
@@ -66,24 +63,12 @@ export const muro = {
     // Arriostramiento (sólo portantes; en tabique arriostramiento="ninguno" → buildBraces no agrega nada).
     const br = buildBraces(input);
     piezas.push(...br.piezas);
-    // Capas de revestimiento como superficies (conmutables, recortan los vanos). No entran en cortes.
-    piezas.push(...buildCapas(input));
-    const cap = input.capas ? computeCapas(input) : null;
     return {
       piezas,
       metadatos: { nombre: "Muro / Tabique", esquema: "frontal", barLen: s.barLen, sistema: input.sistema,
-        tipoMuro: input.tipoMuro, drywall: !!s.drywall, espesorTotal: cap ? cap.espesorTotal : s.a,
-        avisos: br.avisos, cruces: br.zonas }
+        tipoMuro: input.tipoMuro, drywall: !!s.drywall, avisos: br.avisos, cruces: br.zonas }
     };
   },
 
-  materiales(piezas, input){
-    const base = computeMaterials(input, piezas);
-    if (!input.capas) return base;
-    // Las capas reemplazan las placas/aislación/T2 del cómputo base (el muro standalone usa capas; el
-    // ambiente sigue con su propio revestimiento). Los perfiles/peso/cortes/T1 salen del base (piezas[]).
-    const c = computeCapas(input);
-    return { ...base, placas: c.placas, aislacion: c.aislacion, otros: [...base.otros, ...c.otros],
-      tornillos: { t1: base.tornillos.t1, t2: c.t2 }, espesorTotal: c.espesorTotal };
-  }
+  materiales(piezas, input){ return computeMaterials(input, piezas); }
 };

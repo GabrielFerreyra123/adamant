@@ -278,7 +278,7 @@ export const piso = {
     // placa de piso (multiplacado) — se cuenta acá, no se modela pieza por pieza
     if (input.placa){
       const nPlacas = Math.ceil(area / (1.22 * 2.44) * 1.10); // +10% desperdicio
-      otros.push({ key: "placa-piso", label: "Placa de piso OSB/fenólico 18 mm", unidad: "placa 1,22×2,44", cantidad: nPlacas });
+      otros.push({ key: "placa-piso", label: "Placa de piso (diafragma estructural) 18 mm", unidad: "placa 1,22×2,44", cantidad: nPlacas });
     }
 
     // solera/PGU de implantación sobre platea + fijaciones + banda estanca
@@ -307,6 +307,6 @@ export const piso = {
     // Las piezas de apoyo (platea/pilotines) son superficies visuales: no computan peso de perfil.
     const peso = piezas.filter(p => !p.superficie).reduce((a, p) => a + kg(p), 0);
     return { sistema: input.sistema, nVigas: piezas.filter(p => p.tipo === "VIGA").length, nVanos: vano ? 1 : 0,
-      area: +area.toFixed(2), peso: +peso.toFixed(1), perfiles, otros, placas: [], aislacion: 0, tornillos: { t1, t2: 0 }, barLen };
+      area: +area.toFixed(2), peso: +peso.toFixed(1), perfiles, otros, tornillos: { t1 }, barLen };
   }
 };

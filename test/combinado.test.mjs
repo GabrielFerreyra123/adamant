@@ -14,9 +14,9 @@ const amb = (sistema, largo, ancho, extra = {}) => ({
   vanoFrente: [], vanoFondo: [], vanoIzq: [], vanoDer: [], ...extra
 });
 // espesor de muro (profundidad Y de un muro canónico) y suma esperada de piezas. El combinado agrega,
-// además de la estructura de los submódulos: +1 PLACA de piso (placa activa por default) y +8 superficies
-// de revestimiento (exterior + interior por cada uno de los 4 muros).
-const SUPERF = 1 + 8;
+// además de la estructura de los submódulos, +1 PLACA de piso (diafragma, activa por default).
+// Adamant calcula sólo estructura: no hay superficies de revestimiento.
+const SUPERF = 1;
 // Los 4 muros del ambiente son perimetrales portantes: el combinado los arriostra por default
 // (`arriostraX: "cruz"`), así que el muro de referencia se genera con la misma opción.
 function esperado(sistema, largo, ancho, vanos = {}){
@@ -66,8 +66,8 @@ test("combinado wood 4×3 sin vanos: suma exacta", () => {
 //    cada muro (esperado), por eso el chequeo es ENTRE partes distintas.
 //    EXENCIÓN `fleje`: la Cruz de San Andrés va APOYADA sobre la cara exterior del frame (no lo penetra),
 //    pero (a) las dos diagonales de una cruz se superponen a propósito en el centro de la X, (b) su AABB
-//    —al ser piezas diagonales— es mucho mayor que la chapa real y se solapa con la de la otra diagonal y
-//    con la capa visual de revestimiento exterior. Un test de cajas alineadas a los ejes no puede decidir
+//    —al ser piezas diagonales— es mucho mayor que la chapa real y se solapa con la de la otra diagonal.
+//    Un test de cajas alineadas a los ejes no puede decidir
 //    interpenetración de piezas rotadas, así que los flejes quedan fuera de este chequeo.
 for (const [nombre, sis, L, W] of [["steel 4×3", "steel", 4000, 3000], ["wood 5×4", "wood", 5000, 4000]]){
   test(`combinado ${nombre}: sin colisión entre partes (AABB)`, () => {
@@ -116,20 +116,17 @@ for (const placa of [true, false]){
   });
 }
 
-// 4d) Capas de revestimiento: superficies genéricas (8: ext+int por muro) + placa de piso, todas con
-//     `capa` y `superficie`, que NO entran en cortes/materiales.
-test("combinado: capas de revestimiento son superficies visuales (no computan)", () => {
+// 4d) La única superficie visual del ambiente es la placa de piso (diafragma estructural); no computa
+//     en cortes. Adamant no dibuja ni computa revestimientos.
+test("combinado: la placa de piso es superficie visual (no computa) y no hay revestimientos", () => {
   const inp = amb("steel", 4000, 3000);
   const P = combinado.generar(inp).piezas;
-  assert.equal(P.filter(p => p.tipo === "REV.EXT").length, 4, "1 rev exterior por muro");
-  assert.equal(P.filter(p => p.tipo === "REV.INT").length, 4, "1 rev interior por muro");
-  assert.equal(P.filter(p => p.tipo === "PLACA").length, 1);
-  assert.ok(P.filter(p => ["REV.EXT","REV.INT","PLACA"].includes(p.tipo)).every(p => p.superficie && p.capa), "todas con capa + superficie");
-  // capas presentes
-  assert.deepEqual([...new Set(P.filter(p => p.capa).map(p => p.capa))].sort(), ["apoyos", "placa-piso", "rev-ext", "rev-int"]);
-  // no afectan cortes: la lista de corte no incluye el perfil "a definir" ni "OSB…"
+  assert.ok(!P.some(p => p.tipo === "REV.EXT" || p.tipo === "REV.INT"), "sin revestimientos");
+  assert.equal(P.filter(p => p.tipo === "PLACA").length, 1, "sólo la placa de piso (diafragma)");
+  assert.ok(P.filter(p => p.tipo === "PLACA").every(p => p.superficie && p.capa === "placa-piso"));
+  assert.deepEqual([...new Set(P.filter(p => p.capa).map(p => p.capa))].sort(), ["apoyos", "placa-piso"]);
   const { cortes } = computeProject(inp);
-  assert.ok(!cortes.grupos.some(g => g.perfil === "a definir" || g.perfil === "OSB/fenólico 18 mm"));
+  assert.ok(!cortes.grupos.some(g => g.perfil === "a definir" || /Placa de piso/.test(g.perfil)), "la placa no entra en cortes");
 });
 
 // 4e) Tres tipos de vano: puerta (frente) + ventana (izq) + arcada 2,00 m (fondo). Verifica dintel
@@ -157,7 +154,7 @@ test("combinado 3×4: puerta + ventana + arcada (dintel doble, solera de vano, c
   assert.ok(!keys.some(k => k.includes("arcada")), "la arcada no lleva carpintería");
 });
 
-// 5) Fusión de materiales: perfiles optimizados GLOBAL, placas/otros/tornillos sumados.
+// 5) Fusión de materiales: perfiles optimizados GLOBAL, otros y tornillos T1 sumados.
 test("combinado steel 4×3: materiales fusionados (perfiles global + otros del piso)", () => {
   const inp = amb("steel", 4000, 3000);
   const { piezas } = combinado.generar(inp);

@@ -2,7 +2,7 @@
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
 import { techo, validarTecho, anguloPendiente, posCabriadas, posCorreas,
-  PEND_MIN_CHAPA, PEND_REC, ALERO_MAX, MEMBRANA_SOLAPE, PESO_CUBIERTA } from "../src/engine/modules/techo.mjs";
+  PEND_MIN_CHAPA, PEND_REC, ALERO_MAX, PESO_CUBIERTA } from "../src/engine/modules/techo.mjs";
 import { cutList, cutPlan } from "../src/engine/cuts.mjs";
 import { cutOpts, PGO_PERFIL, BAR_LEN, FLEJE_CIELO, FLEJE_CIELO_PERFIL } from "../src/engine/systems.mjs";
 
@@ -280,17 +280,13 @@ test("anclajes: 9 cabriadas → 18 conectores + tornillería", () => {
   assert.match(techo.generar(inp).metadatos.notas[0], /succión del viento/);
 });
 
-// A4) Membrana hidrófuga: m² de faldón × factor de solape, sólo con cubierta.
-test("membrana: m² de faldones × 1,15; sin cubierta no aparece", () => {
+// A4) Adamant calcula sólo estructura: el techo NO computa membrana hidrófuga (revestimiento/envolvente).
+test("techo: sin membrana ni ítems de revestimiento en el cómputo", () => {
   const inp = t({ tipo: "dosAguas", luz: 6000, pendiente: 30 });
   const m = techo.materiales(techo.generar(inp).piezas, inp);
-  const mem = m.otros.find(o => o.key === "membrana");
-  assert.equal(mem.unidad, "m²");
-  assert.equal(mem.cantidad, Math.ceil(m.area * MEMBRANA_SOLAPE), "área de faldón + solape");
-  assert.ok(mem.cantidad > m.area, "siempre más que la chapa");
-  assert.equal(MEMBRANA_SOLAPE, 1.15);
-  const sin = t({ tipo: "dosAguas", luz: 6000, pendiente: 30, cubierta: false });
-  assert.ok(!techo.materiales(techo.generar(sin).piezas, sin).otros.some(o => o.key === "membrana"));
+  assert.ok(!m.otros.some(o => o.key === "membrana"), "no hay membrana");
+  assert.equal(m.tornillos.t2, undefined, "no hay T2");
+  assert.ok(m.otros.some(o => o.key === "chapa"), "la chapa de cubierta sí (estructura de cierre)");
 });
 
 // A5) Peso propio de la cubierta como dato de referencia (sanity check para quien verifica).

@@ -239,50 +239,6 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .intro-h .ico{ font-size:11px; }
 .intro-b{ margin:8px 0 0; font-size:13px; line-height:1.5; color:var(--paper); }
 .intro.off .intro-b{ display:none; }
-/* espesor total (en Materiales) */
-.esptot{ font-family:var(--mono); font-size:13px; color:var(--paper); margin:0 0 14px; padding:9px 12px;
-  border:1px solid var(--hair-teal); border-left-width:3px; border-radius:var(--r-lg,4px); background:rgba(27,182,164,.06); }
-.esptot b{ color:var(--teal); font-size:15px; }
-/* muro · composición de capas: corte vivo proporcional + sistemas por cara + filas */
-.corteviva{ display:flex; align-items:center; gap:18px; margin:0 0 18px; flex-wrap:wrap; }
-.corte2{ display:flex; align-items:stretch; height:96px; padding:6px; border:1px solid var(--outline2);
-  border-radius:var(--r-lg,4px); background:var(--su-lowest); overflow-x:auto; flex:1 1 260px; min-width:220px; }
-.cstrip{ flex:0 0 auto; border-radius:1px; cursor:default; transition:filter .15s ease; }
-.cstrip + .cstrip{ margin-left:1px; }
-.cstrip:hover, .cstrip.hi{ filter:brightness(1.25); }
-.cframe{ background:repeating-linear-gradient(0deg, var(--teal) 0 3px, transparent 3px 9px); position:relative; opacity:.85; min-width:20px; }
-.cframe i{ position:absolute; inset:2px; border-radius:1px; opacity:.5; }
-.cframe .replant{ position:absolute; left:0; top:-6px; bottom:-6px; width:2px; background:var(--tangerine); }
-.corte-ejes{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:9px; letter-spacing:.1em;
-  text-transform:uppercase; color:var(--muted); margin-top:3px; }
-.esptotbig{ display:flex; flex-direction:column; align-items:flex-start; font-family:var(--mono); font-weight:700;
-  font-size:40px; line-height:1; color:var(--teal); flex:0 0 auto; }
-.esptotbig small{ font-size:16px; color:var(--muted); margin-left:2px; }
-.esptotbig span{ font-size:10.5px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-top:6px; max-width:150px; }
-.sistgrid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:8px; margin:0 0 14px; }
-.sistcard{ text-align:left; border:1px solid var(--outline2); border-radius:var(--r-lg,4px); background:var(--su-low);
-  padding:10px 12px; cursor:pointer; color:var(--paper); transition:border-color .15s ease, background-color .15s ease; }
-.sistcard b{ display:block; font-size:13.5px; }
-.sistcard span{ display:block; font-size:11.5px; color:var(--muted); line-height:1.35; margin-top:2px; }
-.sistcard:hover{ border-color:var(--teal); }
-.sistcard.on{ border-color:var(--teal); background:rgba(27,182,164,.1); }
-.perso{ color:var(--tangerine); font-style:normal; font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
-.caplist2{ display:flex; flex-direction:column; gap:4px; margin:14px 0; }
-.caprow2{ display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--paper); padding:4px 6px; border-radius:4px; }
-.caprow2:hover{ background:var(--su-low); }
-.caprow2.lock{ opacity:.72; }
-.caprow2 .cchip{ width:13px; height:13px; border-radius:3px; flex:0 0 auto; }
-.caprow2 .cname{ flex:1 1 auto; min-width:0; }
-.caprow2 .cmm{ font-family:var(--mono); font-size:11px; color:var(--muted); flex:0 0 auto; width:52px; text-align:right; }
-.caprow2 .cimpact{ font-family:var(--mono); font-size:10.5px; color:var(--muted); flex:0 0 auto; }
-.caprow2 .ceye{ border:0; background:transparent; cursor:pointer; font-size:13px; flex:0 0 auto; width:22px; }
-.caprow2 .ceye.lock{ cursor:default; }
-/* slider de despiece sobre el visor */
-.despiece{ position:absolute; left:10px; bottom:34px; z-index:3; display:flex; align-items:center; gap:8px;
-  background:rgba(2,16,24,.9); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:999px; padding:6px 12px; }
-.despiece label{ font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--teal); }
-.despiece input{ width:110px; accent-color:var(--teal); }
-.despiece span{ font-family:var(--mono); font-size:10px; color:var(--muted); min-width:52px; }
 /* vista 3D en vivo del nivel activo dentro del wizard del Ambiente */
 .lvlview{ position:relative; width:100%; height:240px; margin-top:16px; border:1px solid var(--line);
   border-radius:var(--r-lg,4px); overflow:hidden; background:var(--su-lowest,#05151d); touch-action:none; }

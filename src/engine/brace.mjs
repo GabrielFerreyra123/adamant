@@ -69,9 +69,8 @@ function cruz(x0, ancho, alto, yCara, haciaAfuera){
 
 // Arriostramiento del muro. → { piezas, avisos, zonas }
 // `zonas` (para el PDF/esquema): [{ x0, ancho, alto, angulo }] de cada cruz colocada.
-// arriostramiento: "cruz" = Cruz de San Andrés (fleje, esta función); "placa" = la placa OSB/fenólico
-// del revestimiento hace de muro de corte (no agrega piezas acá, no depende del ancho de paño → sin
-// avisos de ángulo); "ninguno" = sin arriostrar. Sólo "cruz" materializa flejes.
+// arriostramiento: "cruz" = Cruz de San Andrés (fleje, esta función); "ninguno" = sin arriostrar.
+// Sólo "cruz" materializa flejes.
 export function buildBraces(input){
   const piezas = [], avisos = [], zonas = [];
   if ((input.arriostramiento || "ninguno") !== "cruz") return { piezas, avisos, zonas };

@@ -19,7 +19,7 @@ const resolveBar = (perfil, opts) => typeof opts === "number" ? opts : barLenOf(
 export function cutList(piezas){
   const map = new Map();
   (piezas || []).forEach(p => {
-    if (p.superficie) return; // superficies (placa de piso, revestimientos): m², no salen de una barra
+    if (p.superficie) return; // superficies (placa de piso / diafragma): no salen de una barra
     const k = p.tipo + "|" + p.perfil + "|" + p.largo;
     if (map.has(k)) map.get(k).cant += 1;
     else map.set(k, { tipo:p.tipo, perfil:p.perfil, largo:p.largo, cant:1, categoria:p.categoria || null });
