@@ -1,4 +1,4 @@
-// ADAMANT · PDF completo (F5), client-side con jsPDF. A4, legible en el celular.
+// ADAMANT · PDF de obra, client-side con jsPDF. A4, legible en el celular.
 // Resumen + imagen del 3D + esquema frontal acotado + lista de compra + lista de cortes.
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -234,6 +234,14 @@ async function pdfCombinado(doc, input, piezas, materiales, metadatos, img3d){
       const wp = piezas.filter(p => p.parte === et.parte && !p.superficie);
       drawCortesTabla(doc, wp, wInput, "Cortes del muro", yy);
     }
+  });
+
+  // --- Etapas de los niveles opcionales (F13): cielorraso y techo, si el ambiente los lleva ---
+  let nEt = etapas.length + 1;
+  [["cielo", "Cielorraso", "Cortes del cielorraso"], ["techo", "Techo", "Cortes del techo"]].forEach(([parte, nombre, tCort]) => {
+    if (!piezas.some(p => p.parte === parte)) return;
+    doc.addPage(); const yy = drawHeader(doc, `Etapa ${nEt++} · ${nombre}`);
+    drawCortesTabla(doc, piezas.filter(p => p.parte === parte && !p.superficie), input, tCort, yy);
   });
 
   // --- Lista de compra unificada + cortes global ---
