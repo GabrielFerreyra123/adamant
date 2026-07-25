@@ -193,10 +193,11 @@ img,svg{ max-width:100%; }
   --card-accent:var(--primary); --card-accent-warm:var(--secondary);
   --card-text:var(--on-surface); --card-muted:var(--on-surface-variant);
   --card-surface:transparent; --card-line:transparent; --card-hover:transparent; --card-shadow:transparent;
-  --card-radius:var(--r-lg); --card-pad:var(--md); --card-gap:var(--gutter); --card-min:250px; --card-h:20rem;
+  --card-radius:var(--r-lg); --card-pad:var(--md); --card-gap:var(--gutter); --card-min:250px; --card-h:18rem;
 }
-.mod p{ margin-top:var(--base); }        /* la landing separa la descripción del ícono */
-.mod-wide .mod-wtxt p{ margin-top:0; }
+/* el borde tangerine del Ambiente se ve a través del industrial-border transparente de la landing */
+.mod-amb{ border-color:color-mix(in srgb, #e85d2a 55%, transparent); }
+.mod-amb.industrial-border:hover{ border-color:#e85d2a; }
 
 /* ============ precios ============ */
 .planes{ display:grid; gap:var(--gutter); max-width:64rem; margin-inline:auto; align-items:stretch; }

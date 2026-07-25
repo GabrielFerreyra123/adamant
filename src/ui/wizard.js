@@ -185,17 +185,19 @@ const MOD_PATH = {
 };
 const modIco = id => MOD_PATH[id] ? svg(MOD_PATH[id], "mod-ico") : "";
 const modGhost = id => MOD_PATH[id] ? svg(MOD_PATH[id], "ghost-ico") : "";
+// Descripción del Ambiente = resumen de los módulos en el orden real del flujo por niveles.
+const AMB_DESC = "Piso, cuatro paredes con sus aberturas, cielorraso y techo. Todo armado por niveles y ubicado en su lugar, con cómputo, cortes y PDF de todo junto.";
 function stepGrid(){
-  const mods = listModules(), grid = mods.filter(m => m.id !== "combinado"), amb = mods.find(m => m.id === "combinado");
-  const card = m => `<button class="mod ${m.id==="piso"?"warm":""} ${state.kind===m.id?'on':''}" data-id="${m.id}">
-    ${modIco(m.id) || `<span class="mod-ico">${m.icono}</span>`}
-    <h3>${m.nombre}</h3><p>${m.descripcion}</p>${modGhost(m.id)}</button>`;
+  const card = m => {
+    const amb = m.id === "combinado";
+    return `<button class="mod ${m.id==="piso"?"warm":""} ${amb?"mod-amb":""} ${state.kind===m.id?'on':''}" data-id="${m.id}">
+      ${modIco(m.id) || `<span class="mod-ico">${m.icono}</span>`}
+      ${amb ? `<span class="mod-tag">Flujo completo</span>` : ""}
+      <h3>${m.nombre}</h3><p>${amb ? AMB_DESC : m.descripcion}</p>${modGhost(m.id)}</button>`;
+  };
   return `<header class="gridhead"><h2>¿Qué vas a construir?</h2>
     <p class="sub">Elegí un módulo para empezar, o armá el ambiente completo (el flujo que integra todo por niveles).</p></header>
-    <div class="mods">${grid.map(card).join("")}
-      ${amb ? `<button class="mod mod-wide ${state.kind==="combinado"?'on':''}" data-id="combinado">
-        ${modIco("combinado")}<div class="mod-wtxt"><h3>${amb.nombre}</h3><p>${amb.descripcion}</p></div>${modGhost("combinado")}</button>` : ""}
-    </div>`;
+    <div class="mods">${listModules().map(card).join("")}</div>`;
 }
 function wireGrid(){
   document.querySelectorAll(".mods .mod").forEach(b => b.onclick = () => {
