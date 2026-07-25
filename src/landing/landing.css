@@ -2,6 +2,7 @@
    visual del rediseño (design-ref/landing.html + app.html) sin Tailwind: todo con los tokens de
    tokens.css. Sin librerías de animación (sólo CSS + un IntersectionObserver en landing.js). */
 @import "./tokens.css";
+@import "../shared/mod-card.css";
 
 /* ============ base ============ */
 *,*::before,*::after{ box-sizing:border-box; }
@@ -184,25 +185,18 @@ img,svg{ max-width:100%; }
 .credib .norma{ color:var(--on-surface-variant); font-size:var(--fs-data); }
 .credib .nota{ font-family:var(--font-mono); font-size:11px; color:color-mix(in srgb, var(--on-surface-variant) 55%, transparent); }
 
-/* ============ módulos (bento) ============ */
+/* ============ módulos (bento) — la tarjeta es el COMPONENTE COMPARTIDO (src/shared/mod-card.css).
+   Acá sólo se mapean los tokens --card-* a la paleta de la landing; el glass-card/industrial-border
+   del markup aportan el fondo y el borde. ============ */
 .mods-band{ background:color-mix(in srgb, var(--surface-container-lowest) 50%, transparent); border-block:1px solid var(--outline-variant); }
-.mods{ display:grid; gap:var(--gutter); }
-@media (min-width:640px){ .mods{ grid-template-columns:repeat(2,1fr); } }
-@media (min-width:1000px){ .mods{ grid-template-columns:repeat(4,1fr); } }
-.mod{ position:relative; overflow:hidden; min-height:20rem;
-  padding:var(--md); border-radius:var(--r-lg); display:flex; flex-direction:column; }
-.mod .mod-ico{ width:40px; height:40px; color:var(--primary); margin-bottom:var(--md); }
-.mod.warm .mod-ico{ color:var(--secondary); }
-.mod h3{ color:var(--on-surface); }
-.mod p{ color:var(--on-surface-variant); font-size:.9rem; margin-top:var(--base); }
-.mod .ghost-ico{ position:absolute; right:-24px; bottom:-24px; width:160px; height:160px; color:var(--primary);
-  opacity:.08; transition:opacity .5s ease, transform .5s ease; }
-.mod:hover .ghost-ico{ opacity:.24; transform:scale(1.1); }
-.mod.warm .ghost-ico{ color:var(--secondary); }
-/* Ambiente completo: banda ancha bajo los 4 módulos, el flujo que los integra. */
-.mod-wide{ min-height:0; margin-top:var(--gutter); flex-direction:row; align-items:flex-start; gap:var(--md);
-  border-color:color-mix(in srgb, var(--primary) 40%, var(--outline-variant)); }
-.mod-wide .mod-ico{ flex:0 0 auto; margin-bottom:0; }
+.mods{
+  --card-accent:var(--primary); --card-accent-warm:var(--secondary);
+  --card-text:var(--on-surface); --card-muted:var(--on-surface-variant);
+  --card-surface:transparent; --card-line:transparent; --card-hover:transparent; --card-shadow:transparent;
+  --card-radius:var(--r-lg); --card-pad:var(--md); --card-gap:var(--gutter); --card-min:250px; --card-h:20rem;
+}
+.mod p{ margin-top:var(--base); }        /* la landing separa la descripción del ícono */
+.mod-wide .mod-wtxt p{ margin-top:0; }
 
 /* ============ precios ============ */
 .planes{ display:grid; gap:var(--gutter); max-width:64rem; margin-inline:auto; align-items:stretch; }

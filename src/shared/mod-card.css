@@ -1,0 +1,34 @@
+/* ADAMANT · Tarjeta de módulo — COMPONENTE COMPARTIDO por la landing y la app (F11-bis).
+   Si la tarjeta cambia, cambia en los dos lados. Cada contexto (landing.css / styles.css) define
+   los tokens --card-* con su propia paleta; acá va sólo la estructura, tipografía y comportamiento.
+   Clases: .mods (grilla) · .mod (tarjeta) · .mod-ico (ícono) · .ghost-ico (marca de agua) · .mod-wide (banner). */
+
+.mods{ display:grid; gap:var(--card-gap, 22px);
+  grid-template-columns:repeat(auto-fit, minmax(var(--card-min, 260px), 1fr)); }
+
+.mod{ position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:flex-start;
+  gap:12px; min-height:var(--card-h, 15rem); padding:var(--card-pad, 28px); text-align:left; cursor:pointer;
+  color:var(--card-text, #e8eef0); border-radius:var(--card-radius, 6px);
+  background:var(--card-surface, transparent); border:1px solid var(--card-line, rgba(27,182,164,.15));
+  transition:border-color .3s cubic-bezier(.4,0,.2,1), transform .3s cubic-bezier(.4,0,.2,1), background-color .3s ease, box-shadow .3s ease; }
+.mod .mod-ico{ width:40px; height:40px; flex:0 0 auto; color:var(--card-accent, #1bb6a4); margin-bottom:2px; }
+.mod.warm .mod-ico{ color:var(--card-accent-warm, #ffb59d); }
+.mod h3, .mod b{ font-family:"Barlow Condensed", sans-serif; font-weight:600; font-size:clamp(19px, 1.4vw, 22px);
+  text-transform:uppercase; line-height:1.15; color:var(--card-text, #e8eef0); }
+.mod p, .mod .moddesc{ color:var(--card-muted, #8aa0a8); font-size:13.5px; line-height:1.5; }
+/* ilustración de marca de agua, abajo a la derecha en baja opacidad */
+.mod .ghost-ico{ position:absolute; right:-24px; bottom:-24px; width:160px; height:160px; color:var(--card-accent, #1bb6a4);
+  opacity:.08; pointer-events:none; transition:opacity .5s ease, transform .5s ease; }
+.mod.warm .ghost-ico{ color:var(--card-accent-warm, #ffb59d); }
+.mod:hover{ border-color:var(--card-accent, #1bb6a4); transform:translateY(-2px); background:var(--card-hover, var(--card-surface)); }
+.mod:hover h3, .mod:hover b{ color:var(--card-accent, #1bb6a4); }
+.mod:hover .ghost-ico{ opacity:.22; transform:scale(1.1); }
+.mod.on{ border-color:var(--card-accent, #1bb6a4); background:var(--card-hover, var(--card-surface)); box-shadow:4px 4px 0 var(--card-shadow, rgba(27,182,164,.2)); }
+.mod.on .mod-ico, .mod.on h3, .mod.on b{ color:var(--card-accent, #1bb6a4); }
+
+/* Banner ancho: el flujo integrador (Ambiente completo), a todo el ancho debajo de la grilla. */
+.mod-wide{ grid-column:1 / -1; min-height:0; margin-top:var(--card-gap, 22px);
+  flex-direction:row; align-items:center; gap:20px;
+  border-color:color-mix(in srgb, var(--card-accent, #1bb6a4) 40%, var(--card-line, rgba(27,182,164,.15))); }
+.mod-wide .mod-ico{ margin-bottom:0; }
+.mod-wide .mod-wtxt{ display:flex; flex-direction:column; gap:5px; }

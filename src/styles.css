@@ -1,4 +1,5 @@
 /* ADAMANT · MVP mobile-first (probado a 390 px). Paleta Ocean Obsidian / Teal Tide / Tangerine. */
+@import "./shared/mod-card.css";
 :root{
   --obsidian:#0a1a22; --panel:#0d222b; --panel2:#102b36; --line:#1d3742; --teal:#1bb6a4; --tangerine:#e85d2a;
   --paper:#e8eef0; --muted:#8aa0a8;
@@ -7,6 +8,15 @@
   --primary-lite:#54dbc8; --salmon:#ffb59d; --outline2:#3c4946; --on-primary:#003731; --card-hover-bg:#0d212b;
   --hair-teal:rgba(27,182,164,.15); --glow-teal:rgba(27,182,164,.4); --shadow-offset:rgba(27,182,164,.2);
   --mono:"JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  /* Sistema de anchos (F11-bis) */
+  --w-wide:1440px;              /* grillas y workspace */
+  --w-text:72ch;               /* prosa, labels, ayuda */
+  --gutter:clamp(16px, 4vw, 48px);
+  /* Tokens de la tarjeta compartida → paleta de la app */
+  --card-accent:var(--teal); --card-accent-warm:var(--salmon);
+  --card-text:var(--paper); --card-muted:var(--muted);
+  --card-surface:var(--su-low); --card-line:var(--hair-teal); --card-hover:var(--card-hover-bg);
+  --card-shadow:var(--shadow-offset); --card-radius:var(--r-lg,6px); --card-pad:26px; --card-gap:22px; --card-min:260px; --card-h:15rem;
 }
 *{ box-sizing:border-box; }
 html,body{ margin:0; height:100%; }
@@ -56,21 +66,32 @@ body{
 .pstep.done::after{ background:var(--teal); }
 @media (max-width:560px){ .pstep:not(:last-child){ margin-right:40px; } .pstep:not(:last-child)::after{ width:40px; } }
 
-/* contenido — centrado y con ancho de escritorio como el reference (1440 máx) */
-.content{ flex:1 1 auto; overflow-y:auto; padding:16px; min-height:0; }
-/* el contenido usa casi todo el ancho de la página (grilla de módulos, tablas); los formularios de
-   una sola columna se mantienen a un ancho legible pero ya no en una franja tan angosta */
-.content > *{ max-width:1600px; margin-inline:auto; }
-.content > .modgrid{ max-width:none; }   /* la grilla de módulos ocupa todo el ancho de la pantalla */
+/* contenido — un solo contenedor a --w-wide con --gutter; el stepper y el contenido comparten ancho.
+   Paso 1 y formularios de una columna: scrollea el contenido (un solo scroll, sin panel anidado). */
+.content{ flex:1 1 auto; overflow-y:auto; min-height:0; padding-block:clamp(20px,3vh,40px); padding-inline:var(--gutter); }
+.content > *{ max-width:var(--w-wide); margin-inline:auto; width:100%; }
 .content > .gridhead{ max-width:760px; }
-@media (min-width:768px){ .content{ padding:28px 40px; } }
-@media (min-width:1400px){ .content{ padding:32px 64px; } }
-.content.noscroll{ overflow:hidden; padding:0; display:flex; }
-.content.noscroll > *{ max-width:none; }
-/* controles de formulario: ancho cómodo (no ultra-ancho), centrados */
-.content > .lbl, .content > .field, .content > .seg, .content > .cards,
-.content > select, .content > .adv-toggle, .content > .adv{ max-width:720px; }
-.content > h2{ max-width:720px; }
+/* prosa y controles de una columna a ancho legible */
+.content > .lbl, .content > .field, .content > .seg, .content > .cards, .content > select,
+.content > .adv-toggle, .content > .adv, .content > h2, .content > .intro, .content > .niveles,
+.content > .solcard, .content > .avisos, .content > .errores, .content > .sub{ max-width:var(--w-text); }
+
+/* WORKSPACE de dos columnas (config con visor y resultado): controles a la izquierda (scroll propio
+   sólo si excede el alto) + visor a la derecha, a toda la altura disponible. Full-width: el visor
+   crece con la ventana, nunca más una caja chica centrada. */
+.content.workmode, .content.noscroll{ overflow:hidden; padding:0; display:grid; }
+.content.workmode > *, .content.noscroll > *{ max-width:none; margin:0; width:auto; }
+.content.workmode{ grid-template-columns:minmax(340px, 400px) 1fr; }
+.ws-controls{ overflow-y:auto; padding:24px var(--gutter); min-width:0; }
+.ws-controls > *{ max-width:var(--w-text); }
+.ws-view{ position:relative; min-width:0; border-left:1px solid var(--outline2); background:var(--su-lowest); }
+.ws-view .lvlview{ position:absolute; inset:0; height:100%; margin:0; border:0; border-radius:0; }
+/* < 1024px: una columna — visor arriba (alto fijo), controles debajo; scrollea el contenido */
+@media (max-width:1023px){
+  .content.workmode{ display:flex; flex-direction:column; overflow-y:auto; }
+  .content.workmode .ws-view{ order:-1; flex:0 0 auto; height:48vh; border-left:0; border-bottom:1px solid var(--outline2); }
+  .content.workmode .ws-controls{ order:0; overflow:visible; }
+}
 /* encabezado del paso 0 (centrado, como el reference) */
 .gridhead{ text-align:center; max-width:760px; margin:8px auto 32px; }
 .gridhead h2{ font-size:clamp(34px,6vw,48px); }
@@ -86,24 +107,8 @@ h2{ font-family:"Barlow Condensed", sans-serif; font-weight:700; font-size:30px;
 .seg button:hover:not(.on){ color:var(--primary-lite); }
 .seg button.on{ background:var(--teal); color:var(--on-primary); font-weight:700; }
 
-/* grilla de módulos (pantalla 1) — 4 cards en una fila, ocupando el ancho de la pantalla */
-.modgrid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; counter-reset:modc; }
-@media (max-width:720px){ .modgrid{ grid-template-columns:repeat(2, 1fr); } }
-@media (max-width:420px){ .modgrid{ grid-template-columns:1fr; } }
-.modcard{ position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:12px; text-align:left; background:var(--su-low); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:28px; color:var(--paper); cursor:pointer; min-height:180px; transition:border-color .3s cubic-bezier(.4,0,.2,1), transform .3s cubic-bezier(.4,0,.2,1), background-color .3s ease, box-shadow .3s ease; }
-.modcard .modtop{ display:block; margin-bottom:2px; }
-.modcard .modicon{ width:36px; height:36px; color:var(--teal); }
-span.modicon{ font-size:34px; line-height:1; width:auto; height:auto; } /* fallback emoji */
-.modcard:nth-child(2n) .modicon{ color:var(--salmon); } /* piso y ambiente en naranja, como el reference */
-.modcard b{ font-family:"Barlow Condensed", sans-serif; font-weight:600; font-size:21px; text-transform:uppercase; line-height:1.15; }
-.modcard .moddesc{ color:var(--muted); font-size:13px; line-height:1.5; }
-/* número #01..#04 (esquina sup. der.) por CSS, sin tocar ese dato en el DOM */
-.modcard::after{ counter-increment:modc; content:"#0" counter(modc); position:absolute; top:24px; right:24px; font-family:var(--mono); font-weight:700; font-size:11px; letter-spacing:.08em; color:var(--muted); opacity:.5; }
-.modcard:hover{ border-color:var(--teal); transform:translateY(-2px); background:var(--card-hover-bg); }
-.modcard:hover b{ color:var(--teal); }
-.modcard.on{ border-color:var(--teal); background:var(--card-hover-bg); box-shadow:4px 4px 0 var(--shadow-offset); }
-.modcard.on .modicon{ color:var(--teal); }
-.modcard.on::after{ color:var(--teal); opacity:.7; }
+/* grilla de módulos (pantalla 1): usa el COMPONENTE COMPARTIDO .mods/.mod (src/shared/mod-card.css),
+   auto-fit para no cortar tarjetas en ningún ancho. Piso lleva la clase .warm (naranja, como la landing). */
 
 .cards{ display:flex; flex-direction:column; gap:10px; }
 .card{ position:relative; text-align:left; background:var(--su-low); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:16px; color:var(--paper); cursor:pointer; transition:border-color .25s ease, background-color .25s ease, box-shadow .25s ease, transform .25s ease; }
@@ -322,8 +327,6 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .info:not(.hidden) ~ .hint{ display:none; }
 
 @media (min-width:720px){
-  .content{ max-width:680px; margin:0 auto; width:100%; }
-  .content.noscroll{ max-width:none; }
   .info{ left:auto; right:16px; max-width:340px; }
 }
 

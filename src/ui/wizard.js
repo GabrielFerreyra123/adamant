@@ -122,10 +122,17 @@ function render(){
   if (viewer && !enResultado){ viewer.dispose(); viewer = null; }
   renderProgress();
   const c = document.getElementById("content");
+  const enConfig = state.step >= 1 && !enResultado;
   c.classList.toggle("noscroll", enResultado);
+  c.classList.toggle("workmode", enConfig);   // dos columnas: controles + visor a toda la altura
   if (state.step === 0){ c.innerHTML = stepGrid(); wireGrid(); }
   else if (enResultado){ c.innerHTML = stepResultado(); wireResultado(); }
-  else { const paso = pasosOf()[state.step - 1]; c.innerHTML = stepPaso(paso); wirePaso(paso); }
+  else {
+    const paso = pasosOf()[state.step - 1];
+    // Workspace: controles a la izquierda, visor en vivo a la derecha (llena la columna).
+    c.innerHTML = `<div class="ws-controls">${stepPaso(paso)}</div><div class="ws-view"><div class="lvlview" id="lvlview"></div></div>`;
+    wirePaso(paso);
+  }
   renderNav();
 }
 
@@ -166,22 +173,32 @@ function renderNav(){
 // ---------- paso 0: grilla de módulos ----------
 // Ícono de línea de cada card (solo visual, estilo design-ref). Aditivo: el SVG reemplaza al emoji
 // sólo en esta grilla; el m.icono del registro no se toca.
-const svg = p => `<svg class="modicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
-const MOD_ICON = {
-  muro:  svg('<rect x="4" y="3" width="4" height="18" rx="1"/><rect x="10" y="3" width="4" height="18" rx="1"/><rect x="16" y="3" width="4" height="18" rx="1"/>'),
-  piso:  svg('<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>'),
-  cielo: svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
-  combinado: svg('<path d="M3 10 12 3l9 7"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/>')
+// Ícono de cada módulo (trazo teal) + su versión "marca de agua" (ghost) abajo a la derecha. Mismo
+// path para los dos, como en las tarjetas de la landing.
+const svg = (p, cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const MOD_PATH = {
+  muro:  '<rect x="4" y="3" width="4" height="18" rx="1"/><rect x="10" y="3" width="4" height="18" rx="1"/><rect x="16" y="3" width="4" height="18" rx="1"/>',
+  piso:  '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
+  cielo: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  techo: '<path d="M3 12 12 4l9 8"/><path d="M6 12l6 4 6-4"/>',
+  combinado: '<path d="M3 10 12 3l9 7"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/>'
 };
+const modIco = id => MOD_PATH[id] ? svg(MOD_PATH[id], "mod-ico") : "";
+const modGhost = id => MOD_PATH[id] ? svg(MOD_PATH[id], "ghost-ico") : "";
 function stepGrid(){
+  const mods = listModules(), grid = mods.filter(m => m.id !== "combinado"), amb = mods.find(m => m.id === "combinado");
+  const card = m => `<button class="mod ${m.id==="piso"?"warm":""} ${state.kind===m.id?'on':''}" data-id="${m.id}">
+    ${modIco(m.id) || `<span class="mod-ico">${m.icono}</span>`}
+    <h3>${m.nombre}</h3><p>${m.descripcion}</p>${modGhost(m.id)}</button>`;
   return `<header class="gridhead"><h2>¿Qué vas a construir?</h2>
-    <p class="sub">Elegí el módulo estructural para iniciar el cálculo de materiales y planos de montaje.</p></header>
-    <div class="modgrid">${listModules().map(m => `<button class="modcard ${state.kind===m.id?'on':''}" data-id="${m.id}">
-      <span class="modtop">${MOD_ICON[m.id] || `<span class="modicon">${m.icono}</span>`}</span>
-      <b>${m.nombre}</b><span class="moddesc">${m.descripcion}</span></button>`).join("")}</div>`;
+    <p class="sub">Elegí un módulo para empezar, o armá el ambiente completo (el flujo que integra todo por niveles).</p></header>
+    <div class="mods">${grid.map(card).join("")}
+      ${amb ? `<button class="mod mod-wide ${state.kind==="combinado"?'on':''}" data-id="combinado">
+        ${modIco("combinado")}<div class="mod-wtxt"><h3>${amb.nombre}</h3><p>${amb.descripcion}</p></div>${modGhost("combinado")}</button>` : ""}
+    </div>`;
 }
 function wireGrid(){
-  document.querySelectorAll(".modcard").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".mods .mod").forEach(b => b.onclick = () => {
     if (state.kind !== b.dataset.id){ state.kind = b.dataset.id; state.params = structuredClone(getModule(state.kind).defaults()); state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; }
     state.step = 1; render();
   });
@@ -202,15 +219,22 @@ const ARMADO = {
 let _lastNivelStep = null;
 function renderNivelPreview(paso){
   const host = document.getElementById("lvlview"); if (!host) return;
-  const partes = NIVEL_PARTES[paso.id]; if (!partes) return;
+  const partes = NIVEL_PARTES[paso.id]; // sólo el Ambiente resalta por nivel; el resto muestra todo
   try {
     const { piezas, metadatos } = computeProject(toEngineInput());
     lvlViewer = new Viewer(host, { onSelect: () => {} });
     lvlViewer.setPieces(piezas.filter(p => !p.superficie), { vista: metadatos.vistaDefault || "iso", elevacion: metadatos.elevacion || 0 });
-    lvlViewer.highlight(partes);
-    // Momento maravilla: sólo al ENTRAR al nivel (no en cada toque de campo del mismo nivel).
-    if (_lastNivelStep !== state.step){ _lastNivelStep = state.step; lvlViewer.playAssembly(partes, ARMADO[paso.id]); }
-  } catch (e) { console.warn("preview de nivel no disponible (WebGL):", e && e.message); host.remove(); }
+    if (partes){
+      lvlViewer.highlight(partes);
+      // Momento maravilla: sólo al ENTRAR al nivel (no en cada toque de campo del mismo nivel).
+      if (_lastNivelStep !== state.step){ _lastNivelStep = state.step; lvlViewer.playAssembly(partes, ARMADO[paso.id]); }
+    }
+  } catch (e) {
+    // Sin WebGL: el workspace vuelve a una columna (controles a todo el ancho), sin caja vacía.
+    console.warn("preview no disponible (WebGL):", e && e.message);
+    const ws = host.closest(".ws-view"); if (ws) ws.remove();
+    document.getElementById("content")?.classList.remove("workmode");
+  }
 }
 // Micro-explicación por nivel: 2-3 líneas de "qué estás construyendo y por qué". Colapsable; la
 // preferencia (abierto/cerrado) se recuerda en localStorage y aplica a todos los niveles.
@@ -235,8 +259,6 @@ function stepPaso(paso){
       html += `<button class="adv-toggle" id="advt">${state.adv?"▾":"▸"} Opciones avanzadas</button>
         <div class="adv ${state.adv?'':'hide'}">${adv}</div>`;
   }
-  // Vista en vivo del ambiente por niveles: el nivel activo resaltado, los ya armados semi-transparentes.
-  if (state.kind === "combinado" && NIVEL_PARTES[paso.id]) html += `<div class="lvlview" id="lvlview"></div>`;
   return html;
 }
 // Stepper vertical de niveles (sólo Ambiente completo): muestra los pasos como niveles; los ya
