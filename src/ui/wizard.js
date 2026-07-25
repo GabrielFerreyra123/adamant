@@ -2,6 +2,7 @@
 // (desde el registro del motor) y los pasos siguientes se autogeneran desde el `schema` del módulo.
 // Agregar un tipo nuevo NO toca este archivo si usa sólo campos simples (sistema/medida/seg/cards/perfil).
 import { computeProject, cutPlan, cutOpts, listModules, getModule } from "../engine/index.mjs";
+import { cutList } from "../engine/cuts.mjs";
 import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.mjs";
 import { validarTecho } from "../engine/modules/techo.mjs";
@@ -10,6 +11,8 @@ import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { getLicencia, diasRestantes, iniciarPago, generarPDF, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
+import { glossHTML, glossForTipo, glossKeyForTipo } from "../content/glosario.js";
+import { initGlosario } from "./glosario-ui.js";
 
 const VANO_DEFAULTS = {
   puerta:  { ancho:800,  alto:2050, sill:0   },
@@ -21,7 +24,7 @@ const VANO_INI = { puerta:"P", ventana:"V", arcada:"A" };
 const VANO_COL = { puerta:"var(--tangerine)", ventana:"#e8b53a", arcada:"#27b0c9" };
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
-const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null };
+const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null, quePieza: false };
 // Capas de revestimiento conmutables (superficies): id de capa → etiqueta y tipo (para color de leyenda).
 const CAPA_INFO = {
   "apoyos":      { l: "Apoyos (fundación)",      tipo: "PLATEA" },
@@ -37,7 +40,7 @@ function capasDe(piezas){
   const ids = new Set(piezas.filter(p => p.capa).map(p => p.capa));
   return CAPA_ORDEN.filter(id => ids.has(id)).map(id => ({ id, ...CAPA_INFO[id] }));
 }
-let root, viewer = null, lvlViewer = null;
+let root, viewer = null, lvlViewer = null, _codeOf = new Map();
 function disposeLvlViewer(){ if (lvlViewer){ try { lvlViewer.dispose(); } catch {} lvlViewer = null; } }
 
 // El proyecto en curso vive sólo en memoria (state); al ir a pagar, la vuelta desde Mercado Pago
@@ -103,6 +106,7 @@ export function startWizard(el){
      <section class="content" id="content"></section>
      <nav class="wnav" id="wnav"></nav>`;
   restaurarProyecto(); // si volvemos del pago (o recarga), recuperar el proyecto en curso
+  initGlosario();      // glosario integrado: tarjeta al tocar un término subrayado
   render();
   // Si venimos del checkout de Mercado Pago, canjear el pago por la licencia y refrescar la UI.
   // El canje puede adoptar el proyecto pagado como activo, así que restauramos otra vez por si el
@@ -188,6 +192,14 @@ function wireGrid(){
 const NIVEL_PARTES = { suelo: ["piso"], muros: ["frente","fondo","izq","der"], cielo: ["cielo"], techo: ["techo"] };
 // Vista 3D en vivo del ambiente mientras se recorren los niveles: el nivel activo resaltado, los ya
 // armados semi-transparentes. Se regenera con cada cambio (el paso se re-renderiza al tocar un campo).
+// Orden de armado REAL por nivel (por tipo de pieza): lo usa el "momento maravilla".
+const ARMADO = {
+  suelo: ["CENEFA","VIGA_DOBLE","TRIMMER","VIGA","CABEZAL","VIGA_COLA","BLOCKING"],
+  muros: ["SOL.PANEL","SOL.VANO","SOL.DINTEL","MONTANTE","KING","JACK","DINTEL","CRIPPLE","FLEJE"],
+  cielo: ["SOLERA","MONTANTE","MAESTRA","VELA"],
+  techo: ["CORDON_INFERIOR","CORDON_SUPERIOR","DIAGONAL","MONTANTE_CABRIADA","MONTANTE_TIMPANO","CORREA","FLEJE","FLEJE_CIELO"]
+};
+let _lastNivelStep = null;
 function renderNivelPreview(paso){
   const host = document.getElementById("lvlview"); if (!host) return;
   const partes = NIVEL_PARTES[paso.id]; if (!partes) return;
@@ -196,10 +208,23 @@ function renderNivelPreview(paso){
     lvlViewer = new Viewer(host, { onSelect: () => {} });
     lvlViewer.setPieces(piezas.filter(p => !p.superficie), { vista: metadatos.vistaDefault || "iso", elevacion: metadatos.elevacion || 0 });
     lvlViewer.highlight(partes);
+    // Momento maravilla: sólo al ENTRAR al nivel (no en cada toque de campo del mismo nivel).
+    if (_lastNivelStep !== state.step){ _lastNivelStep = state.step; lvlViewer.playAssembly(partes, ARMADO[paso.id]); }
   } catch (e) { console.warn("preview de nivel no disponible (WebGL):", e && e.message); host.remove(); }
 }
+// Micro-explicación por nivel: 2-3 líneas de "qué estás construyendo y por qué". Colapsable; la
+// preferencia (abierto/cerrado) se recuerda en localStorage y aplica a todos los niveles.
+const INTRO_KEY = "adamant_intros_off";
+const introsOff = () => { try { return localStorage.getItem(INTRO_KEY) === "1"; } catch { return false; } };
+function introHTML(paso){
+  if (!paso.intro) return "";
+  const off = introsOff();
+  return `<div class="intro ${off?'off':''}" id="intro">
+    <button type="button" class="intro-h" id="introToggle"><span class="ico">${off?"▸":"▾"}</span> Qué estás construyendo</button>
+    <p class="intro-b">${glossHTML(paso.intro)}</p></div>`;
+}
 function stepPaso(paso){
-  let html = `<h2>${paso.titulo}</h2>` + nivelesBar();
+  let html = `<h2>${paso.titulo}</h2>` + nivelesBar() + introHTML(paso);
   if (paso.componente === "vanos") html += vanosHTML();
   else if (paso.componente === "murosPlanta") html += murosPlantaHTML();
   else if (paso.componente === "vanoPiso") html += vanoPisoHTML();
@@ -238,16 +263,22 @@ function perfilHTML(){
 }
 function campoHTML(c){
   if (c.soloSi && !c.soloSi(state.params)) return ""; // campo condicional (p. ej. sólo si el ambiente lleva techo)
-  const v = getVal(c);
+  const v = getVal(c), lbl = glossHTML(c.label); // subraya los términos técnicos de la etiqueta
   if (c.tipo === "sistema") return `<label class="lbl">Sistema</label>${segHTML("sistema", state.params.sistema, [{v:"steel",l:"Steel frame"},{v:"wood",l:"Wood frame"}])}`;
-  if (c.tipo === "cards")   return `<label class="lbl">${c.label}</label><div class="cards" data-cards="${c.k}">${c.opciones.map(o => `<button class="card ${v===o.v?'on':''}" data-v="${o.v}"><b>${o.titulo}</b><span>${o.desc}</span></button>`).join("")}</div>`;
-  if (c.tipo === "medida"){ const err = errCampo(c); return `<label class="lbl">${c.label}</label><div class="field ${err?'bad':''}"><input type="text" inputmode="decimal" autocomplete="off" data-medida="${c.k}" value="${(v||0)/1000}"><span class="unit">m</span>${err?`<small>${err}</small>`:""}</div>`; }
-  if (c.tipo === "seg")     return `<label class="lbl">${c.label}</label>${segHTML((c.opt?"opt:":"") + c.k, v, c.opciones)}`;
+  if (c.tipo === "cards")   return `<label class="lbl">${lbl}</label><div class="cards" data-cards="${c.k}">${c.opciones.map(o => `<button class="card ${v===o.v?'on':''}" data-v="${o.v}"><b>${o.titulo}</b><span>${o.desc}</span></button>`).join("")}</div>`;
+  if (c.tipo === "medida"){ const err = errCampo(c); return `<label class="lbl">${lbl}</label><div class="field ${err?'bad':''}"><input type="text" inputmode="decimal" autocomplete="off" data-medida="${c.k}" value="${(v||0)/1000}"><span class="unit">m</span>${err?`<small>${err}</small>`:""}</div>`; }
+  if (c.tipo === "seg")     return `<label class="lbl">${lbl}</label>${segHTML((c.opt?"opt:":"") + c.k, v, c.opciones)}`;
   if (c.tipo === "perfil")  return perfilHTML();
   return "";
 }
 function wirePaso(paso){
   document.querySelectorAll("[data-nivel]").forEach(b => b.onclick = () => { state.step = +b.dataset.nivel; render(); });
+  const it = document.getElementById("introToggle");
+  if (it) it.onclick = () => {
+    const off = !introsOff(); try { localStorage.setItem(INTRO_KEY, off ? "1" : "0"); } catch {}
+    document.getElementById("intro").classList.toggle("off", off);
+    it.querySelector(".ico").textContent = off ? "▸" : "▾";
+  };
   renderNivelPreview(paso);
   if (paso.componente === "vanos"){ wireVanos(); return; }
   if (paso.componente === "murosPlanta"){ wireMurosPlanta(); return; }
@@ -352,11 +383,11 @@ function renderVanoList(){
     const sinSill = v.tipo !== "ventana";
     const warn = (v.ancho > 2500 ? "Ancho máx 2,50 m. " : "") + (v.sill + v.alto > A ? "No entra en alto. " : "");
     return `<div class="vcard">
-      <div class="vhead"><b>${VANO_LABEL[v.tipo]} ${i+1}${v.ancho > 1500 ? " · dintel doble" : ""}</b><button class="x" data-del="${i}">✕</button></div>
+      <div class="vhead"><b>${VANO_LABEL[v.tipo]} ${i+1}${v.ancho > 1500 ? ` · ${glossHTML("dintel")} doble` : ""}</b><button class="x" data-del="${i}">✕</button></div>
       <div class="vgrid">
         <label>Ancho<input type="number" data-k="ancho" data-i="${i}" value="${v.ancho}"><i>mm</i></label>
         <label>Alto<input type="number" data-k="alto" data-i="${i}" value="${v.alto}"><i>mm</i></label>
-        <label>Antepecho<input type="number" data-k="sill" data-i="${i}" value="${v.sill}" ${sinSill?'disabled':''}><i>mm</i></label>
+        <label>${glossHTML("Antepecho")}<input type="number" data-k="sill" data-i="${i}" value="${v.sill}" ${sinSill?'disabled':''}><i>mm</i></label>
         <label>Posición<input type="number" data-k="pos" data-i="${i}" value="${v.pos}"><i>mm</i></label>
       </div>${warn?`<small class="vwarn">⚠ ${warn}</small>`:""}</div>`;
   }).join("");
@@ -531,8 +562,14 @@ function renderTab(){
     const capas = capasDe(piezas);
     const capasPanel = capas.length
       ? `<div class="capas" id="capaspanel"><b>Capas</b>${capas.map(c => `<label><input type="checkbox" data-capa="${c.id}" ${capaOn(c.id)?'checked':''}><i style="background:${colorHex(c.tipo)}"></i>${c.l}</label>`).join("")}</div>` : "";
-    // Sin leyenda fija: tapaba el modelo. La identificación de cada perfil sale al TOCARLO (info3d).
-    body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${partesel}${capasPanel}<div class="info hidden" id="info3d"></div>
+    // Mapa código de corte por pieza (tipo|perfil|largo → código J1/K1/D1…), para el "¿Qué es esto?".
+    _codeOf = new Map(); cutList(piezas).groups.forEach(g => _codeOf.set(g.tipo + "|" + g.perfil + "|" + g.largo, g.code));
+    // Botón "¿Qué es esto?": modo educativo. Al tocar una pieza, además del nombre muestra para qué
+    // sirve y su código en la lista de cortes. Sin leyenda fija (tapaba el modelo).
+    const qOn = state.quePieza ? " on" : "";
+    body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${partesel}${capasPanel}
+      <button class="qbtn${qOn}" id="qbtn" title="Modo aprender: tocá una pieza y te digo qué es">💡 ¿Qué es esto?</button>
+      <div class="info hidden" id="info3d"></div>
       <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · <b>tocá una pieza para ver qué es</b></p></div>`;
     try {
       viewer = new Viewer(document.getElementById("viewer3d"), { onSelect: showInfo3d });
@@ -548,6 +585,9 @@ function renderTab(){
       if (cp) cp.querySelectorAll("input[data-capa]").forEach(chk => chk.onchange = () => {
         state.capas[chk.dataset.capa] = chk.checked; viewer.setLayerVisible(chk.dataset.capa, chk.checked);
       });
+      const qb = document.getElementById("qbtn");
+      if (qb) qb.onclick = () => { state.quePieza = !state.quePieza; qb.classList.toggle("on", state.quePieza);
+        if (!state.quePieza) viewer.clearSelection(); };
     } catch (e) {
       // Sin WebGL / aceleración por hardware: no romper la app, avisar y dejar el resto funcionando.
       if (viewer){ try { viewer.dispose(); } catch {} viewer = null; }
@@ -575,13 +615,21 @@ function showInfo3d(p){
   if (!p){ el.classList.add("hidden"); return; }
   el.classList.remove("hidden");
   const nombre = `<b><i class="dot" style="background:${colorHex(p.tipo)}"></i>${TIPO_LABEL[p.tipo]||p.tipo}</b>`;
+  // Bloque EDUCATIVO ("¿Qué es esto?"): para qué sirve la pieza + dónde aparece en la lista de cortes.
+  let edu = "";
+  if (state.quePieza){
+    const g = glossForTipo(p.tipo);
+    const code = _codeOf.get(p.tipo + "|" + p.perfil + "|" + p.largo);
+    edu = `${g ? `<div class="eduwhy">${g.def}${g.fn ? ` <b>${g.fn}</b>` : ""}</div>` : ""}`
+      + (code ? `<div class="row">En cortes: <b>${code}</b>${p.largo ? ` · ${p.largo} mm` : ""}</div>` : "");
+  }
   // Superficies (apoyos de fundación, placas, revestimientos): no son un perfil de barra. Se muestran
   // sus dimensiones desde la caja (o el Ø del pilotín), no una sección/largo que no tienen.
   if (p.superficie){
     const [sx, sy, sz] = (p.box?.size || []).map(Math.round);
     const dim = p.forma === "cilindro" ? `Ø ${p.r*2} mm · ${sz} mm de profundidad`
       : (sx != null ? `${sx} × ${sy} × ${sz} mm` : "");
-    el.innerHTML = `${nombre}<div class="row">${p.perfil || "Superficie"}</div>${dim ? `<div class="row">${dim}</div>` : ""}`;
+    el.innerHTML = `${nombre}${edu}<div class="row">${p.perfil || "Superficie"}</div>${dim ? `<div class="row">${dim}</div>` : ""}`;
     return;
   }
   // OJO: `axis` NO existe en las piezas diagonales (cabriada, flejes), que traen su base propia
@@ -589,7 +637,7 @@ function showInfo3d(p){
   // mide. El punto de color reemplaza a la leyenda fija que antes tapaba el modelo.
   const s = secDims(p.perfil);
   const sec = p.categoria === "fleje" ? "" : ` · ${Math.round(s.h)} × ${Math.round(s.b)} mm`;
-  el.innerHTML = `${nombre}
+  el.innerHTML = `${nombre}${edu}
     <div class="row">${p.perfil}${sec}</div>
     <div class="row">Largo <b>${p.largo} mm</b></div>`;
 }

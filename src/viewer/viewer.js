@@ -197,6 +197,20 @@ export class Viewer {
     if (hayActivo && !foco.isEmpty()) this._frame(foco);
   }
 
+  // "Momento maravilla": revela las piezas del nivel activo en SECUENCIA DE ARMADO REAL (el `orden` es
+  // una lista de tipos: soleras → montantes → king/jack → dintel → cripples…). Enseña el orden de obra.
+  playAssembly(partes, orden){
+    const act = new Set(partes || []);
+    const rank = t => { const i = (orden || []).indexOf(t); return i < 0 ? (orden || []).length : i; };
+    const meshes = this.group.children.filter(m => m.userData && m.userData.pieza && act.has(m.userData.pieza.parte) && m.visible);
+    if (meshes.length < 2) return;
+    meshes.sort((a, b) => rank(a.userData.pieza.tipo) - rank(b.userData.pieza.tipo));
+    meshes.forEach(m => { m.visible = false; });
+    const paso = Math.max(10, Math.min(55, Math.round(1100 / meshes.length)));
+    this._asm = (this._asm || 0) + 1; const gen = this._asm; // cancela una animación previa
+    meshes.forEach((m, i) => setTimeout(() => { if (this._asm === gen) m.visible = true; }, i * paso));
+  }
+
   // Encuadra la estructura completa. "frontal": de frente (muro). "iso": isométrica (piso/planta),
   // ajustando por la esfera contenedora (un piso es casi plano: no sirve encuadrar por su alto).
   _frame(box){

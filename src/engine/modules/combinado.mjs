@@ -116,7 +116,9 @@ export const combinado = {
   // campos de un nivel apagado.
   schema: {
     pasos: [
-      { id: "suelo", titulo: "Suelo", campos: [
+      { id: "suelo", titulo: "Suelo",
+        intro: "Arrancás por el suelo: el entramado de vigas sobre el que se para todo. Definís el tamaño del ambiente y sobre qué apoya (platea de hormigón o pilotines). Todo lo demás se acomoda a estas medidas.",
+        campos: [
         { k: "sistema", tipo: "sistema" },
         { k: "largo", tipo: "medida", label: "Largo", rango: [2000, 12000] },
         { k: "ancho", tipo: "medida", label: "Ancho", rango: [2000, 12000] },
@@ -125,14 +127,19 @@ export const combinado = {
         { k: "apoyo", tipo: "seg", label: "Apoyo", opciones: [{ v: "platea", l: "Platea" }, { v: "pilotines", l: "Pilotines" }] },
         { k: "placa", tipo: "seg", label: "Placa de piso", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] }
       ] },
-      { id: "muros", titulo: "Muros y vanos", componente: "murosPlanta" },
-      { id: "cielo", titulo: "Cielorraso", campos: [
+      { id: "muros", titulo: "Muros y vanos", componente: "murosPlanta",
+        intro: "Ahora las paredes. Cada muro es una grilla de montantes parados entre dos soleras. Donde va una puerta o ventana se arma el vano: king a los lados, jack sosteniendo el dintel, y cripples para completar la modulación." },
+      { id: "cielo", titulo: "Cielorraso",
+        intro: "El cielorraso cuelga de la estructura de arriba con velas y vigas maestras; abajo lleva los montantes que reciben la placa. Es opcional: si este ambiente no lleva, seguí de largo.",
+        campos: [
         { k: "llevaCielo", tipo: "seg", label: "¿Este ambiente lleva cielorraso?", opciones: [{ v: false, l: "No" }, { v: true, l: "Sí" }] },
         { k: "cieloSusp", tipo: "medida", label: "Cuánto cuelga de la estructura", rango: [50, 1500], soloSi: p => p.llevaCielo }
       ], avanzado: [
         { k: "cieloPerfil", tipo: "seg", label: "Perfil del cielorraso", opciones: Object.keys(CIELO).map(k => ({ v: k, l: k })), soloSi: p => p.llevaCielo }
       ] },
-      { id: "techo", titulo: "Techo", campos: [
+      { id: "techo", titulo: "Techo",
+        intro: "El techo son cabriadas: triángulos armados con cordones y diagonales que apoyan sobre los muros y salvan la luz del ambiente. Encima van las correas y la chapa. Es opcional.",
+        campos: [
         { k: "llevaTecho", tipo: "seg", label: "¿Este ambiente lleva techo?", opciones: [{ v: false, l: "No" }, { v: true, l: "Sí" }] },
         { k: "techoTipo", tipo: "cards", label: "¿Cómo cae el agua?", soloSi: p => p.llevaTecho, opciones: [
           { v: "dosAguas", titulo: "Dos aguas", desc: "Dos faldones con cumbrera al medio, tipo casita." },

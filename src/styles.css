@@ -204,6 +204,36 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
   border:1px solid #ff6b5e; border-left-width:3px; border-radius:var(--r-lg,4px); background:rgba(255,107,94,.1); }
 .errores b{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#ff8a80; }
 .errores span{ font-size:12.5px; line-height:1.45; color:var(--paper); }
+/* ===== capa educativa (F14) ===== */
+/* término técnico: subrayado punteado, clickeable */
+.gloss{ border-bottom:1px dotted currentColor; cursor:help; }
+.gloss:hover{ color:var(--teal); }
+/* tarjeta flotante del glosario */
+.gloss-pop{ position:fixed; z-index:1000; display:flex; gap:11px; padding:12px 13px; max-width:300px;
+  background:rgba(3,18,26,.98); backdrop-filter:blur(8px); border:1px solid var(--teal); border-radius:var(--r-lg,6px);
+  box-shadow:0 10px 30px rgba(0,0,0,.5); animation:infoIn .14s ease-out; }
+.gloss-pop[hidden]{ display:none; }
+.gloss-pop .gp-ico{ flex:0 0 auto; width:56px; color:var(--teal); }
+.gloss-pop .gloss-svg{ width:56px; height:auto; }
+.gloss-pop .gp-txt{ display:flex; flex-direction:column; gap:3px; }
+.gloss-pop .gp-txt b{ color:var(--paper); font-size:13.5px; }
+.gloss-pop .gp-txt span{ color:var(--muted); font-size:12px; line-height:1.4; }
+.gloss-pop .gp-txt em{ color:var(--teal); font-size:11.5px; font-style:normal; line-height:1.4; }
+/* botón "¿Qué es esto?" del visor 3D */
+.qbtn{ position:absolute; right:10px; bottom:34px; z-index:3; border:1px solid var(--hair-teal); border-radius:999px;
+  background:rgba(2,16,24,.9); backdrop-filter:blur(6px); color:var(--muted); font-family:var(--mono); font-size:11px;
+  padding:6px 12px; cursor:pointer; transition:color .15s ease, border-color .15s ease, background-color .15s ease; }
+.qbtn.on{ color:var(--on-primary,#04231f); background:var(--teal); border-color:var(--teal); font-weight:700; }
+.info .eduwhy{ font-size:12.5px; line-height:1.45; color:var(--paper); margin:2px 0 4px; }
+.info .eduwhy b{ color:var(--teal); font-weight:600; }
+/* micro-explicación por nivel (colapsable) */
+.intro{ margin:0 0 16px; border:1px solid var(--hair-teal); border-left-width:3px; border-radius:var(--r-lg,4px);
+  background:rgba(27,182,164,.06); padding:10px 12px; }
+.intro-h{ display:flex; align-items:center; gap:7px; width:100%; border:0; background:transparent; cursor:pointer;
+  color:var(--teal); font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; padding:0; }
+.intro-h .ico{ font-size:11px; }
+.intro-b{ margin:8px 0 0; font-size:13px; line-height:1.5; color:var(--paper); }
+.intro.off .intro-b{ display:none; }
 /* vista 3D en vivo del nivel activo dentro del wizard del Ambiente */
 .lvlview{ position:relative; width:100%; height:240px; margin-top:16px; border:1px solid var(--line);
   border-radius:var(--r-lg,4px); overflow:hidden; background:var(--su-lowest,#05151d); touch-action:none; }
