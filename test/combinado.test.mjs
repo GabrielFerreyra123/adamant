@@ -25,7 +25,10 @@ function esperado(sistema, largo, ancho, vanos = {}){
   const e = Math.round(boundsEngine(wall(largo).filter(p => p.categoria !== "fleje")).size[1]);
   const encaj = ancho - 2 * e;
   const pisoN = piso.generar({ sistema, largo, ancho, separacion: 400, apoyo: "platea", placa: true, opciones: OPC }).piezas.length;
-  const n = pisoN + SUPERF
+  // F11-bis.3: el combinado SUPRIME los 2 montantes de extremo de cada muro (4×2) y agrega 3 montantes
+  // por esquina (4×3) → +4 piezas netas respecto de la suma de muros independientes.
+  const ESQ_DELTA = 4*3 - 4*2;
+  const n = pisoN + SUPERF + ESQ_DELTA
     + wall(largo, vanos.frente).length + wall(largo, vanos.fondo).length
     + wall(encaj, vanos.izq).length + wall(encaj, vanos.der).length;
   return { e, encaj, n };
@@ -80,6 +83,42 @@ for (const [nombre, sis, L, W] of [["steel 4×3", "steel", 4000, 3000], ["wood 5
         assert.ok(!solapa(bs[i].b, bs[j].b), `colisión ${bs[i].parte}/${bs[i].tipo} ↔ ${bs[j].parte}/${bs[j].tipo}`);
   });
 }
+
+// F11-bis.3 — poste de esquina: 3 montantes en contacto real, cero huecos.
+test("esquinas: 3 montantes por esquina en contacto, sin hueco", () => {
+  const { piezas, metadatos } = combinado.generar(amb("steel", 4000, 3000));
+  const posts = piezas.filter(p => p.tipo === "MONTANTE_ESQUINA" || p.tipo === "MONTANTE_ARRANQUE")
+    .map(p => ({ tipo: p.tipo, b: pieceBoxEngine(p) }));
+  assert.equal(posts.length, 12, "4 esquinas × 3 montantes");
+  const rng = b => [[b.center[0]-b.size[0]/2, b.center[0]+b.size[0]/2], [b.center[1]-b.size[1]/2, b.center[1]+b.size[1]/2]];
+  const ov = (u, v) => u[0] < v[1] && v[0] < u[1];
+  const tocan = (a, b) => (Math.max(a[0][0]-b[0][1], b[0][0]-a[0][1]) <= 0.5 && ov(a[1], b[1]))
+                       || (Math.max(a[1][0]-b[1][1], b[1][0]-a[1][1]) <= 0.5 && ov(a[0], b[0]));
+  metadatos.esquinas.forEach(([cx, cy]) => {
+    const near = posts.filter(p => Math.abs(p.b.center[0]-cx) < 300 && Math.abs(p.b.center[1]-cy) < 300);
+    assert.equal(near.length, 3, `esquina (${cx},${cy}) debe tener 3 montantes`);
+    assert.equal(near.filter(p => p.tipo === "MONTANTE_ESQUINA").length, 2, "doble del pasante");
+    assert.equal(near.filter(p => p.tipo === "MONTANTE_ARRANQUE").length, 1, "arranque del encajado");
+    near.forEach((p, i) => assert.ok(near.some((q, j) => j !== i && tocan(rng(p.b), rng(q.b))),
+      `un montante de la esquina (${cx},${cy}) quedó suelto (hueco)`));
+  });
+  // el cómputo suma los T1 de esquina: 4 × 2 uniones × ceil(2600/600) = 4×2×5 = 40
+  const m = combinado.materiales(piezas, amb("steel", 4000, 3000));
+  assert.ok(m.tornillos.t1 >= 40, "T1 de esquina en el cómputo");
+});
+
+// F11-bis.3 — medida interior derivada + inversión de pasante/encajado.
+test("convención de medidas: interior derivado y swap de pasante", () => {
+  const ff = combinado.generar(amb("steel", 4000, 3000)); // frente/fondo pasante (default)
+  assert.deepEqual(ff.metadatos.exterior, { x: 4000, y: 3000 });
+  assert.deepEqual(ff.metadatos.interior, { x: 4000 - 2*ff.metadatos.espesorMuro, y: 3000 - 2*ff.metadatos.espesorMuro });
+  // el muro frente (pasante) corre los 4000 completos; el izq (encajado) corre ancho − 2e
+  const largoDe = (P, parte) => Math.max(...P.filter(p => p.parte === parte && p.tipo === "SOL.PANEL").map(p => p.box ? p.box.size[0] : p.largo));
+  const lat = combinado.generar(amb("steel", 4000, 3000, { pasante: "laterales" }));
+  // al invertir, ahora los laterales corren de punta a punta (ancho completo) y frente/fondo encajan
+  assert.equal(lat.metadatos.esquinas.length, 4);
+  assert.ok(lat.piezas.filter(p => p.tipo === "MONTANTE_ESQUINA").length === 8, "sigue habiendo 4 postes de esquina");
+});
 
 // 4b) Bounding box global = largo × ancho × (alto entramado + placa + alto muro).
 test("combinado steel 4×3: bounding box = largo × ancho × alto total", () => {
@@ -170,8 +209,8 @@ test("combinado: la optimización global ahorra barras vs por etapa", () => {
   const r = cortesPorEtapaVsGlobal(amb("steel", 4000, 3000));
   assert.ok(r.global <= r.porEtapa, "global nunca usa más barras que por etapa");
   assert.equal(r.ahorro, r.porEtapa - r.global);
-  assert.equal(r.porEtapa, 36); assert.equal(r.global, 34);
-  assert.equal(r.ahorro, 2, "cortando todo junto se ahorran 2 barras (36 → 34)");
+  assert.equal(r.porEtapa, 38); assert.equal(r.global, 36);
+  assert.equal(r.ahorro, 2, "cortando todo junto se ahorran 2 barras (38 → 36, ya con postes de esquina)");
 });
 
 // ============ F13 — Ambiente por niveles: cielorraso + techo integrados ============

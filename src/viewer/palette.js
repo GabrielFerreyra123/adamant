@@ -1,6 +1,8 @@
 // Color y etiqueta por tipo de pieza. Cada tipo, un color distinto (con leyenda).
 export const TIPO_COLOR = {
   MONTANTE:    0x1bb6a4, // teal
+  MONTANTE_ESQUINA:  0x27d3bd, // teal claro (poste de esquina, doble del pasante)
+  MONTANTE_ARRANQUE: 0x34b3e0, // celeste (arranque del muro encajado)
   KING:        0xe85d2a, // tangerine
   JACK:        0x27b0c9, // cyan
   DINTEL:      0xb0b8bf, // gris claro
@@ -35,7 +37,8 @@ export const TIPO_COLOR = {
   PLACA:       0xc9a66b
 };
 export const TIPO_LABEL = {
-  MONTANTE:"Montante", KING:"King", JACK:"Jack", DINTEL:"Dintel", CRIPPLE:"Cripple",
+  MONTANTE:"Montante", MONTANTE_ESQUINA:"Montante de esquina", MONTANTE_ARRANQUE:"Montante de arranque",
+  KING:"King", JACK:"Jack", DINTEL:"Dintel", CRIPPLE:"Cripple",
   "SOL.PANEL":"Solera panel", "SOL.VANO":"Solera de vano", "SOL.DINTEL":"Solera de dintel",
   VIGA:"Viga", VIGA_DOBLE:"Viga doble", CENEFA:"Cenefa", BLOCKING:"Blocking",
   TRIMMER:"Trimmer (borde de vano)", CABEZAL:"Cabezal", VIGA_COLA:"Viga cola",

@@ -58,15 +58,20 @@ export const muro = {
 
   generar(input){
     const s = resolveSystem(input);
-    const piezas = buildPieces(input);
+    let piezas = buildPieces(input);
     piezas.forEach(p => { if (p.tipo === "SOL.PANEL" && p.pos[2] < 1) p.nombre = "Solera inferior (sobre plataforma)"; });
+    // Rol en el ambiente: un muro PASANTE o ENCAJADO NO lleva sus montantes de extremo — el poste de
+    // esquina (que arma el orquestador con el solver de esquinas) los reemplaza. Aislado (default): los deja.
+    const rol = input.rol || "aislado", larg = +input.largo;
+    if (rol !== "aislado")
+      piezas = piezas.filter(p => !(p.tipo === "MONTANTE" && (p.pos[0] < 1 || p.pos[0] > larg - s.cf - 1)));
     // Arriostramiento (sólo portantes; en tabique arriostramiento="ninguno" → buildBraces no agrega nada).
     const br = buildBraces(input);
     piezas.push(...br.piezas);
     return {
       piezas,
       metadatos: { nombre: "Muro / Tabique", esquema: "frontal", barLen: s.barLen, sistema: input.sistema,
-        tipoMuro: input.tipoMuro, drywall: !!s.drywall, avisos: br.avisos, cruces: br.zonas }
+        tipoMuro: input.tipoMuro, rol, drywall: !!s.drywall, avisos: br.avisos, cruces: br.zonas }
     };
   },
 

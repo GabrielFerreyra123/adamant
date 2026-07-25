@@ -5,6 +5,7 @@
 import { barLenOf, rolloDe } from "./systems.mjs";
 
 const CODE_PREF = { MONTANTE:"M", KING:"K", JACK:"J", CRIPPLE:"C", DINTEL:"D",
+  MONTANTE_ESQUINA:"ME", MONTANTE_ARRANQUE:"MA",
   "SOL.PANEL":"SP", "SOL.VANO":"SV", "SOL.DINTEL":"SD",
   VIGA:"V", VIGA_DOBLE:"VD", CENEFA:"CE", BLOCKING:"B", SOLERA:"S", MAESTRA:"VM", VELA:"VL", FLEJE:"F",
   TRIMMER:"TR", CABEZAL:"CB", VIGA_COLA:"VC",

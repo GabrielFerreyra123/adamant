@@ -249,8 +249,9 @@ habitaciones (Casa) o columnas/estantes/barrales (Mueble vía `applyMueble`). `i
 - Cuatro aguas: sin cabios secundarios (jack rafters) ni correas en faldones de las puntas; **no lleva
   hastial** (es a 4 aguas). El apoyo del techo (hastiales/muro alto) se resuelve en dos aguas y una agua.
 - Cruz de San Andrés: se omite en paños con vano.
-- Esquina: aproximación de 2 montantes; con esquinas activas se saltea el montante de extremo del muro
-  para evitar solape con el poste (no arma el poste de 3 montantes exacto de ConsulSteel).
+- Esquina (F11-bis.3): poste real de **3 montantes** en contacto (doble del pasante `MONTANTE_ESQUINA` +
+  arranque del encajado `MONTANTE_ARRANQUE`), solver único `src/engine/esquina.mjs` (reusable para
+  encuentro en T). Convención de medidas (exterior→interior) en `docs/convenciones.md`.
 - Fijaciones: los marcadores de tornillo se ponen en montantes/kings (no en cada tornillo de placa);
   la planilla es estimación por tipo de unión. Los anclajes apoyan la tuerca sobre la solera y **se saltean
   en umbrales de puerta**; el hold-down es un **fleje STHD14** (flat strap) dibujado en el plano X-Z (queda

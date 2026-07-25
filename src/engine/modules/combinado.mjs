@@ -11,8 +11,9 @@ import { piso } from "./piso.mjs";
 import { muro } from "./muro.mjs";
 import { cielo } from "./cielo.mjs";
 import { techo } from "./techo.mjs";
-import { cutOpts, FLEJE, FLEJE_PERFIL, FLEJE_CIELO, FLEJE_CIELO_PERFIL, CIELO } from "../systems.mjs";
+import { resolveSystem, cutOpts, FLEJE, FLEJE_PERFIL, FLEJE_CIELO, FLEJE_CIELO_PERFIL, CIELO } from "../systems.mjs";
 import { computeFlejes } from "../brace.mjs";
+import { postesEsquina, t1Esquina } from "../esquina.mjs";
 import { pieceBoxEngine, boundsEngine } from "../geometry.mjs";
 import { cutList, optimizeCuts } from "../cuts.mjs";
 
@@ -76,20 +77,46 @@ function descomponer(input){
         alt: 0, suspension: +input.cieloSusp || 400, modulo, opciones: { perfil: input.cieloPerfil || "Solera/montante 70" } }
     : null;
 
+  // PASANTE / ENCAJADO (F11-bis.3): por defecto Frente y Fondo corren de punta a punta (pasantes) y los
+  // Laterales encajan entre ellos. `pasante:"laterales"` invierte la regla para todo el ambiente. El
+  // pasante usa la medida exterior completa; el encajado, la exterior − 2·espesor del pasante.
+  const pasanteFF = input.pasante !== "laterales";
+  const largoFF = largo, largoLat = ancho, encajFF = Math.max(largo - 2*e, 1);
+  const M = (parte, largoM, rol, vanos, arrL, caraExt) => ({ parte,
+    input: { ...muroBase, largo: largoM, rol, vanos: vanos || [], arriostramiento: arr(arrL), ...(caraExt ? { caraExterior: caraExt } : {}) } });
+  // Cada muro con su ubicación (rot/tx/ty en coords del ambiente); `tz` lo pone generar (= tope del piso).
+  const muros = pasanteFF ? [
+    { ...M("frente", largo, "pasante", input.vanoFrente, "Frente"),          place: { rot: 0,  tx: 0,     ty: 0 } },
+    { ...M("fondo",  largo, "pasante", input.vanoFondo,  "Fondo", "ymax"),   place: { rot: 0,  tx: 0,     ty: ancho - e } },
+    { ...M("izq",    encaj, "encajado", input.vanoIzq,   "Izq",  "ymax"),    place: { rot: 90, tx: e,     ty: e } },
+    { ...M("der",    encaj, "encajado", input.vanoDer,   "Der"),             place: { rot: 90, tx: largo, ty: e } }
+  ] : [
+    { ...M("izq",    largoLat, "pasante", input.vanoIzq,  "Izq",  "ymax"),   place: { rot: 90, tx: e,     ty: 0 } },
+    { ...M("der",    largoLat, "pasante", input.vanoDer,  "Der"),            place: { rot: 90, tx: largo, ty: 0 } },
+    { ...M("frente", encajFF,  "encajado", input.vanoFrente, "Frente"),      place: { rot: 0,  tx: e,     ty: 0 } },
+    { ...M("fondo",  encajFF,  "encajado", input.vanoFondo,  "Fondo", "ymax"), place: { rot: 0, tx: e,   ty: ancho - e } }
+  ];
+  // Las 4 esquinas (encuentro pasante↔encajado): punto EXTERIOR + versor del pasante (p) y del encajado
+  // (q) hacia el interior. El solver arma el poste (doble del pasante + arranque del encajado).
+  const corners = pasanteFF ? [
+    { c: [0, 0],         p: [1, 0],  q: [0, 1],  pP: "frente", pE: "izq" },
+    { c: [largo, 0],     p: [-1, 0], q: [0, 1],  pP: "frente", pE: "der" },
+    { c: [0, ancho],     p: [1, 0],  q: [0, -1], pP: "fondo",  pE: "izq" },
+    { c: [largo, ancho], p: [-1, 0], q: [0, -1], pP: "fondo",  pE: "der" }
+  ] : [
+    { c: [0, 0],         p: [0, 1],  q: [1, 0],  pP: "izq", pE: "frente" },
+    { c: [0, ancho],     p: [0, -1], q: [1, 0],  pP: "izq", pE: "fondo" },
+    { c: [largo, 0],     p: [0, 1],  q: [-1, 0], pP: "der", pE: "frente" },
+    { c: [largo, ancho], p: [0, -1], q: [-1, 0], pP: "der", pE: "fondo" }
+  ];
+
   return {
     largo, ancho, alto, placa, e, encaj, front, modulo, techoInput, techoMap, cieloInput,
+    interior: { x: Math.max(largo - 2*e, 0), y: Math.max(ancho - 2*e, 0) }, corners,
     // `vano`: passthrough del vano de escalera/trampa del piso (mismas coords que el entramado).
     pisoInput: { sistema: input.sistema, largo, ancho, separacion: input.separacion || 400,
       apoyo: input.apoyo || "platea", placa, opciones: input.opciones, vano: input.vano || null },
-    // Arriostramiento por muro (passthrough al módulo Muro; el orquestador no reimplementa nada).
-    // `caraExterior:"ymax"` en fondo/der: esos muros se ubican sin espejar, así que su cara local
-    // Y=0 mira HACIA ADENTRO del ambiente; el fleje debe salir por la cara opuesta.
-    muros: [
-      { parte: "frente", input: { ...muroBase, largo, vanos: input.vanoFrente || [], arriostramiento: arr("Frente") } },
-      { parte: "fondo",  input: { ...muroBase, largo, vanos: input.vanoFondo || [], arriostramiento: arr("Fondo"), caraExterior: "ymax" } },
-      { parte: "izq",    input: { ...muroBase, largo: encaj, vanos: input.vanoIzq || [], arriostramiento: arr("Izq"), caraExterior: "ymax" } },
-      { parte: "der",    input: { ...muroBase, largo: encaj, vanos: input.vanoDer || [], arriostramiento: arr("Der") } }
-    ]
+    muros
   };
 }
 
@@ -100,7 +127,7 @@ export const combinado = {
   icono: "🏠",
 
   defaults(){
-    return { sistema: "steel", largo: 4000, ancho: 3000, alto: 2600, apoyo: "platea", placa: true,
+    return { sistema: "steel", largo: 4000, ancho: 3000, alto: 2600, apoyo: "platea", placa: true, pasante: "frenteFondo",
       opciones: { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90", lumber: "2x6 (38×140)", modulo: 400 },
       vanoFrente: [], vanoFondo: [], vanoIzq: [], vanoDer: [],
       arriostraFrente: "cruz", arriostraFondo: "cruz", arriostraIzq: "cruz", arriostraDer: "cruz",
@@ -178,15 +205,21 @@ export const combinado = {
       box: { size: [d.largo, d.ancho, PLACA_ESP], center: [d.largo/2, d.ancho/2, hEntramado + PLACA_ESP/2] } });
 
     // --- MUROS --- apoyan SOBRE la placa si va (entramado + 18 mm) o directamente sobre el entramado.
-    // En ambos casos el borde inferior del muro queda en CONTACTO con lo que tiene debajo.
+    // En ambos casos el borde inferior del muro queda en CONTACTO con lo que tiene debajo. Cada muro se
+    // genera con su rol (pasante/encajado → sin montantes de extremo, los pone el poste de esquina) y se
+    // reubica con su `place`. Los muros NO se reutilizan de descomponer (front era sólo para medir `e`).
     const hp = hEntramado + (d.placa ? PLACA_ESP : 0);
     const e = d.e;
-    const gens = { frente: d.front, fondo: muro.generar(d.muros[1].input),
-      izq: muro.generar(d.muros[2].input), der: muro.generar(d.muros[3].input) };
-    P.push(...reubicar(gens.frente.piezas, { rot: 0,  tx: 0,      ty: 0,         tz: hp, parte: "frente" })); // Y ∈ [0, e]
-    P.push(...reubicar(gens.fondo.piezas,  { rot: 0,  tx: 0,      ty: d.ancho-e, tz: hp, parte: "fondo" }));  // Y ∈ [ancho−e, ancho]
-    P.push(...reubicar(gens.izq.piezas,    { rot: 90, tx: e,      ty: e,         tz: hp, parte: "izq" }));    // X ∈ [0, e], Y ∈ [e, ancho−e]
-    P.push(...reubicar(gens.der.piezas,    { rot: 90, tx: d.largo, ty: e,        tz: hp, parte: "der" }));    // X ∈ [largo−e, largo]
+    const gens = {};
+    d.muros.forEach(m => { const g = muro.generar(m.input); gens[m.parte] = g;
+      P.push(...reubicar(g.piezas, { ...m.place, tz: hp, parte: m.parte })); });
+
+    // --- POSTES DE ESQUINA --- 3 montantes por esquina en contacto real (doble del pasante + arranque
+    // del encajado). El solver es puro; el orquestador sólo le pasa la geometría del encuentro.
+    const s = resolveSystem(input);
+    const zb = s.wood ? s.te : s.t, hmon = s.wood ? d.alto - 3*s.te : d.alto - 2*s.t;
+    d.corners.forEach(k => P.push(...postesEsquina({
+      c: k.c, p: k.p, q: k.q, e, cf: s.cf, perfil: s.perfilMont, hmon, zb: hp + zb, mat: "montante", parteP: k.pP, parteE: k.pE })));
 
     // --- CIELORRASO (opcional) --- grilla interior que cuelga hasta su cota. La referencia de cuelgue
     // es el tope de los muros (cara inferior del cordón de la cabriada si hay techo, o la losa): las
@@ -222,6 +255,7 @@ export const combinado = {
     return { piezas: P, metadatos: { nombre: "Ambiente completo", esquema: "planta", avisos, notas: nivelNotas,
       sistema: input.sistema, planta: { x: d.largo, y: d.ancho }, elevacion: 0,
       barLen: pisoGen.metadatos.barLen, espesorMuro: e, hMuro: hp, niveles: { cielo: !!d.cieloInput, techo: !!d.techoInput },
+      exterior: { x: d.largo, y: d.ancho }, interior: d.interior, esquinas: d.corners.map(k => k.c),
       partes, vistaDefault: "iso", bbox: bb.size } };
   },
 
@@ -261,7 +295,9 @@ export const combinado = {
     if (flejeCielo)
       otros.push({ key:"fleje-cielo-rollo", label:`Fleje ${FLEJE_CIELO.ancho}x${FLEJE_CIELO.esp} arriostre de cielo (rollo ${FLEJE_CIELO.rollo/1000} m) — ${flejeCielo.metros} m`,
         unidad:"rollo", cantidad: flejeCielo.rollos });
-    const tornillos = { t1: all.reduce((a, m) => a + (m.tornillos?.t1 || 0), 0) };
+    // T1 de esquinas: 4 esquinas × (unión del doble + unión arranque↔doble), cada una cada 600 mm en altura.
+    const t1Esq = d.corners.length * t1Esquina(d.alto, 600);
+    const tornillos = { t1: all.reduce((a, m) => a + (m.tornillos?.t1 || 0), 0) + t1Esq };
     const peso = +all.reduce((a, m) => a + (m.peso || 0), 0).toFixed(1);
     const nMont = muroMats.reduce((a, m) => a + (m.nMont || 0), 0);
     const nVanos = d.muros.reduce((a, m) => a + (m.input.vanos?.length || 0), 0);
@@ -288,9 +324,13 @@ export function murosDelAmbiente(input){
 // usa cada perfil si se corta por etapa (piso, cada muro por separado) vs todo junto.
 export function cortesPorEtapaVsGlobal(input){
   const d = descomponer(input);
+  const s = resolveSystem(input);
+  const zb = s.wood ? s.te : s.t, hmon = s.wood ? d.alto - 3*s.te : d.alto - 2*s.t;
+  const esquinasP = d.corners.flatMap(k => postesEsquina({ c: k.c, p: k.p, q: k.q, e: d.e, cf: s.cf, perfil: s.perfilMont, hmon, zb, parteP: k.pP, parteE: k.pE }));
   const etapas = [
     { parte: "piso", piezas: piso.generar(d.pisoInput).piezas },
     ...d.muros.map(m => ({ parte: m.parte, piezas: muro.generar(m.input).piezas })),
+    { parte: "esquinas", piezas: esquinasP },
     ...(d.cieloInput ? [{ parte: "cielo", piezas: cielo.generar(d.cieloInput).piezas }] : []),
     ...(d.techoInput ? [{ parte: "techo", piezas: techo.generar(d.techoInput).piezas }] : [])
   ];
