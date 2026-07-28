@@ -239,18 +239,6 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .intro-h .ico{ font-size:11px; }
 .intro-b{ margin:8px 0 0; font-size:13px; line-height:1.5; color:var(--paper); }
 .intro.off .intro-b{ display:none; }
-/* detalle de esquina en planta (visor del Ambiente) */
-.esqdet{ position:absolute; right:10px; bottom:56px; z-index:3; width:210px; background:rgba(2,16,24,.92);
-  backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:8px; }
-.esqhead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-.esqhead b{ font-family:var(--mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--teal); }
-.esqsel{ display:flex; gap:3px; }
-.esqsel button{ width:20px; height:20px; border:1px solid var(--outline2); background:transparent; color:var(--muted);
-  border-radius:4px; font-family:var(--mono); font-size:10px; cursor:pointer; }
-.esqsel button.on{ background:var(--teal); color:var(--on-primary); border-color:var(--teal); }
-.esqsvg{ background:var(--su-lowest); border-radius:3px; }
-.esqsvg svg{ display:block; width:100%; height:auto; }
-@media (max-width:1023px){ .esqdet{ display:none; } }
 /* medida interior libre en vivo (Ambiente · Suelo) */
 .interlibre{ margin:14px 0 0; padding:9px 12px; font-family:var(--mono); font-size:13px; color:var(--muted);
   border:1px dashed var(--outline2); border-radius:var(--r-lg,4px); }

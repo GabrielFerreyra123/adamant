@@ -560,44 +560,6 @@ function wireMurosPlanta(){
   document.querySelectorAll('[data-seg="pasante"] button').forEach(b => b.onclick = () => { state.params.pasante = b.dataset.v; render(); });
   drawPlanta4();
 }
-// Detalle de esquina en PLANTA (corte a media altura): los montantes cerca de la esquina con la
-// orientación de sus almas y los puntos de tornillo. Se dibuja desde piezas[] (no es fija).
-function drawEsquinaDetalle(piezas, corner){
-  const box = document.getElementById("esqsvg"); if (!box || !corner) return;
-  const [cx, cy] = corner, R = 300;
-  const near = piezas.filter(p => p.box && ["MONTANTE_ESQUINA","MONTANTE_ARRANQUE","MONTANTE","SOL.PANEL","KING","JACK"].includes(p.tipo))
-    .map(p => ({ tipo: p.tipo, s: p.box.size, c: p.box.center }))
-    .filter(p => Math.abs(p.c[0]-cx) < R && Math.abs(p.c[1]-cy) < R);
-  if (!near.length){ box.innerHTML = `<p class="sub" style="padding:8px">—</p>`; return; }
-  const W = box.clientWidth || 220, pad = 12, iw = W - 2*pad, sc = iw / (2*R), H = 2*R*sc + 2*pad;
-  const X = x => pad + (x - (cx - R)) * sc, Y = y => pad + (2*R - (y - (cy - R))) * sc; // Y invertida → planta natural
-  const COL = { MONTANTE_ESQUINA:"#27d3bd", MONTANTE_ARRANQUE:"#34b3e0", MONTANTE:"#1bb6a4", "SOL.PANEL":"#9aa4ac", KING:"#e85d2a", JACK:"#27b0c9" };
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`;
-  near.sort((a,b) => (a.tipo==="SOL.PANEL"?-1:0) - (b.tipo==="SOL.PANEL"?-1:0)); // soleras al fondo
-  near.forEach(p => { const c = COL[p.tipo] || "#888";
-    const x0 = X(p.c[0]-p.s[0]/2), y0 = Y(p.c[1]+p.s[1]/2), w = Math.max(2, p.s[0]*sc), h = Math.max(2, p.s[1]*sc);
-    s += `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${c}" fill-opacity="${p.tipo==='SOL.PANEL'?0.14:0.5}" stroke="${c}" stroke-width="1.3" rx="1"/>`;
-    // alma: línea gruesa sobre la cara larga (el alma del perfil), para ver su orientación
-    if (["MONTANTE_ESQUINA","MONTANTE_ARRANQUE"].includes(p.tipo)){
-      const horiz = p.s[0] > p.s[1];
-      s += horiz ? `<line x1="${x0.toFixed(1)}" y1="${(y0+h).toFixed(1)}" x2="${(x0+w).toFixed(1)}" y2="${(y0+h).toFixed(1)}" stroke="${c}" stroke-width="2.5"/>`
-                 : `<line x1="${(x0+w).toFixed(1)}" y1="${y0.toFixed(1)}" x2="${(x0+w).toFixed(1)}" y2="${(y0+h).toFixed(1)}" stroke="${c}" stroke-width="2.5"/>`;
-    }
-  });
-  // tornillos: 2 puntos por cara de contacto entre los postes de la esquina (aprox: cara compartida).
-  const posts = near.filter(p => ["MONTANTE_ESQUINA","MONTANTE_ARRANQUE"].includes(p.tipo));
-  for (let i = 0; i < posts.length; i++) for (let j = i+1; j < posts.length; j++){
-    const a = posts[i], b = posts[j];
-    const oxMin = Math.max(a.c[0]-a.s[0]/2, b.c[0]-b.s[0]/2), oxMax = Math.min(a.c[0]+a.s[0]/2, b.c[0]+b.s[0]/2);
-    const oyMin = Math.max(a.c[1]-a.s[1]/2, b.c[1]-b.s[1]/2), oyMax = Math.min(a.c[1]+a.s[1]/2, b.c[1]+b.s[1]/2);
-    const gap = Math.max(oxMin-oxMax, oyMin-oyMax); // ~0 si se tocan
-    if (gap > 2 || oxMax < oxMin - 20 && oyMax < oyMin - 20) continue;
-    const mx = (Math.max(oxMin,oxMax)+Math.min(oxMin,oxMax))/2, my = (Math.max(oyMin,oyMax)+Math.min(oyMin,oyMax))/2;
-    s += `<circle cx="${X(mx).toFixed(1)}" cy="${Y(my).toFixed(1)}" r="2.6" fill="#e85d2a"/>`;
-  }
-  s += `</svg>`;
-  box.innerHTML = s;
-}
 function nVanosMuro(parte){ return (state.params["vano" + cap(parte)] || []).length; }
 function drawPlanta4(){
   const box = document.getElementById("planta4"); if (!box) return;
@@ -646,12 +608,7 @@ function renderTab(){
     // Botón "¿Qué es esto?": modo educativo. Al tocar una pieza, además del nombre muestra para qué
     // sirve y su código en la lista de cortes. Sin leyenda fija (tapaba el modelo).
     const qOn = state.quePieza ? " on" : "";
-    // Detalle de esquina (Ambiente): corte en planta a media altura, ampliado — el 3D tapa los montantes.
-    const esq = metadatos.esquinas || null;
-    const esqPanel = esq ? `<div class="esqdet" id="esqdet">
-      <div class="esqhead"><b>Detalle de esquina</b><div class="esqsel">${esq.map((c, i) => `<button data-esq="${i}" class="${(state.esquinaSel||0)===i?'on':''}">${i+1}</button>`).join("")}</div></div>
-      <div class="esqsvg" id="esqsvg"></div></div>` : "";
-    body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${partesel}${capasPanel}${esqPanel}
+    body.innerHTML = `<div class="viewer ${partes?'hasparts':''}" id="viewer3d">${partesel}${capasPanel}
       <button class="qbtn${qOn}" id="qbtn" title="Modo aprender: tocá una pieza y te digo qué es">💡 ¿Qué es esto?</button>
       <div class="info hidden" id="info3d"></div>
       <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · <b>tocá una pieza para ver qué es</b></p></div>`;
@@ -672,15 +629,6 @@ function renderTab(){
       const qb = document.getElementById("qbtn");
       if (qb) qb.onclick = () => { state.quePieza = !state.quePieza; qb.classList.toggle("on", state.quePieza);
         if (!state.quePieza) viewer.clearSelection(); };
-      // Detalle de esquina en planta (Ambiente).
-      if (esq){
-        document.querySelectorAll("[data-esq]").forEach(b => b.onclick = () => {
-          state.esquinaSel = +b.dataset.esq;
-          document.querySelectorAll("[data-esq]").forEach(x => x.classList.toggle("on", x === b));
-          drawEsquinaDetalle(piezas, esq[state.esquinaSel]);
-        });
-        drawEsquinaDetalle(piezas, esq[state.esquinaSel || 0]);
-      }
     } catch (e) {
       // Sin WebGL / aceleración por hardware: no romper la app, avisar y dejar el resto funcionando.
       if (viewer){ try { viewer.dispose(); } catch {} viewer = null; }
