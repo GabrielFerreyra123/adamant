@@ -35,6 +35,10 @@ export class Viewer {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.touchAction = "none";
+    // a11y (WCAG 1.1.1): el canvas es una imagen 3D. Equivalente textual + el cómputo/lista de materiales
+    // (tabla real en la solapa Materiales) es la vía accesible a la misma información.
+    this.renderer.domElement.setAttribute("role", "img");
+    this.renderer.domElement.setAttribute("aria-label", "Vista 3D de la estructura en seco diseñada (steel frame / wood frame). El detalle está en las solapas Materiales y Cortes.");
 
     this._initControls();
 

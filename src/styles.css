@@ -288,6 +288,11 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 /* visor 3D */
 .viewer{ position:relative; width:100%; height:100%; touch-action:none; }
 .viewer canvas{ display:block; width:100%; height:100%; }
+/* Skeleton mientras descarga el bundle 3D (Three.js): ocupa el mismo lugar → sin salto de layout (CLS). */
+.viewskel{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:var(--su-lowest); color:var(--muted); font-family:var(--mono); font-size:12px; letter-spacing:.03em; }
+.viewskel-spin{ width:28px; height:28px; border:2px solid var(--outline2); border-top-color:var(--teal); border-radius:50%; animation:viewspin .8s linear infinite; }
+@keyframes viewspin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce){ .viewskel-spin{ animation:none; } }
 /* Sin leyenda fija de tipos: tapaba el modelo. La identificación sale al TOCAR la pieza (.info). */
 .info{ position:absolute; left:10px; right:10px; bottom:10px; background:rgba(2,16,24,.94); backdrop-filter:blur(6px); border:1px solid var(--hair-teal); border-radius:var(--r-lg,4px); padding:12px 14px; font-size:14px; line-height:1.5;
   animation:infoIn .16s ease-out; }

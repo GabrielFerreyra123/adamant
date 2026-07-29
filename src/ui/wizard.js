@@ -6,7 +6,6 @@ import { cutList } from "../engine/cuts.mjs";
 import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.mjs";
 import { validarTecho } from "../engine/modules/techo.mjs";
-import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
@@ -42,6 +41,17 @@ function capasDe(piezas){
 }
 let root, viewer = null, lvlViewer = null, _codeOf = new Map();
 function disposeLvlViewer(){ if (lvlViewer){ try { lvlViewer.dispose(); } catch {} lvlViewer = null; } }
+
+// El visor 3D (Three.js, ~el grueso del bundle) se carga BAJO DEMANDA: la grilla de módulos y el
+// arranque no lo necesitan. Sale del chunk inicial → menos JS que parsear en el primer render (mejora
+// TTI/LCP de /app). Mientras descarga, se muestra un skeleton de las mismas dimensiones (evita CLS).
+let ViewerClass = null, _viewerLoad = null;
+function cargarVisor(){ return _viewerLoad ||= import("../viewer/viewer.js").then(m => (ViewerClass = m.Viewer)); }
+const skeleton3D = `<div class="viewskel" aria-hidden="true"><span class="viewskel-spin"></span>Cargando visor 3D…</div>`;
+
+// Debounce genérico: agrupa ráfagas de eventos (tipeo en las medidas) en una sola ejecución del trabajo
+// pesado (recalcular el motor), protegiendo el hilo principal → mejora INP.
+function debounce(fn, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
 // El proyecto en curso vive sólo en memoria (state); al ir a pagar, la vuelta desde Mercado Pago
 // recarga la página y lo borraría. Lo persistimos en localStorage y lo reponemos al cargar, así al
@@ -107,6 +117,7 @@ export function startWizard(el){
      <nav class="wnav" id="wnav"></nav>`;
   restaurarProyecto(); // si volvemos del pago (o recarga), recuperar el proyecto en curso
   initGlosario();      // glosario integrado: tarjeta al tocar un término subrayado
+  cargarVisor();       // precarga en segundo plano: el 3D queda listo antes de llegar al paso 1
   render();
   // Si venimos del checkout de Mercado Pago, canjear el pago por la licencia y refrescar la UI.
   // El canje puede adoptar el proyecto pagado como activo, así que restauramos otra vez por si el
@@ -297,10 +308,12 @@ const ARMADO = {
 let _lastNivelStep = null;
 function renderNivelPreview(paso){
   const host = document.getElementById("lvlview"); if (!host) return;
+  if (!ViewerClass){ host.innerHTML = skeleton3D; cargarVisor().then(() => { if (document.getElementById("lvlview")) renderNivelPreview(paso); }); return; }
   const partes = NIVEL_PARTES[paso.id]; // sólo el Ambiente resalta por nivel; el resto muestra todo
   try {
+    host.innerHTML = ""; // limpiar el skeleton antes de montar el canvas
     const { piezas, metadatos } = computeProject(toEngineInput());
-    lvlViewer = new Viewer(host, { onSelect: () => {} });
+    lvlViewer = new ViewerClass(host, { onSelect: () => {} });
     lvlViewer.setPieces(piezas.filter(p => !p.superficie), { vista: metadatos.vistaDefault || "iso", elevacion: metadatos.elevacion || 0 });
     if (partes){
       lvlViewer.highlight(partes);
@@ -409,10 +422,17 @@ function wirePaso(paso){
     if (campo && campo.onSet) campo.onSet(state.params, b.dataset.v);
     render();
   }));
-  document.querySelectorAll("[data-medida]").forEach(inp => inp.oninput = () => {
-    const k = inp.dataset.medida; state.params[k] = Math.round(parseNum(inp.value) * 1000);
-    renderNav(); inp.parentElement.classList.toggle("bad", !!errCampo(findCampo(paso, k)));
-    actualizarInterior();
+  // El tipeo actualiza el estado de inmediato (barato), pero la parte pesada — validación + recálculo
+  // del motor para el "interior libre" — se DEBOUNCEA para no correr computeProject en cada tecla (INP).
+  document.querySelectorAll("[data-medida]").forEach(inp => {
+    const recalc = debounce(() => {
+      renderNav(); inp.parentElement.classList.toggle("bad", !!errCampo(findCampo(paso, inp.dataset.medida)));
+      actualizarInterior();
+    }, 120);
+    inp.oninput = () => {
+      state.params[inp.dataset.medida] = Math.round(parseNum(inp.value) * 1000);
+      recalc();
+    };
   });
   document.querySelectorAll("select[data-opt]").forEach(sel => sel.onchange = () => { state.params.opciones[sel.dataset.opt] = sel.value; });
   const advt = document.getElementById("advt"); if (advt) advt.onclick = () => { state.adv = !state.adv; render(); };
@@ -666,6 +686,8 @@ function renderTab(){
   const body = document.getElementById("tabbody");
   if (viewer){ viewer.dispose(); viewer = null; }
   if (state.tab === "3d"){
+    // Visor aún no descargado: skeleton (mismas dimensiones → sin CLS) y re-render al terminar.
+    if (!ViewerClass){ body.innerHTML = `<div class="viewer" id="viewer3d">${skeleton3D}</div>`; cargarVisor().then(() => { if (state.tab === "3d") renderTab(); }); return; }
     const { piezas, metadatos } = computeProject(toEngineInput());
     const vistas = vistasDe(metadatos);
     if (!state.vista3d || !vistas.some(v => v.id === state.vista3d)) state.vista3d = metadatos.vistaDefault || vistas[0].id;
@@ -690,7 +712,7 @@ function renderTab(){
       <div class="info hidden" id="info3d"></div>
       <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · <b>tocá una pieza para ver qué es</b></p></div>`;
     try {
-      viewer = new Viewer(document.getElementById("viewer3d"), { onSelect: showInfo3d });
+      viewer = new ViewerClass(document.getElementById("viewer3d"), { onSelect: showInfo3d });
       const mostrar = () => (partes && state.parte3d !== "todo") ? piezas.filter(p => p.parte === state.parte3d) : piezas;
       const aplicarCapas = () => capas.forEach(c => { if (capaOn(c.id)) viewer.setLayerVisible(c.id, true); });
       viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
@@ -927,13 +949,14 @@ async function renderCortes(body){
 // ---------- export ----------
 // Snapshot del 3D para el PDF (el WebGL solo existe en el navegador; el backend recibe la imagen).
 function capture3D(piezas, metadatos = {}){
+  if (!ViewerClass) return null; // visor no cargado: el PDF se genera igual server-side, sin la imagen 3D
   const div = document.createElement("div");
   div.style.cssText = "position:fixed;left:-10000px;top:0;width:900px;height:560px;";
   document.body.appendChild(div);
   let url = null;
   const vista = metadatos.vistaDefault || metadatos.vistas?.[0]?.id
     || (metadatos.esquema === "planta" ? "planta" : "frontal");
-  try { const v = new Viewer(div, { snapshot: true }); v.setPieces(piezas, { vista, elevacion: metadatos.elevacion || 0 }); v.resize(); url = v.toDataURL(); v.dispose(); }
+  try { const v = new ViewerClass(div, { snapshot: true }); v.setPieces(piezas, { vista, elevacion: metadatos.elevacion || 0 }); v.resize(); url = v.toDataURL(); v.dispose(); }
   catch (e) { console.warn("snapshot 3D falló", e); }
   div.remove();
   return url;
@@ -1014,6 +1037,7 @@ function renderExport(body){
   document.getElementById("dlpdf").onclick = async () => {
     msg.textContent = "Generando PDF…";
     try {
+      await cargarVisor(); // asegura el visor para el snapshot 3D del PDF (aunque no se haya abierto la solapa 3D)
       const input = toEngineInput();
       const { piezas, metadatos } = computeProject(input);
       const img = capture3D(piezas.filter(p => !p.superficie), metadatos);
