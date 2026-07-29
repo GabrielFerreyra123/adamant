@@ -1,7 +1,7 @@
 // ADAMANT · Wizard (F6). Schema-driven: la pantalla 1 es una grilla de módulos constructivos
 // (desde el registro del motor) y los pasos siguientes se autogeneran desde el `schema` del módulo.
 // Agregar un tipo nuevo NO toca este archivo si usa sólo campos simples (sistema/medida/seg/cards/perfil).
-import { computeProject, cutPlan, cutOpts, listModules, getModule } from "../engine/index.mjs";
+import { computeProject, listModules, getModule } from "../engine/index.mjs";
 import { cutList } from "../engine/cuts.mjs";
 import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.mjs";
@@ -10,7 +10,8 @@ import { Viewer } from "../viewer/viewer.js";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
-import { getLicencia, diasRestantes, iniciarPago, generarPDF, canjearSiVuelve, nuevoProyecto, getProyId } from "./licencia.js";
+import { estadoLicencia, autorizado, iniciarPago, generarPDF, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
+import { PRICING } from "../config/pricing.js";
 import { glossHTML, glossForTipo, glossKeyForTipo } from "../content/glosario.js";
 import { initGlosario } from "./glosario-ui.js";
 
@@ -99,7 +100,7 @@ export function startWizard(el){
        <nav class="tb-nav" id="tbnav">
          <a data-phase="0">Elegir</a><a data-phase="1">Medidas</a><a data-phase="2">Plano</a><a data-phase="3">Exportar</a>
        </nav>
-       <a class="tb-cta" href="/">Empezar gratis</a>
+       <div class="tb-lic" id="tblic"></div>
      </header>
      <div class="progress" id="progress"></div>
      <section class="content" id="content"></section>
@@ -110,7 +111,83 @@ export function startWizard(el){
   // Si venimos del checkout de Mercado Pago, canjear el pago por la licencia y refrescar la UI.
   // El canje puede adoptar el proyecto pagado como activo, así que restauramos otra vez por si el
   // id se había desincronizado (recién ahí coinciden proyecto y licencia).
-  canjearSiVuelve().then(activada => { if (activada){ restaurarProyecto(); render(); } });
+  canjearSiVuelve().then(d => { if (d){ restaurarProyecto(); render(); if (d.token) mostrarCodigo(d); } });
+}
+
+// ============ licencia: badge, código, recuperación ============
+const CONTACTO = "hola@adamant.com.ar";
+const precioSku = sku => PRICING.skus[sku].precio;
+
+function renderLicBadge(){
+  const el = document.getElementById("tblic"); if (!el) return;
+  const est = estadoLicencia();
+  let txt, cls;
+  if (est.tipo === "pase"){ txt = `Pase activo · ${est.dias} día${est.dias!==1?"s":""}`; cls = "ok"; }
+  else if (est.tipo === "proyecto"){ txt = "Proyecto desbloqueado"; cls = "ok"; }
+  else { txt = "Sin licencia"; cls = "off"; }
+  el.innerHTML = `<span class="licpill ${cls}">${txt}</span><button class="licya" id="licya">Ya compré</button>`;
+  document.getElementById("licya").onclick = abrirRecuperar;
+}
+
+// --- modal genérico ---
+function abrirModal(html){
+  cerrarModal();
+  const ov = document.createElement("div");
+  ov.className = "modalov"; ov.id = "modalov";
+  ov.innerHTML = `<div class="modal">${html}<button class="modalx" id="modalx" aria-label="Cerrar">✕</button></div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener("click", e => { if (e.target === ov) cerrarModal(); });
+  document.getElementById("modalx").onclick = cerrarModal;
+  return ov;
+}
+function cerrarModal(){ const ov = document.getElementById("modalov"); if (ov) ov.remove(); }
+
+// Código de acceso tras la compra: hay que copiarlo o descargarlo antes de seguir.
+function mostrarCodigo(d){
+  const est = d.sku === "proyecto" ? "Proyecto desbloqueado — tuyo para siempre."
+    : `Pase de obra activo — ${Math.max(0, Math.ceil((d.exp - Date.now())/864e5))} días.`;
+  const ov = abrirModal(`<h3>¡Listo! ${est}</h3>
+    <p class="msub">Guardá este código de acceso. Con él recuperás tu acceso en cualquier navegador.</p>
+    <textarea class="codebox" id="codebox" readonly rows="3">${d.token}</textarea>
+    <div class="modalrow"><button class="btn" id="copcod">Copiar</button>
+      <button class="btn ghost" id="dlcod">Descargar .txt</button></div>
+    <label class="chkvi"><input type="checkbox" id="vicod"> Ya lo copié / descargué</label>
+    <button class="btn" id="segcod" disabled>Continuar</button>
+    <p class="msub">¿Problemas? Escribinos: <a href="mailto:${CONTACTO}">${CONTACTO}</a></p>`);
+  const marcar = () => { document.getElementById("vicod").checked = true; document.getElementById("segcod").disabled = false; };
+  document.getElementById("copcod").onclick = () => { navigator.clipboard?.writeText(d.token).then(marcar, marcar); marcar(); };
+  document.getElementById("dlcod").onclick = () => {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([d.token], { type: "text/plain" }));
+    a.download = "adamant-codigo.txt"; a.click(); URL.revokeObjectURL(a.href); marcar();
+  };
+  document.getElementById("vicod").onchange = e => { document.getElementById("segcod").disabled = !e.target.checked; };
+  document.getElementById("segcod").onclick = () => { cerrarModal(); render(); };
+  ov.querySelector(".modalx").style.display = "none"; // no se cierra hasta confirmar que vio el código
+}
+
+// Pantalla "Ya compré": pegar código o ingresar N° de operación de MP.
+function abrirRecuperar(){
+  abrirModal(`<h3>Ya compré — recuperar acceso</h3>
+    <p class="msub">Pegá tu código de acceso, o ingresá el N° de operación de Mercado Pago.</p>
+    <label class="mlab">Código de acceso</label>
+    <textarea class="codebox" id="reccod" rows="3" placeholder="pegá el código acá"></textarea>
+    <button class="btn" id="reccodbtn">Restaurar con el código</button>
+    <div class="modalsep">o</div>
+    <label class="mlab">N° de operación de Mercado Pago</label>
+    <input class="minput" id="recop" inputmode="numeric" placeholder="ej. 1234567890">
+    <button class="btn ghost" id="recopbtn">Recuperar con la operación</button>
+    <p class="recmsg" id="recmsg"></p>
+    <p class="msub">¿No encontrás ninguno? Escribinos: <a href="mailto:${CONTACTO}">${CONTACTO}</a></p>`);
+  const msg = document.getElementById("recmsg");
+  document.getElementById("reccodbtn").onclick = () => {
+    try { restaurarPorCodigo(document.getElementById("reccod").value); cerrarModal(); render(); }
+    catch (e) { msg.textContent = "Error: " + e.message; }
+  };
+  document.getElementById("recopbtn").onclick = async () => {
+    msg.textContent = "Verificando en Mercado Pago…";
+    try { await recuperarPorOperacion(document.getElementById("recop").value); cerrarModal(); render(); }
+    catch (e) { msg.textContent = "Error: " + e.message; }
+  };
 }
 
 function render(){
@@ -133,6 +210,7 @@ function render(){
     wirePaso(paso);
   }
   renderNav();
+  renderLicBadge();
 }
 
 function renderProgress(){
@@ -145,7 +223,6 @@ function renderProgress(){
     const nPasos = state.kind ? pasosOf().length : 0;
     const enResultado = state.kind && state.step === nPasos + 1;
     const compo = state.step >= 1 && state.step <= nPasos ? pasosOf()[state.step - 1].componente : null;
-    // En el Ambiente, los niveles después del Suelo (muros/cielo/techo) son la fase de "Plano".
     const fase = state.step === 0 ? 0 : enResultado ? 3
       : (compo === "vanos" || compo === "murosPlanta" || (state.kind === "combinado" && state.step >= 2)) ? 2 : 1;
     nav.querySelectorAll("a").forEach(a => a.classList.toggle("on", +a.dataset.phase === fase));
@@ -797,28 +874,53 @@ function renderMateriales(body){
 }
 
 // ---------- cortes ----------
-function renderCortes(body){
-  const { piezas } = computeProject(toEngineInput());
-  const plan = cutPlan(piezas, cutOpts(toEngineInput())); // largo de barra por perfil
-  const secciones = plan.map(pl => {
-    // FLEJES: vienen en rollo, no salen de una barra → se listan los largos, sin barras ni sobra.
-    if (pl.fleje) return `<div class="cutgrp"><div class="cuthead"><b>${pl.perfil}</b>
-      <span>${pl.metros} m · ${pl.rollos} rollo${pl.rollos!==1?"s":""} de ${pl.largoRollo/1000} m</span></div>
-      <div class="bin"><span class="binno">Rollo</span><span class="binitems">${pl.items.map(it =>
-        `<i title="${TIPO_LABEL[it.tipo]||it.tipo}">${it.code}·${it.largo}</i>`).join("")}</span>
-      <span class="binrem">${pl.piezas} pieza${pl.piezas!==1?"s":""}</span></div></div>`;
-    const unidad = unidadBarra(pl.barLen), esTira = unidad.split(" ")[0] === "tira";
-    const bins = pl.bins.map((b, i) => `<div class="bin"><span class="binno">${esTira?"Tira":"Barra"} ${i+1}</span>
-      <span class="binitems">${b.items.map(it => `<i title="${TIPO_LABEL[it.tipo]||it.tipo}">${it.code}·${it.largo}</i>`).join("")}</span>
-      <span class="binrem">sobra ${b.rem} mm</span></div>`).join("");
-    const alerta = pl.over ? `<div class="warn">${pl.over} pieza(s) más largas que la barra — requieren empalme.</div>` : "";
-    return `<div class="cutgrp"><div class="cuthead"><b>${pl.perfil}</b><span>${pl.bins.length} ${unidad}${pl.bins.length!==1?"s":""} · desperdicio ${pl.waste}%</span></div>${bins}${alerta}</div>`;
-  }).join("");
-  const gate = !getLicencia();
-  body.innerHTML = `<div class="pane ${gate ? "gated" : ""}">${avisosHTML(computeProject(toEngineInput()).metadatos)}${secciones || `<p class="sub">Sin piezas.</p>`}
-    <p class="sub">Cada etiqueta es <b>código·largo(mm)</b>. Optimización First-Fit, sin descontar merma de sierra.</p>
-    ${gate ? `<div class="gateoverlay"><p>La lista de cortes optimizada viene con el proyecto desbloqueado.</p><button class="btn" id="gate-pagar">Desbloquear proyecto</button></div>` : ""}</div>`;
-  if (gate) document.getElementById("gate-pagar").onclick = () => { guardarProyecto(); iniciarPago().catch(e => alert(e.message)); };
+// Render de una sección del plan de corte (barras con sus piezas). Sólo con licencia (viene del server).
+function seccionPlan(pl){
+  if (pl.fleje) return `<div class="cutgrp"><div class="cuthead"><b>${pl.perfil}</b>
+    <span>${pl.metros} m · ${pl.rollos} rollo${pl.rollos!==1?"s":""} de ${pl.largoRollo/1000} m</span></div>
+    <div class="bin"><span class="binno">Rollo</span><span class="binitems">${pl.items.map(it =>
+      `<i title="${TIPO_LABEL[it.tipo]||it.tipo}">${it.code}·${it.largo}</i>`).join("")}</span>
+    <span class="binrem">${pl.piezas} pieza${pl.piezas!==1?"s":""}</span></div></div>`;
+  const unidad = unidadBarra(pl.barLen), esTira = unidad.split(" ")[0] === "tira";
+  const bins = pl.bins.map((b, i) => `<div class="bin"><span class="binno">${esTira?"Tira":"Barra"} ${i+1}</span>
+    <span class="binitems">${b.items.map(it => `<i title="${TIPO_LABEL[it.tipo]||it.tipo}">${it.code}·${it.largo}</i>`).join("")}</span>
+    <span class="binrem">sobra ${b.rem} mm</span></div>`).join("");
+  const alerta = pl.over ? `<div class="warn">${pl.over} pieza(s) más largas que la barra — requieren empalme.</div>` : "";
+  return `<div class="cutgrp"><div class="cuthead"><b>${pl.perfil}</b><span>${pl.bins.length} ${unidad}${pl.bins.length!==1?"s":""} · desperdicio ${pl.waste}%</span></div>${bins}${alerta}</div>`;
+}
+// Muro de valor: los AGREGADOS (barras, ahorro, desperdicio) los calcula el servidor y se ven SIEMPRE;
+// la lista detallada sólo llega con licencia. Sin licencia se muestra difuminada (preview de 3 barras).
+async function renderCortes(body){
+  const input = toEngineInput();
+  const metadatos = computeProject(input).metadatos;
+  body.innerHTML = `<div class="pane">${avisosHTML(metadatos)}<p class="sub">Calculando la optimización…</p></div>`;
+  let d;
+  try { d = await fetchCortes(input, loadPrices()); }
+  catch (e) { body.innerHTML = `<div class="pane">${avisosHTML(metadatos)}<p class="warn">No se pudo calcular: ${e.message}</p></div>`; return; }
+  const a = d.agregados;
+  const pesos = a.ahorroPesos > 0 ? ` · ahorrás <b>${money(a.ahorroPesos)}</b> con tus precios` : "";
+  const resumen = a.barrasOpt ? `<div class="ahorro">
+    <div class="ahtit">Con optimización: <b>${a.barrasOpt} barras</b> en vez de ${a.barrasNaive}.</div>
+    <div class="ahsub">Ahorrás <b>${a.ahorroBarras} barra${a.ahorroBarras!==1?"s":""}</b> y bajás el desperdicio del ${a.desperdicioNaive}% al ${a.desperdicioOpt}%${pesos}.</div>
+  </div>` : "";
+  if (d.licenciado){
+    const secciones = (d.plan || []).map(seccionPlan).join("");
+    body.innerHTML = `<div class="pane">${avisosHTML(metadatos)}${resumen}${secciones || `<p class="sub">Sin piezas.</p>`}
+      <p class="sub">Cada etiqueta es <b>código·largo(mm)</b>. Optimización First-Fit, sin descontar merma de sierra.</p></div>`;
+    wireSoluciones(body); return;
+  }
+  // Sin licencia: 2-3 barras reales + relleno difuminado (la forma se ve; no se puede usar).
+  const reales = (d.preview || []).map(b => `<div class="bin"><span class="binno">Barra</span>
+    <span class="binitems">${b.items.map(it => `<i>${it.code}·${it.largo}</i>`).join("")}</span>
+    <span class="binrem">sobra ${b.rem} mm</span></div>`).join("");
+  const falsas = Array.from({ length: 5 }, () => `<div class="bin blur"><span class="binno">Barra</span>
+    <span class="binitems"><i>••·••••</i><i>••·••••</i><i>••·••••</i></span><span class="binrem">sobra ••• mm</span></div>`).join("");
+  body.innerHTML = `<div class="pane">${avisosHTML(metadatos)}${resumen}
+    <div class="cutgrp"><div class="cuthead"><b>Lista de cortes por barra</b><span>${d.totalBarras} barras</span></div>
+      ${reales}${falsas}
+      <div class="gatemsg"><p>La lista detallada — qué corte sale de qué barra y en qué orden — viene con el proyecto desbloqueado.</p>
+      <button class="btn" id="gate-pagar">Ver planes</button></div></div></div>`;
+  document.getElementById("gate-pagar").onclick = () => { state.tab = "pdf"; renderTab(); };
   wireSoluciones(body);
 }
 
@@ -837,35 +939,72 @@ function capture3D(piezas, metadatos = {}){
   return url;
 }
 
+// Dos tarjetas de compra (proyecto suelto · pase de obra recomendado). Copy orientado a resultado.
+function pagoHTML(){
+  return `<div class="planes">
+    <div class="plan">
+      <h4>${PRICING.skus.proyecto.label}</h4>
+      <div class="planprice">${money(precioSku("proyecto"))}</div>
+      <p>Un proyecto, con todas las ediciones que necesites. Tuyo para siempre.</p>
+      <button class="btn ghost" data-sku="proyecto">Comprar proyecto</button>
+    </div>
+    <div class="plan destacado">
+      <span class="planrec">RECOMENDADO</span>
+      <h4>${PRICING.skus.pase90.label}</h4>
+      <div class="planprice">${money(precioSku("pase90"))}</div>
+      <p>Todos los proyectos que quieras durante 90 días. Lo que armes queda tuyo para siempre, aunque venza el pase.</p>
+      <button class="btn" data-sku="pase90">Comprar pase de obra</button>
+    </div>
+  </div>
+  <p class="planlegal">No es suscripción. Se paga una vez y no se renueva solo.</p>`;
+}
+function wirePago(root, msg){
+  root.querySelectorAll("[data-sku]").forEach(b => b.onclick = () => {
+    if (msg) msg.textContent = "Abriendo Mercado Pago…";
+    guardarProyecto();
+    iniciarPago(b.dataset.sku).catch(e => { if (msg) msg.textContent = "Error: " + e.message; else alert(e.message); });
+  });
+}
+const RENOV_KEY = "adamant_renov_ofrecido";
+
 function renderExport(body){
-  if (!getLicencia()){
+  if (!autorizado()){
     body.innerHTML = `<div class="pane center">
-      <p class="sub"><b>Desbloqueá este proyecto</b> y llevate el PDF de obra completo (resumen, 3D, esquema
-      acotado, lista de compra con tus precios y lista de cortes optimizada por barra comercial).
-      Ediciones libres por 30 días — rehacé el PDF las veces que quieras.</p>
-      <button class="btn" id="pagar">Desbloquear con Mercado Pago</button>
-      <p class="expnote">Pago único <b>por proyecto</b>: desbloquea el que estás armando y lo podés seguir
-      editando 30 días. Empezar otro proyecto requiere un pago nuevo. La licencia queda en este navegador.</p>
+      <p class="sub"><b>Desbloqueá el PDF de obra y la lista de cortes detallada.</b> Elegí cómo:</p>
+      ${pagoHTML()}
       <p class="expmsg" id="expmsg"></p></div>`;
-    const msg = document.getElementById("expmsg");
-    document.getElementById("pagar").onclick = () => {
-      msg.textContent = "Abriendo Mercado Pago…";
-      guardarProyecto(); // asegurar el proyecto en storage antes de irnos al checkout
-      iniciarPago().catch(e => { msg.textContent = "Error: " + e.message; });
-    };
+    wirePago(body, document.getElementById("expmsg"));
     return;
   }
+  const est = estadoLicencia();
+  const dias = est.dias;
+  const estado = est.tipo === "pase"
+    ? `Pase activo ✓ (${dias} día${dias!==1?"s":""} restantes). Proyectos ilimitados.`
+    : "Proyecto desbloqueado ✓ — tuyo para siempre.";
+  // Renovación: a ≤15 días del vencimiento, se ofrece UNA vez el renov (no se insiste después).
+  let renov = "";
+  if (est.tipo === "pase" && dias <= 15 && !localStorage.getItem(RENOV_KEY)){
+    try { localStorage.setItem(RENOV_KEY, "1"); } catch {}
+    renov = `<div class="renov"><p>Tu pase vence pronto. Si querés seguir con proyectos ilimitados, podés renovarlo por ${money(precioSku("pase90_renov"))} (90 días más).</p>
+      <button class="btn" data-sku="pase90_renov">Renovar pase</button></div>`;
+  }
   body.innerHTML = `<div class="pane center">
-    <p class="sub">Proyecto desbloqueado ✓ (quedan ${diasRestantes()} días). Descargá el PDF de obra completo (resumen, 3D, esquema acotado, lista de compra y cortes optimizados).</p>
+    <p class="sub">${estado} Descargá el PDF de obra completo (resumen, 3D, esquema acotado, lista de compra y cortes optimizados).</p>
     <button class="btn" id="dlpdf">🧾 Descargar PDF de obra</button>
+    ${renov}
     <div class="expsep">Otro proyecto</div>
     <button class="btn ghost" id="nuevoproy">✚ Empezar un proyecto nuevo</button>
-    <p class="expnote">El desbloqueo vale para <b>este</b> proyecto. Empezar uno nuevo requiere otro pago.</p>
+    <p class="expnote">${est.tipo === "pase" ? "Con el pase, empezar otro proyecto no cuesta nada." : "El desbloqueo vale para <b>este</b> proyecto. Con un pase de obra hacés todos los que quieras."}</p>
     <p class="expmsg" id="expmsg"></p></div>`;
   const msg = document.getElementById("expmsg");
   const fallo = e => { msg.textContent = "Error: " + (e.message || e); console.error(e); };
+  if (renov) wirePago(body.querySelector(".renov"), msg);
   document.getElementById("nuevoproy").onclick = () => {
-    if (!confirm("Vas a empezar un proyecto nuevo, que hay que desbloquear con otro pago.\n\nEl proyecto actual queda cerrado: si querés volver a bajar su PDF, hacelo ahora.\n\n¿Seguir?")) return;
+    const conPase = estadoLicencia().tipo === "pase";
+    const aviso = conPase
+      ? "Vas a empezar un proyecto nuevo. El pase te lo cubre igual.\n\nEl actual queda cerrado: si querés volver a bajar su PDF, hacelo ahora.\n\n¿Seguir?"
+      : "Vas a empezar un proyecto nuevo, que hay que desbloquear con otro pago.\n\nEl actual queda cerrado: si querés volver a bajar su PDF, hacelo ahora.\n\n¿Seguir?";
+    if (!confirm(aviso)) return;
     nuevoProyecto();
     borrarProyectoGuardado();
     state.kind = null; state.step = 0; state.params = null;

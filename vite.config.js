@@ -1,6 +1,7 @@
 // Config de Vite. Sólo agrega un middleware de DESARROLLO que monta las funciones de `api/`
 // (en producción las sirve Vercel). Sin esto, `npm run dev` no puede probar la pared de pago.
-// Lee las variables de `.env.local` (LICENSE_SECRET, MP_ACCESS_TOKEN, PRECIO_PROYECTO, APP_URL).
+// Lee las variables de `.env.local` (LICENSE_SECRET, MP_ACCESS_TOKEN, APP_URL). Los precios viven en
+// src/config/pricing.js, no en env.
 import { defineConfig, loadEnv } from "vite";
 import { resolve } from "node:path";
 

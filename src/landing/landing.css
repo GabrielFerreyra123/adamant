@@ -202,7 +202,8 @@ img,svg{ max-width:100%; }
 /* ============ precios ============ */
 .planes{ display:grid; gap:var(--gutter); max-width:64rem; margin-inline:auto; align-items:stretch; }
 @media (min-width:820px){ .planes{ grid-template-columns:1fr 1fr; } }
-.plan{ display:flex; flex-direction:column; padding:var(--lg); border-radius:var(--r-xl); }
+@media (min-width:980px){ .planes{ grid-template-columns:repeat(3,1fr); max-width:72rem; } }
+.plan{ display:flex; flex-direction:column; padding:var(--lg); border-radius:var(--r-xl); background:var(--panel-glass); border:1px solid var(--hair-teal); }
 .plan-free{ background:var(--panel-glass); backdrop-filter:blur(8px); border:1px dashed var(--hair-teal); }
 .plan-pro{ position:relative; overflow:hidden;
   background:color-mix(in srgb, var(--primary) 5%, transparent);

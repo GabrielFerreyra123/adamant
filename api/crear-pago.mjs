@@ -1,37 +1,40 @@
-// POST /api/crear-pago → { init_point } (URL de Checkout Pro).
-// El precio vive en el servidor (env PRECIO_PROYECTO), nunca se confía en el cliente.
-import { mpFetch, json, soloPost, limpiarProy } from "./_lib.mjs";
+// POST /api/crear-pago { sku, projectHash? } → { init_point, precio } (URL de Checkout Pro).
+// El precio SIEMPRE sale de src/config/pricing.js; nunca se confía en el cliente.
+import { mpFetch, json, soloPost, limpiarProy, packRef } from "./_lib.mjs";
+import { esSkuValido, precioDe, PRICING } from "../src/config/pricing.js";
+
+const TITULO = {
+  proyecto: "Adamant — Proyecto suelto (PDF de obra + cortes optimizados)",
+  pase90: "Adamant — Pase de obra 90 días (proyectos ilimitados)",
+  pase90_renov: "Adamant — Renovación del pase de obra (90 días)"
+};
+const DESC = {
+  proyecto: "Un proyecto: PDF de obra y lista de cortes optimizada, con ediciones ilimitadas. Tuyo para siempre.",
+  pase90: "Todos los proyectos que quieras durante 90 días. Lo que armes queda tuyo para siempre.",
+  pase90_renov: "90 días más de proyectos ilimitados."
+};
 
 export default async function handler(req, res){
   if (!soloPost(req, res)) return;
-  // El id de proyecto viaja como external_reference: MP nos lo devuelve en /canjear y ata la
-  // licencia a ese proyecto. Sin él no se puede emitir licencia.
-  const proy = limpiarProy(req.body?.proy);
-  if (!proy) return json(res, 400, { error: "proy requerido" });
+  const sku = String(req.body?.sku || "");
+  if (!esSkuValido(sku)) return json(res, 400, { error: "SKU inválido" });
+  const projectHash = limpiarProy(req.body?.projectHash);
+  if (sku === "proyecto" && !projectHash) return json(res, 400, { error: "projectHash requerido para proyecto" });
   try {
-    const precio = Number(process.env.PRECIO_PROYECTO || 20000);
-    // El retorno de MP tiene que caer en el MISMO origen desde el que se abrió el checkout: la
-    // licencia y el proyecto viven en el localStorage de ese origen. Si volviéramos a otro host
-    // (p.ej. un APP_URL fijo distinto al alias que está usando el usuario), el canje andaría pero
-    // el proyecto no se restauraría (otro localStorage). Por eso priorizamos el origen real del
-    // pedido (Origin del navegador, o proto+host reenviados por Vercel) sobre APP_URL.
+    const precio = precioDe(sku);
+    // El retorno de MP tiene que caer en el MISMO origen desde el que se abrió el checkout (mismo
+    // localStorage). Priorizamos el origen real del pedido sobre APP_URL.
     const proto = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers["x-forwarded-host"] || req.headers.host;
     const base = (req.headers.origin || (host ? `${proto}://${host}` : process.env.APP_URL || "")).replace(/\/+$/, "");
-    // MP vuelve a la RAÍZ (Vercel la sirve siempre, sin el redirect de trailing-slash que /app/ puede
-    // tener y que rompe auto_return). La landing reenvía a /app/ con los params del pago, donde corre
-    // canjearSiVuelve(). Mismo origen → mismo localStorage, así el proyecto se restaura.
-    const app = `${base}/`;
-    // auto_return sólo con URL pública https: MP rechaza http/localhost ("back_url.success must be
-    // defined"). En local se omite (no se puede probar el redirect igual); en prod se activa.
+    const app = `${base}/`; // MP vuelve a la raíz; la landing reenvía a /app/ con los params del pago.
     const publica = /^https:\/\//.test(base) && !/localhost|127\.0\.0\.1/.test(base);
     const body = {
       items: [{
-        title: "Adamant — Proyecto desbloqueado (PDF de obra + cortes optimizados)",
-        description: "PDF de obra completo y lista de cortes optimizada por barra comercial. Ediciones libres por 30 días.",
-        quantity: 1, currency_id: "ARS", unit_price: precio
+        title: TITULO[sku], description: DESC[sku],
+        quantity: 1, currency_id: PRICING.moneda, unit_price: precio
       }],
-      external_reference: proy,
+      external_reference: packRef(sku, projectHash),
       back_urls: { success: app, pending: app, failure: app },
       statement_descriptor: "ADAMANT"
     };
