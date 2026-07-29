@@ -27,7 +27,7 @@ export default async function handler(req, res){
     const proto = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers["x-forwarded-host"] || req.headers.host;
     const base = (req.headers.origin || (host ? `${proto}://${host}` : process.env.APP_URL || "")).replace(/\/+$/, "");
-    const app = `${base}/`; // MP vuelve a la raíz; la landing reenvía a /app/ con los params del pago.
+    const app = `${base}/`; // MP vuelve a la raíz; la landing reenvía a /app con los params del pago.
     const publica = /^https:\/\//.test(base) && !/localhost|127\.0\.0\.1/.test(base);
     const body = {
       items: [{
