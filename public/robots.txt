@@ -1,0 +1,8 @@
+# Adamant — https://adamant-livid.vercel.app/
+# /app NO se bloquea acá a propósito: lleva <meta robots="noindex,follow">, y para que Google lo
+# respete tiene que poder rastrear la página. Solo se bloquea /api (funciones serverless).
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://adamant-livid.vercel.app/sitemap.xml

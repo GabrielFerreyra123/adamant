@@ -4,25 +4,40 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Adamant · Diseñá tu estructura en seco, gratis y en 3D</title>
-  <meta name="description" content="Diseñá paredes con aberturas, pisos, cielorrasos y ambientes completos en steel frame o wood frame. Gratis, en 3D, con lista de materiales al instante. No hace falta saber usar programas de diseño.">
+  <meta name="description" content="Diseñá tu estructura de steel frame o wood frame en 3D, gratis. Cómputo y lista de materiales al instante, sin saber usar programas de diseño.">
   <meta name="theme-color" content="#05151d">
+  <link rel="canonical" href="https://adamant-livid.vercel.app/">
 
   <meta property="og:type" content="website">
   <meta property="og:title" content="Adamant · Diseñá tu estructura en seco, gratis y en 3D">
   <meta property="og:description" content="Paredes con aberturas, pisos, cielorrasos y ambientes completos. Con lista de materiales al instante.">
   <meta property="og:locale" content="es_AR">
+  <!-- og:url/og:image ABSOLUTAS al dominio de producción. Si algún día se migra a dominio propio,
+       actualizar acá, en el canonical y en el JSON-LD. La imagen vive en public/og-image.jpg (1200×630). -->
+  <meta property="og:url" content="https://adamant-livid.vercel.app/">
+  <meta property="og:site_name" content="Adamant">
+  <meta property="og:image" content="https://adamant-livid.vercel.app/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Adamant · diseño de estructuras de steel frame y wood frame en 3D">
+  <meta name="twitter:image:alt" content="Adamant · diseño de estructuras de steel frame y wood frame en 3D">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Adamant · Diseñá tu estructura en seco, gratis y en 3D">
+  <meta name="twitter:description" content="Paredes con aberturas, pisos, cielorrasos y ambientes completos. Con lista de materiales al instante.">
+  <meta name="twitter:image" content="https://adamant-livid.vercel.app/og-image.jpg">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Space+Grotesk:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/landing/landing.css">
 
-  <!-- Retorno de Mercado Pago: MP vuelve a la raíz; si trae los params del pago, reenviamos a /app/
-       (mismo origen) para que la app los canjee. Va antes de pintar nada para no mostrar la landing. -->
+  <!-- Retorno de Mercado Pago: MP vuelve a la raíz; si trae los params del pago, reenviamos a /app
+       (mismo origen, URL canónica con cleanUrls) para que la app los canjee. Va antes de pintar nada. -->
   <script>
     (function(){
       var q = location.search;
-      if (/[?&](payment_id|collection_id|preference_id)=/.test(q)){ location.replace("/app/" + q); }
+      if (/[?&](payment_id|collection_id|preference_id)=/.test(q)){ location.replace("/app" + q); }
     })();
   </script>
   <!-- Marca que hay JS: sin esto el contenido con .reveal nunca se oculta (a prueba de fallos). -->
@@ -36,7 +51,7 @@
       <b>ADAMANT</b>
       <span>Autoconstrucción en seco</span>
     </a>
-    <a class="btn-nav" href="/app/">Empezar gratis</a>
+    <a class="btn-nav" href="/app">Empezar gratis</a>
   </div>
 </header>
 
@@ -54,7 +69,7 @@
             cielorrasos y ambientes completos, con lista de materiales al instante.
           </p>
           <div class="hero-cta">
-            <a class="btn btn-primary" href="/app/">Empezar gratis <span class="arw">→</span></a>
+            <a class="btn btn-primary" href="/app">Empezar gratis <span class="arw">→</span></a>
             <a class="btn btn-secondary" href="#como-funciona">Ver cómo funciona</a>
           </div>
           <p class="hero-note">Sin instalar nada y sin cuenta. Diseñar y ver el 3D no se paga.</p>
@@ -194,7 +209,7 @@
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Lista de materiales al instante</li>
             <li class="off"><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M6 18 18 6"/></svg>Optimización de cortes y exportables</li>
           </ul>
-          <a class="btn btn-secondary" href="/app/">Empezar gratis</a>
+          <a class="btn btn-secondary" href="/app">Empezar gratis</a>
         </article>
 
         <article class="plan reveal">
@@ -207,7 +222,7 @@
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>PDF de obra con el listado de corte pieza por pieza</li>
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Lista de compra con tus precios y el presupuesto</li>
           </ul>
-          <a class="btn btn-secondary" href="/app/">Empezar un proyecto</a>
+          <a class="btn btn-secondary" href="/app">Empezar un proyecto</a>
         </article>
 
         <article class="plan plan-pro reveal">
@@ -220,7 +235,7 @@
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Probá variantes sin que cada una cueste</li>
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Lo generado queda re-exportable para siempre</li>
           </ul>
-          <a class="btn" href="/app/">Ver el pase de obra</a>
+          <a class="btn" href="/app">Ver el pase de obra</a>
           <p class="plan-note">No es suscripción: se paga una vez y no se renueva solo.</p>
         </article>
       </div>
@@ -267,7 +282,7 @@
     <div class="wrap">
       <div class="cta-panel reveal">
         <h2 class="h-lg">Tu próximo proyecto empieza con un muro.</h2>
-        <a class="btn" href="/app/">Abrir la app</a>
+        <a class="btn" href="/app">Abrir la app</a>
       </div>
     </div>
   </section>
@@ -286,7 +301,7 @@
     </div>
     <div class="pie-col">
       <nav class="pie-links" aria-label="Enlaces del pie">
-        <a href="/app/">Abrir la app</a>
+        <a href="/app">Abrir la app</a>
         <a href="#como-funciona">Cómo funciona</a>
         <a href="#precios">Precios</a>
         <a href="#faq">Preguntas frecuentes</a>
@@ -296,6 +311,77 @@
   </div>
 </footer>
 
+<!-- Datos estructurados (Rich Results). URLs absolutas al dominio de producción: actualizar junto con
+     canonical/og:url si cambia el dominio. Los precios NO se declaran como Offer todavía (no están
+     publicados en la página); `price: 0` refleja que diseñar es gratis. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://adamant-livid.vercel.app/#organization",
+      "name": "Adamant",
+      "url": "https://adamant-livid.vercel.app/",
+      "description": "Diseño de estructuras de steel frame y wood frame en 3D, con cómputo y lista de materiales.",
+      "areaServed": "AR",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Bahía Blanca",
+        "addressRegion": "Buenos Aires",
+        "addressCountry": "AR"
+      }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://adamant-livid.vercel.app/#app",
+      "name": "Adamant",
+      "url": "https://adamant-livid.vercel.app/",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Web",
+      "description": "Diseñá tu estructura de steel frame o wood frame en 3D, gratis. Cómputo y lista de materiales al instante, sin saber usar programas de diseño.",
+      "publisher": { "@id": "https://adamant-livid.vercel.app/#organization" },
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "ARS",
+        "description": "Diseñar, ver el 3D y la lista de materiales es gratis. El PDF de obra y los cortes optimizados se desbloquean por proyecto o con un pase de 90 días."
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://adamant-livid.vercel.app/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Necesito saber diseñar o usar algún programa?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Toda la app funciona en el navegador: elegís qué construir, cargás las medidas y la estructura se arma sola en 3D. No hay que dibujar ni instalar nada." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué es exactamente lo gratis?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Diseñar, ver el 3D completo y la lista de materiales, sin límite de proyectos y sin registrarte. Podés cambiar medidas y aberturas todas las veces que quieras." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué desbloqueo al pagar?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Los cortes optimizados por barra comercial y el PDF de obra: resumen, 3D, esquema acotado, lista de compra con tus precios y el listado de corte pieza por pieza. Podés desbloquear un proyecto suelto o un pase de obra de 90 días con proyectos ilimitados." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Es una suscripción?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Se paga una vez y no se renueva solo: no hay nada que dar de baja. El pase de obra dura 90 días y después vence sin cobrarte de nuevo — y lo que armaste durante el pase queda tuyo para siempre." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué me llevo al final?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Un anteproyecto y un cómputo de materiales para entender qué vas a construir y cuánto sale: el 3D, la lista de compra con tus precios y el PDF de obra con los cortes optimizados." }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <script type="module" src="/src/landing/landing.js"></script>
 </body>
 </html>
