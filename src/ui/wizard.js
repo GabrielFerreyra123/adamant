@@ -758,7 +758,7 @@ function editorHTML(){
   const secs = pasosOf().map(paso => {
     if (paso.componente){
       const lbl = paso.componente === "vanoPiso" ? "Vano de piso…" : "Aberturas…";
-      return `<div class="edgrp"><button class="btn ghost sm" data-editcomp="${paso.id}">✎ ${lbl}</button></div>`;
+      return `<div class="edgrp"><button class="btn ghost sm" data-editcomp="${paso.componente}">✎ ${lbl}</button></div>`;
     }
     const campos = [...(paso.campos || []), ...(paso.avanzado || [])].map(campoHTML).join("");
     return campos.trim() ? `<div class="edgrp"><h4>${paso.titulo}</h4>${campos}</div>` : "";
