@@ -118,7 +118,10 @@ export function startWizard(el){
   restaurarProyecto(); // si volvemos del pago (o recarga), recuperar el proyecto en curso
   initGlosario();      // glosario integrado: tarjeta al tocar un término subrayado
   cargarVisor();       // precarga en segundo plano: el 3D queda listo antes de llegar al paso 1
-  render();
+  // Link compartido (?p=<medidas>): reabre el proyecto exacto (viene de WhatsApp / lo comparte el usuario).
+  const shared = new URLSearchParams(location.search).get("p");
+  if (shared){ history.replaceState(null, "", location.pathname); try { cargarProyectoCompartido(shared); } catch (e) { console.warn("[link] proyecto inválido:", e.message); render(); } }
+  else render();
   // Si venimos del checkout de Mercado Pago, canjear el pago por la licencia y refrescar la UI.
   // El canje puede adoptar el proyecto pagado como activo, así que restauramos otra vez por si el
   // id se había desincronizado (recién ahí coinciden proyecto y licencia).
@@ -126,7 +129,9 @@ export function startWizard(el){
 }
 
 // ============ licencia: badge, código, recuperación ============
-const CONTACTO = "hola@adamant.com.ar";
+const WPP = "5492914631729";   // WhatsApp de Adamant: contacto, lead del proyecto y habilitación manual
+const ALIAS_MP = "adamant";    // alias Personal Pay para transferencia directa (pago manual)
+const wppLink = txt => `https://wa.me/${WPP}?text=${encodeURIComponent(txt)}`;
 const precioSku = sku => PRICING.skus[sku].precio;
 
 function renderLicBadge(){
@@ -164,7 +169,7 @@ function mostrarCodigo(d){
       <button class="btn ghost" id="dlcod">Descargar .txt</button></div>
     <label class="chkvi"><input type="checkbox" id="vicod"> Ya lo copié / descargué</label>
     <button class="btn" id="segcod" disabled>Continuar</button>
-    <p class="msub">¿Problemas? Escribinos: <a href="mailto:${CONTACTO}">${CONTACTO}</a></p>`);
+    <p class="msub">¿Problemas? Escribinos por <a href="${wppLink('Hola! Tengo un problema con mi código de acceso de Adamant.')}" target="_blank" rel="noopener">WhatsApp</a>.</p>`);
   const marcar = () => { document.getElementById("vicod").checked = true; document.getElementById("segcod").disabled = false; };
   document.getElementById("copcod").onclick = () => { navigator.clipboard?.writeText(d.token).then(marcar, marcar); marcar(); };
   document.getElementById("dlcod").onclick = () => {
@@ -188,7 +193,7 @@ function abrirRecuperar(){
     <input class="minput" id="recop" inputmode="numeric" placeholder="ej. 1234567890">
     <button class="btn ghost" id="recopbtn">Recuperar con la operación</button>
     <p class="recmsg" id="recmsg"></p>
-    <p class="msub">¿No encontrás ninguno? Escribinos: <a href="mailto:${CONTACTO}">${CONTACTO}</a></p>`);
+    <p class="msub">¿No encontrás ninguno? Escribinos por <a href="${wppLink('Hola! No puedo recuperar mi acceso a Adamant.')}" target="_blank" rel="noopener">WhatsApp</a>.</p>`);
   const msg = document.getElementById("recmsg");
   document.getElementById("reccodbtn").onclick = () => {
     try { restaurarPorCodigo(document.getElementById("reccod").value); cerrarModal(); render(); }
@@ -274,6 +279,50 @@ const modIco = id => MOD_PATH[id] ? svg(MOD_PATH[id], "mod-ico") : "";
 const modGhost = id => MOD_PATH[id] ? svg(MOD_PATH[id], "ghost-ico") : "";
 // Descripción del Ambiente = resumen de los módulos en el orden real del flujo por niveles.
 const AMB_DESC = "Piso, cuatro paredes con sus aberturas, cielorraso y techo. Todo armado por niveles y ubicado en su lugar, con cómputo, cortes y PDF de todo junto.";
+
+// Arranque rápido (onboarding): un toque → estructura armada y editable en pantalla, sin pelear con un
+// formulario vacío. Son proyectos NORMALES (gate del entregable como cualquiera), sólo un punto de partida.
+const VN = (tipo, ancho, alto, sill, pos) => ({ tipo, ancho, alto, sill, pos });
+const PRESETS = [
+  { l: "Quincho 4×6", kind: "combinado", over: { largo: 6000, ancho: 4000, vanoFrente: [VN("puerta", 900, 2050, 0, 3000)], vanoIzq: [VN("ventana", 1200, 1100, 900, 2000)], llevaTecho: true, techoTipo: "dosAguas" } },
+  { l: "Ampliación 3×4", kind: "combinado", over: { largo: 4000, ancho: 3000, vanoFrente: [VN("ventana", 1200, 1100, 900, 2000)] } },
+  { l: "Muro con ventana", kind: "muro", over: { largo: 4000, alto: 2600, vanos: [VN("ventana", 1200, 1100, 900, 2000)] } },
+  { l: "Techo a dos aguas", kind: "techo", over: { tipo: "dosAguas", luz: 4000, largo: 6000 } }
+];
+// Abre un proyecto (preset o compartido) directo en el RESULTADO: 3D + solapas, editable con "Editar".
+function abrirProyecto(kind, params){
+  if (!KINDS.has(kind)) return;
+  state.kind = kind; state.params = params;
+  nuevoProyecto(); // projectHash propio → gate normal del entregable
+  state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tab = "3d";
+  state.step = pasosOf().length + 1; // salta al resultado
+  render();
+}
+function cargarPreset(i){
+  const pr = PRESETS[i]; if (!pr) return;
+  const params = structuredClone(getModule(pr.kind).defaults());
+  Object.assign(params, pr.over);
+  abrirProyecto(pr.kind, params);
+}
+// Link que reabre EXACTAMENTE este proyecto (medidas serializadas en la URL). Es lo que viaja por
+// WhatsApp: el lead nos llega con el proyecto adentro, sin backend ni cuentas.
+function linkProyecto(){
+  const data = JSON.stringify({ k: state.kind, p: state.params });
+  const enc = btoa(unescape(encodeURIComponent(data))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return location.origin + "/app?p=" + enc;
+}
+function cargarProyectoCompartido(enc){
+  let s = String(enc).replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "=";
+  const { k, p } = JSON.parse(decodeURIComponent(escape(atob(s))));
+  if (k && p) abrirProyecto(k, p); else render();
+}
+function resumenProyecto(){
+  const p = state.params, sis = p.sistema === "wood" ? "wood frame" : "steel frame";
+  if (state.kind === "combinado") return `ambiente ${p.largo/1000}×${p.ancho/1000} m, ${sis}`;
+  if (state.kind === "muro") return `muro ${p.largo/1000}×${p.alto/1000} m, ${sis}`;
+  if (state.kind === "techo") return `techo ${p.tipo === "dosAguas" ? "dos aguas" : "un agua"}, ${sis}`;
+  return `${getModule(state.kind).nombre}, ${sis}`;
+}
 function stepGrid(){
   const card = m => {
     const amb = m.id === "combinado";
@@ -283,7 +332,9 @@ function stepGrid(){
       <h3>${m.nombre}</h3><p>${amb ? AMB_DESC : m.descripcion}</p>${modGhost(m.id)}</button>`;
   };
   return `<header class="gridhead"><h2>¿Qué vas a construir?</h2>
-    <p class="sub">Elegí un módulo para empezar, o armá el ambiente completo (el flujo que integra todo por niveles).</p></header>
+    <p class="sub">Tocá un ejemplo listo para verlo en 3D al toque, o elegí un módulo desde cero.</p>
+    <div class="presets">${PRESETS.map((p, i) => `<button class="preset" data-preset="${i}">${p.l}</button>`).join("")}</div>
+    </header>
     <div class="mods">${listModules().map(card).join("")}</div>`;
 }
 function wireGrid(){
@@ -291,6 +342,7 @@ function wireGrid(){
     if (state.kind !== b.dataset.id){ state.kind = b.dataset.id; state.params = structuredClone(getModule(state.kind).defaults()); state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; }
     state.step = 1; render();
   });
+  document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => cargarPreset(+b.dataset.preset));
 }
 
 // ---------- pasos autogenerados ----------
@@ -937,9 +989,11 @@ async function renderCortes(body){
     <span class="binrem">sobra ${b.rem} mm</span></div>`).join("");
   const falsas = Array.from({ length: 5 }, () => `<div class="bin blur"><span class="binno">Barra</span>
     <span class="binitems"><i>••·••••</i><i>••·••••</i><i>••·••••</i></span><span class="binrem">sobra ••• mm</span></div>`).join("");
+  const ocultas = Math.max(0, (d.totalBarras || 0) - (d.preview || []).length);
+  const masLabel = ocultas ? `<div class="binmore">+ ${ocultas} barra${ocultas !== 1 ? "s" : ""} más con el detalle completo</div>` : "";
   body.innerHTML = `<div class="pane">${avisosHTML(metadatos)}${resumen}
     <div class="cutgrp"><div class="cuthead"><b>Lista de cortes por barra</b><span>${d.totalBarras} barras</span></div>
-      ${reales}${falsas}
+      ${reales}${falsas}${masLabel}
       <div class="gatemsg"><p>La lista detallada — qué corte sale de qué barra y en qué orden — viene con el proyecto desbloqueado.</p>
       <button class="btn" id="gate-pagar">Ver planes</button></div></div></div>`;
   document.getElementById("gate-pagar").onclick = () => { state.tab = "pdf"; renderTab(); };
@@ -990,11 +1044,28 @@ function wirePago(root, msg){
 }
 const RENOV_KEY = "adamant_renov_ofrecido";
 
+// Captura de lead + pago manual (primeros usuarios): guardar el proyecto por WhatsApp (nos llega el
+// contacto con el proyecto), y transferencia al alias con comprobante por WhatsApp (habilitación a mano).
+function extrasCompraHTML(){
+  const resumen = resumenProyecto(), ph = getProyId();
+  const lead = wppLink(`Hola! Armé este proyecto en Adamant (${resumen}) y quiero guardarlo. Link: ${linkProyecto()}`);
+  const transf = wppLink(`Hola! Voy a transferir al alias ${ALIAS_MP} por Adamant. Te paso el comprobante. Mi código de proyecto: ${ph}`);
+  return `
+    <div class="expsep">Guardalo para después</div>
+    <a class="btn ghost" href="${lead}" target="_blank" rel="noopener">📲 Guardá este proyecto por WhatsApp</a>
+    <p class="expnote">Te llega un link que reabre estas mismas medidas cuando quieras seguir.</p>
+    <div class="expsep">o pagá por transferencia</div>
+    <p class="sub" style="max-width:340px">Alias Personal Pay <b>${ALIAS_MP}</b>. Transferí y mandanos el comprobante por WhatsApp; te habilitamos en minutos con un código.</p>
+    <a class="btn ghost" href="${transf}" target="_blank" rel="noopener">📲 Enviar comprobante por WhatsApp</a>
+    <p class="expnote">Tu código de proyecto: <code>${ph}</code> — va en el mensaje, lo necesitamos para habilitarte.</p>`;
+}
+
 function renderExport(body){
   if (!autorizado()){
     body.innerHTML = `<div class="pane center">
       <p class="sub"><b>Desbloqueá el PDF de obra y la lista de cortes detallada.</b> Elegí cómo:</p>
       ${pagoHTML()}
+      ${extrasCompraHTML()}
       <p class="expmsg" id="expmsg"></p></div>`;
     wirePago(body, document.getElementById("expmsg"));
     return;
