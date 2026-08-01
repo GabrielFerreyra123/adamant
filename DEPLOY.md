@@ -36,17 +36,17 @@
 - **Reembolsos: manuales**, dentro de los 7 días, desde el panel de Mercado Pago (Actividad → Devolver).
 - Los precios se ajustan editando `base` en `src/config/pricing.js` (revisión trimestral por IPC; ver `docs/pricing.md`).
 
-## Venta manual (primeros usuarios)
-La pantalla de compra ofrece, además de Mercado Pago:
-- **"Guardá este proyecto por WhatsApp"**: abre `wa.me` con un link que reabre las medidas exactas
-  (`/app?p=<medidas>`). El lead nos llega con el proyecto adentro, sin backend.
-- **Transferencia**: alias Personal Pay `adamant` + "mandanos el comprobante por WhatsApp". El comprador
-  ve su **código de proyecto** (`projectHash`) en pantalla y lo manda con el comprobante.
+## Lead por WhatsApp
+La pantalla de compra ofrece, además del pago con Mercado Pago, un botón **"Guardá este proyecto por
+WhatsApp"**: abre `wa.me` con un link que reabre las medidas exactas (`/app?p=<medidas>`). El lead llega
+con el proyecto adentro, sin backend. (El número se cambia en `src/ui/wizard.js`: `WPP`.)
 
-Para habilitar a mano tras una transferencia, emitir el código con el MISMO `LICENSE_SECRET` de Vercel:
+## Reemisión manual de códigos (solo soporte)
+El pago normal (Checkout Pro) **habilita solo** — esto NO se usa en la venta. Es una herramienta de
+soporte: reponerle el acceso a alguien que perdió el código, o una venta puntual por fuera de MP. Con el
+MISMO `LICENSE_SECRET` de Vercel:
 ```
 LICENSE_SECRET=xxxx node scripts/emitir-codigo.mjs pase90                 # cualquier proyecto, 90 días
-LICENSE_SECRET=xxxx node scripts/emitir-codigo.mjs proyecto <projectHash> # uno perpetuo, con el hash que mandó
+LICENSE_SECRET=xxxx node scripts/emitir-codigo.mjs proyecto <projectHash> # uno perpetuo, con el hash del comprador
 ```
-El comprador pega el código en **"Ya compré → Pegar código de acceso"**. (WhatsApp/alias se cambian en
-`src/ui/wizard.js`: `WPP` / `ALIAS_MP`.)
+El comprador lo pega en **"Ya compré → Pegar código de acceso"**.

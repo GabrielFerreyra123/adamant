@@ -129,8 +129,7 @@ export function startWizard(el){
 }
 
 // ============ licencia: badge, código, recuperación ============
-const WPP = "5492914631729";   // WhatsApp de Adamant: contacto, lead del proyecto y habilitación manual
-const ALIAS_MP = "adamant";    // alias Personal Pay para transferencia directa (pago manual)
+const WPP = "5492914631729";   // WhatsApp de Adamant: contacto y lead del proyecto
 const wppLink = txt => `https://wa.me/${WPP}?text=${encodeURIComponent(txt)}`;
 const precioSku = sku => PRICING.skus[sku].precio;
 
@@ -1044,20 +1043,14 @@ function wirePago(root, msg){
 }
 const RENOV_KEY = "adamant_renov_ofrecido";
 
-// Captura de lead + pago manual (primeros usuarios): guardar el proyecto por WhatsApp (nos llega el
-// contacto con el proyecto), y transferencia al alias con comprobante por WhatsApp (habilitación a mano).
+// Captura de lead: guardar el proyecto por WhatsApp (nos llega el contacto con el proyecto adentro).
+// El pago se cierra por Mercado Pago (automático); no hay flujo de transferencia manual en la UI.
 function extrasCompraHTML(){
-  const resumen = resumenProyecto(), ph = getProyId();
-  const lead = wppLink(`Hola! Armé este proyecto en Adamant (${resumen}) y quiero guardarlo. Link: ${linkProyecto()}`);
-  const transf = wppLink(`Hola! Voy a transferir al alias ${ALIAS_MP} por Adamant. Te paso el comprobante. Mi código de proyecto: ${ph}`);
+  const lead = wppLink(`Hola! Armé este proyecto en Adamant (${resumenProyecto()}) y quiero guardarlo. Link: ${linkProyecto()}`);
   return `
     <div class="expsep">Guardalo para después</div>
     <a class="btn ghost" href="${lead}" target="_blank" rel="noopener">📲 Guardá este proyecto por WhatsApp</a>
-    <p class="expnote">Te llega un link que reabre estas mismas medidas cuando quieras seguir.</p>
-    <div class="expsep">o pagá por transferencia</div>
-    <p class="sub" style="max-width:340px">Alias Personal Pay <b>${ALIAS_MP}</b>. Transferí y mandanos el comprobante por WhatsApp; te habilitamos en minutos con un código.</p>
-    <a class="btn ghost" href="${transf}" target="_blank" rel="noopener">📲 Enviar comprobante por WhatsApp</a>
-    <p class="expnote">Tu código de proyecto: <code>${ph}</code> — va en el mensaje, lo necesitamos para habilitarte.</p>`;
+    <p class="expnote">Te llega un link que reabre estas mismas medidas cuando quieras seguir.</p>`;
 }
 
 function renderExport(body){
