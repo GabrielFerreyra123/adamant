@@ -20,8 +20,8 @@ export const LUMBER = {
 // Perfiles de cielorraso suspendido (PGO/solera galvanizada). a = alma, fl = ala, e = espesor, kg = kg/m.
 // El perímetro y los portantes usan el mismo perfil (como en el generador legacy scriptCielo).
 export const CIELO = {
-  "Solera/montante 70":  { a:70,  fl:30, e:0.94, kg:0.75 },
-  "Solera/montante 100": { a:100, fl:30, e:1.25, kg:1.05 }
+  "Solera/montante 35": { a:35, fl:30, e:0.94, kg:0.55 },
+  "Solera/montante 70": { a:70, fl:30, e:0.94, kg:0.75 }
 };
 // Cielorraso suspendido de dos niveles (configurable, mm):
 //   VELA_SEP     — separación máx. de velas a lo largo de cada viga maestra (cuelgan de la losa).
