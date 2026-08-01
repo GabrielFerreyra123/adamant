@@ -151,7 +151,11 @@ export const combinado = {
         { k: "alto",  tipo: "medida", label: "Alto de muros", rango: [2400, 3000] }
       ], avanzado: [
         { k: "apoyo", tipo: "seg", label: "Apoyo", opciones: [{ v: "platea", l: "Platea" }, { v: "pilotines", l: "Pilotines" }] },
-        { k: "placa", tipo: "seg", label: "Placa de piso", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] }
+        { k: "placa", tipo: "seg", label: "Placa de piso", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] },
+        // Cuáles de las 4 paredes cruzan enteras en la esquina (las otras encajan entre ellas). Detalle
+        // del encuentro de esquina; no cambia qué paredes hay. Por eso va en avanzadas, no en el plano.
+        { k: "pasante", tipo: "seg", label: "Paredes que cruzan enteras (esquinas)",
+          opciones: [{ v: "frenteFondo", l: "Frente y Fondo" }, { v: "laterales", l: "Laterales" }] }
       ] },
       { id: "muros", titulo: "Muros y vanos", componente: "murosPlanta",
         intro: "Ahora las paredes. Cada muro es una grilla de montantes parados entre dos soleras. Donde va una puerta o ventana se arma el vano: king a los lados, jack sosteniendo el dintel, y cripples para completar la modulación." },

@@ -701,18 +701,13 @@ function murosPlantaHTML(){
     return `<div class="muroedit"><button class="btn ghost sm" id="volverPlanta">← Planta</button>
       <b>${m.l} · ${(m.largo/1000).toFixed(2)} m</b></div>${vanosHTML()}`;
   }
-  const pas = state.params.pasante === "laterales" ? "laterales" : "frenteFondo";
-  return `<label class="lbl">${glossHTML("¿Qué paredes corren de punta a punta?")}</label>
-    <p class="sub" style="margin-top:0">Las pasantes se cruzan enteras; las otras encajan entre ellas y llevan el montante de arranque en la esquina.</p>
-    ${segHTML("pasante", pas, [{ v: "frenteFondo", l: "Frente y Fondo" }, { v: "laterales", l: "Laterales" }])}
-    <p class="sub">Tocá un muro para agregarle puertas, ventanas o arcadas.</p><div class="planta4" id="planta4"></div>`;
+  return `<p class="sub">Tocá un muro para agregarle puertas, ventanas o arcadas.</p><div class="planta4" id="planta4"></div>`;
 }
 function wireMurosPlanta(){
   if (state.muroSel){
     document.getElementById("volverPlanta").onclick = () => { state.muroSel = null; emitEdit(); };
     wireVanos(); return;
   }
-  document.querySelectorAll('[data-seg="pasante"] button').forEach(b => b.onclick = () => { state.params.pasante = b.dataset.v; emitEdit(); });
   drawPlanta4();
 }
 function nVanosMuro(parte){ return (state.params["vano" + cap(parte)] || []).length; }
