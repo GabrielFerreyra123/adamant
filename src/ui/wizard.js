@@ -24,7 +24,7 @@ const VANO_INI = { puerta:"P", ventana:"V", arcada:"A" };
 const VANO_COL = { puerta:"var(--tangerine)", ventana:"#e8b53a", arcada:"#27b0c9" };
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
-const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null, quePieza: false };
+const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null, quePieza: false, editOpen: false };
 // Superficies estructurales conmutables del visor: id de capa → etiqueta y tipo (para color de leyenda).
 // Superficies conmutables del visor: apoyos de fundación y placa de piso (diafragma estructural).
 const CAPA_INFO = {
@@ -41,6 +41,12 @@ function capasDe(piezas){
 }
 let root, viewer = null, lvlViewer = null, _codeOf = new Map();
 function disposeLvlViewer(){ if (lvlViewer){ try { lvlViewer.dispose(); } catch {} lvlViewer = null; } }
+
+// Editor todo-en-uno (en la vista de Resultado): _repintar3d actualiza el 3D en vivo (cámara quieta);
+// _onEdit redirige los editores interactivos (aberturas) para que refresquen el resultado en lugar de
+// navegar. Fuera del editor, _onEdit es null → los editores usan render() normal.
+let _repintar3d = null, _onEdit = null;
+const emitEdit = () => (_onEdit || render)();
 
 // El visor 3D (Three.js, ~el grueso del bundle) se carga BAJO DEMANDA: la grilla de módulos y el
 // arranque no lo necesitan. Sale del chunk inicial → menos JS que parsear en el primer render (mejora
@@ -294,6 +300,7 @@ function abrirProyecto(kind, params){
   state.kind = kind; state.params = params;
   nuevoProyecto(); // projectHash propio → gate normal del entregable
   state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tab = "3d";
+  state.editOpen = true;             // preset/compartido abre con el editor a mano (tocar medidas al toque)
   state.step = pasosOf().length + 1; // salta al resultado
   render();
 }
@@ -530,7 +537,7 @@ function addVano(tipo){
   if (d.ancho > largo - 100) d.ancho = Math.max(400, largo - 100); // que entre en el muro
   const v = { tipo, ...d, pos: Math.round(largo / 2) };
   v.pos = clampPos(v, arr, largo);
-  arr.push(v); render();
+  arr.push(v); emitEdit();
 }
 function drawSchem(){
   const box = document.getElementById("schem"); if (!box) return;
@@ -575,7 +582,7 @@ function renderVanoList(){
         <label>Posición<input type="number" data-k="pos" data-i="${i}" value="${v.pos}"><i>mm</i></label>
       </div>${warn?`<small class="vwarn">⚠ ${warn}</small>`:""}</div>`;
   }).join("");
-  el.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { arr.splice(+b.dataset.del, 1); render(); });
+  el.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { arr.splice(+b.dataset.del, 1); emitEdit(); });
   el.querySelectorAll("input[data-k]").forEach(inp => inp.oninput = () => {
     const v = arr[+inp.dataset.i], k = inp.dataset.k, val = Math.round(parseFloat(inp.value) || 0);
     if (k === "ancho") v.ancho = Math.max(300, Math.min(2500, Math.min(val, L - 100)));       // entra en el muro, máx 2,50
@@ -662,7 +669,7 @@ function startVanoPisoDrag(e){
 function ponerVano(v){
   const { vano, ajustes } = encajarVano(state.params, v);
   state.params.vano = vano; state.vanoAjustes = ajustes;
-  render();
+  emitEdit();
 }
 function wireVanoPiso(){
   const add = document.getElementById("vpAdd");
@@ -671,7 +678,7 @@ function wireVanoPiso(){
       ponerVano({ x: Math.round(corrida/2 - 300), y: Math.round(luz/2 - 300), ancho: 600, largo: 600 }); };
     return;
   }
-  const del = document.getElementById("vpDel"); if (del) del.onclick = () => { state.params.vano = null; state.vanoAjustes = null; render(); };
+  const del = document.getElementById("vpDel"); if (del) del.onclick = () => { state.params.vano = null; state.vanoAjustes = null; emitEdit(); };
   const fix = document.getElementById("vpFix"); if (fix) fix.onclick = () => ponerVano(state.params.vano);
   const ang = document.getElementById("vpAngosto"); if (ang) ang.onclick = () => ponerVano({ ...state.params.vano, ancho: 1200 });
   const gir = document.getElementById("vpGirar"); if (gir) gir.onclick = () => {
@@ -702,10 +709,10 @@ function murosPlantaHTML(){
 }
 function wireMurosPlanta(){
   if (state.muroSel){
-    document.getElementById("volverPlanta").onclick = () => { state.muroSel = null; render(); };
+    document.getElementById("volverPlanta").onclick = () => { state.muroSel = null; emitEdit(); };
     wireVanos(); return;
   }
-  document.querySelectorAll('[data-seg="pasante"] button').forEach(b => b.onclick = () => { state.params.pasante = b.dataset.v; render(); });
+  document.querySelectorAll('[data-seg="pasante"] button').forEach(b => b.onclick = () => { state.params.pasante = b.dataset.v; emitEdit(); });
   drawPlanta4();
 }
 function nVanosMuro(parte){ return (state.params["vano" + cap(parte)] || []).length; }
@@ -723,19 +730,92 @@ function drawPlanta4(){
     ${g("izq",    0, t,     t, H-2*t, 12, H/2)}
     ${g("der",    W-t, t,   t, H-2*t, W-12, H/2)}
     <text x="${W/2}" y="${H/2}" text-anchor="middle" class="plantahint">planta</text></svg>`;
-  box.querySelectorAll(".wtap").forEach(w => w.onclick = () => { state.muroSel = w.dataset.parte; render(); });
+  box.querySelectorAll(".wtap").forEach(w => w.onclick = () => { state.muroSel = w.dataset.parte; emitEdit(); });
 }
 
 // ---------- paso resultado (común a todos los módulos) ----------
 function stepResultado(){
   const tabs = [["3d","3D"],["mat","Materiales"],["cut","Cortes"],["pdf","PDF"]];
-  return `<div class="result"><div class="tabs">${tabs.map(([k,l]) => `<button class="tab ${state.tab===k?'on':''}" data-tab="${k}">${l}</button>`).join("")}</div><div class="tabbody" id="tabbody"></div></div>`;
+  const drawer = state.editOpen ? `<aside class="editpanel" id="editpanel">${editorHTML()}</aside>` : "";
+  return `<div class="reswrap ${state.editOpen?'editing':''}">${drawer}
+    <div class="result">
+      <div class="resbar"><button class="btn ghost sm" id="toggleEdit">${state.editOpen?"✕ Cerrar edición":"✎ Editar proyecto"}</button></div>
+      <div class="tabs">${tabs.map(([k,l]) => `<button class="tab ${state.tab===k?'on':''}" data-tab="${k}">${l}</button>`).join("")}</div>
+      <div class="tabbody" id="tabbody"></div>
+    </div></div>`;
 }
-function wireResultado(){ document.querySelectorAll(".tabs .tab").forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderTab(); }); renderTab(); }
+function wireResultado(){
+  const t = document.getElementById("toggleEdit"); if (t) t.onclick = () => { state.editOpen = !state.editOpen; render(); };
+  if (state.editOpen) wireEditor();
+  document.querySelectorAll(".tabs .tab").forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderTab(); });
+  renderTab();
+}
+
+// --- editor todo-en-uno (drawer del resultado) ---
+// Junta en un panel los campos simples de TODOS los pasos (medidas, sistema, perfil, techo, niveles).
+// Los componentes interactivos (aberturas, vano de piso) abren su editor real en un modal.
+function editorHTML(){
+  const secs = pasosOf().map(paso => {
+    if (paso.componente){
+      const lbl = paso.componente === "vanoPiso" ? "Vano de piso…" : "Aberturas…";
+      return `<div class="edgrp"><button class="btn ghost sm" data-editcomp="${paso.id}">✎ ${lbl}</button></div>`;
+    }
+    const campos = [...(paso.campos || []), ...(paso.avanzado || [])].map(campoHTML).join("");
+    return campos.trim() ? `<div class="edgrp"><h4>${paso.titulo}</h4>${campos}</div>` : "";
+  }).join("");
+  const il = state.kind === "combinado" ? `<div class="interlibre" id="interlibre">${interiorTxt()}</div>` : "";
+  return `<div class="editinner"><b class="edttl">Editar proyecto</b>${secs}${il}</div>`;
+}
+function renderEditor(){ const el = document.getElementById("editpanel"); if (el){ el.innerHTML = editorHTML(); wireEditor(); } }
+// Refresca el resultado. vivo=true → actualiza el 3D EN EL LUGAR (cámara quieta), para tipeo de medidas.
+function refrescarResultado(vivo){
+  if (vivo && state.tab === "3d" && viewer && _repintar3d) _repintar3d();
+  else renderTab();
+  const il = document.getElementById("interlibre"); if (il) il.innerHTML = interiorTxt();
+}
+function findCampoAny(k){ for (const p of pasosOf()){ const c = findCampo(p, k); if (c) return c; } return null; }
+function wireEditor(){
+  const root = document.getElementById("editpanel"); if (!root) return;
+  root.querySelectorAll("[data-seg]").forEach(seg => seg.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const key = seg.dataset.seg, raw = b.dataset.v;
+    const val = raw === "true" ? true : raw === "false" ? false : (isNaN(+raw) ? raw : +raw);
+    if (key === "sistema"){ state.params.sistema = raw; renderEditor(); refrescarResultado(false); return; }
+    const opt = key.startsWith("opt:"), k = opt ? key.slice(4) : key;
+    if (opt) state.params.opciones[k] = val; else state.params[k] = val;
+    renderEditor(); refrescarResultado(false);
+  }));
+  root.querySelectorAll("[data-cards]").forEach(cs => cs.querySelectorAll(".card").forEach(b => b.onclick = () => {
+    const k = cs.dataset.cards, campo = findCampoAny(k);
+    state.params[k] = b.dataset.v; if (campo && campo.onSet) campo.onSet(state.params, b.dataset.v);
+    renderEditor(); refrescarResultado(false);
+  }));
+  root.querySelectorAll("[data-medida]").forEach(inp => {
+    const recalc = debounce(() => refrescarResultado(true), 130); // tipeo: 3D en vivo, sin reencuadrar
+    inp.oninput = () => { state.params[inp.dataset.medida] = Math.round(parseNum(inp.value) * 1000); recalc(); };
+  });
+  root.querySelectorAll("select[data-opt]").forEach(sel => sel.onchange = () => { state.params.opciones[sel.dataset.opt] = sel.value; refrescarResultado(false); });
+  root.querySelectorAll("[data-editcomp]").forEach(b => b.onclick = () => abrirAberturasModal(b.dataset.editcomp));
+}
+// Editor interactivo de aberturas (o vano de piso) en un modal, reusando los componentes del wizard.
+// Mientras está abierto, _onEdit hace que sus cambios refresquen el resultado en vivo (no navegan).
+function abrirAberturasModal(compId){
+  const ov = abrirModal(`<h3>${compId === "vanoPiso" ? "Vano de piso" : "Aberturas"}</h3><div class="modal-ab" id="modalAb"></div>`);
+  const pintar = () => {
+    const cont = document.getElementById("modalAb"); if (!cont) return;
+    cont.innerHTML = compId === "murosPlanta" ? murosPlantaHTML() : compId === "vanoPiso" ? vanoPisoHTML() : vanosHTML();
+    if (compId === "murosPlanta") wireMurosPlanta(); else if (compId === "vanoPiso") wireVanoPiso(); else wireVanos();
+  };
+  _onEdit = () => { pintar(); refrescarResultado(false); };  // los editores llaman emitEdit() → esto
+  const cerrar = () => { _onEdit = null; state.muroSel = null; cerrarModal(); refrescarResultado(false); };
+  const x = document.getElementById("modalx"); if (x) x.onclick = cerrar;
+  ov.addEventListener("click", e => { if (e.target === ov) cerrar(); });
+  pintar();
+}
 function renderTab(){
   document.querySelectorAll(".tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
   const body = document.getElementById("tabbody");
   if (viewer){ viewer.dispose(); viewer = null; }
+  _repintar3d = null;
   if (state.tab === "3d"){
     // Visor aún no descargado: skeleton (mismas dimensiones → sin CLS) y re-render al terminar.
     if (!ViewerClass){ body.innerHTML = `<div class="viewer" id="viewer3d">${skeleton3D}</div>`; cargarVisor().then(() => { if (state.tab === "3d") renderTab(); }); return; }
@@ -764,13 +844,16 @@ function renderTab(){
       <p class="hint">Girá con un dedo · pellizcá zoom · dos dedos desplazar · <b>tocá una pieza para ver qué es</b></p></div>`;
     try {
       viewer = new ViewerClass(document.getElementById("viewer3d"), { onSelect: showInfo3d });
-      const mostrar = () => (partes && state.parte3d !== "todo") ? piezas.filter(p => p.parte === state.parte3d) : piezas;
+      const mostrar = pz => (partes && state.parte3d !== "todo") ? pz.filter(p => p.parte === state.parte3d) : pz;
       const aplicarCapas = () => capas.forEach(c => { if (capaOn(c.id)) viewer.setLayerVisible(c.id, true); });
-      viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
+      viewer.setPieces(mostrar(piezas), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
+      // Repintado EN VIVO (editor todo-en-uno): recomputa y actualiza la geometría sin mover la cámara.
+      _repintar3d = () => { try { const r = computeProject(toEngineInput());
+        viewer.setPieces(mostrar(r.piezas), { vista: state.vista3d, elevacion: r.metadatos.elevacion || 0, keepCamera: true }); aplicarCapas(); } catch (e) { console.warn("repintar3d", e && e.message); } };
       const ps = document.getElementById("partesel");
       if (ps) ps.querySelectorAll("button").forEach(b => b.onclick = () => {
         state.parte3d = b.dataset.p; ps.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
-        viewer.setPieces(mostrar(), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
+        viewer.setPieces(mostrar(piezas), { vista: state.vista3d, elevacion: metadatos.elevacion || 0 }); aplicarCapas();
       });
       const cp = document.getElementById("capaspanel");
       if (cp) cp.querySelectorAll("input[data-capa]").forEach(chk => chk.onchange = () => {

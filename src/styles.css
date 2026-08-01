@@ -174,7 +174,22 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .btn:disabled{ opacity:.4; box-shadow:none; }
 
 /* resultado */
-.result{ flex:1; display:flex; flex-direction:column; min-height:0; }
+/* Resultado como WORKSPACE: drawer de edición (izq) + solapas/3D (der). El editor cambia medidas y
+   aberturas y el 3D se actualiza en vivo, sin volver al wizard. */
+.reswrap{ display:flex; height:100%; min-height:0; }
+.result{ flex:1; min-width:0; display:flex; flex-direction:column; min-height:0; }
+.editpanel{ flex:0 0 320px; overflow-y:auto; border-right:1px solid var(--outline2); background:var(--su-lowest); padding:16px var(--gutter,18px); scrollbar-width:thin; }
+.editinner{ display:flex; flex-direction:column; gap:6px; }
+.edttl{ font-family:"Barlow Condensed", sans-serif; font-weight:700; font-size:18px; text-transform:uppercase; color:var(--on-surface); margin-bottom:6px; }
+.edgrp{ border-top:1px solid var(--outline2); padding-top:10px; margin-top:8px; }
+.edgrp:first-of-type{ border-top:0; padding-top:0; margin-top:0; }
+.edgrp h4{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--primary-lite); margin:0 0 8px; }
+.resbar{ flex:0 0 auto; display:flex; justify-content:flex-end; padding:8px 12px; border-bottom:1px solid var(--outline2); }
+.modal-ab{ margin-top:6px; }
+@media (max-width:900px){
+  .reswrap{ flex-direction:column; }
+  .editpanel{ flex:0 0 auto; max-height:46vh; border-right:0; border-bottom:1px solid var(--outline2); }
+}
 .tabs{ flex:0 0 auto; display:flex; border-bottom:1px solid var(--outline2); background:var(--su-lowest); }
 .tabs .tab{ flex:1; appearance:none; border:0; background:transparent; color:var(--muted); padding:14px 6px; min-height:48px; font-family:"Barlow Condensed", sans-serif; font-weight:600; font-size:16px; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; border-bottom:2px solid transparent; transition:color .2s ease, border-color .2s ease; }
 .tabs .tab:hover:not(.on){ color:var(--on-surface); }

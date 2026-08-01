@@ -115,8 +115,10 @@ export class Viewer {
   // vista: "frontal" (muro) · "planta" (piso, cenital) · "iso-abajo"/"abajo" (cielorraso, contrapicada).
   // elevacion (mm, motor Z): eleva el grupo raíz para módulos suspendidos (cielorraso). Genérico: el
   // visor sólo lee metadatos, sin condicionales por tipo de módulo.
-  setPieces(piezas, { vista = "frontal", elevacion = 0 } = {}){
+  // keepCamera: actualiza la geometría SIN reencuadrar (edición en vivo — la cámara no salta).
+  setPieces(piezas, { vista = "frontal", elevacion = 0, keepCamera = false } = {}){
     this._vista = vista;
+    if (!keepCamera) this._userMoved = false;
     this._ensureCamera(ORTHO_VIEWS.has(vista));
     this.clearSelection();
     this.group.clear();
@@ -143,7 +145,7 @@ export class Viewer {
     this.group.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(this.group); // ya en mundo Y-up, con la elevación aplicada
     this._box = box.isEmpty() ? null : box;
-    if (this._box) this._frame(this._box);
+    if (this._box && !keepCamera) this._frame(this._box); // en vivo (keepCamera) no reencuadra
   }
 
   // Geometría de una pieza DIAGONAL (fleje de arriostramiento). El motor no la describe con un `axis`
