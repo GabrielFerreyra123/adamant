@@ -9,6 +9,7 @@ import { validarTecho } from "../engine/modules/techo.mjs";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
+import { precioRef, PRECIOS_REF, rubroDe, RUBROS_ORDEN } from "../config/precios-referencia.js";
 import { estadoLicencia, autorizado, iniciarPago, generarPDF, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
 import { PRICING } from "../config/pricing.js";
 import { glossHTML, glossForTipo, glossKeyForTipo } from "../content/glosario.js";
@@ -1001,22 +1002,31 @@ function shoppingList(mat){
 }
 function renderMateriales(body){
   const { materiales, metadatos } = computeProject(toEngineInput());
-  const items = shoppingList(materiales);
-  const rows = items.map(it => {
-    const sku = it.key.replace(/[^a-z0-9]+/gi, "-");
+  const grupos = {};
+  shoppingList(materiales).forEach(it => { (grupos[rubroDe(it.key)] = grupos[rubroDe(it.key)] || []).push(it); });
+  const fila = it => {
+    const sku = it.key.replace(/[^a-z0-9]+/gi, "-"), ref = precioRef(it.key), saved = getPrice(it.key);
     return `<tr><td>${it.label}</td><td class="u">${it.unidad}</td><td class="n">${it.cant}</td>
-      <td class="n"><input class="pinput" type="text" inputmode="decimal" autocomplete="off" name="precio-unitario-${sku}" id="precio-unitario-${sku}" aria-label="Precio ${it.label}" data-key="${it.key}" data-cant="${it.cant}" value="${getPrice(it.key) || ""}" placeholder="0"></td>
-      <td class="n" data-sub>${money(it.cant * getPrice(it.key))}</td></tr>`;
-  }).join("");
+      <td class="n"><input class="pinput" type="text" inputmode="decimal" autocomplete="off" id="precio-unitario-${sku}" aria-label="Precio ${it.label}" data-key="${it.key}" data-cant="${it.cant}" data-ref="${ref}" value="${saved || ""}" placeholder="${ref || 0}"></td>
+      <td class="n" data-sub></td></tr>`;
+  };
+  const cuerpo = RUBROS_ORDEN.filter(r => grupos[r]).map(r =>
+    `<tbody data-rubro="${r}"><tr class="rubro"><td colspan="4">${r}</td><td class="n" data-rubrosub="${r}"></td></tr>${grupos[r].map(fila).join("")}</tbody>`).join("");
   body.innerHTML = `<form class="pane" autocomplete="off" onsubmit="return false">
     ${avisosHTML(metadatos)}
     <table class="mtable"><thead><tr><th>Material</th><th>Unidad</th><th class="n">Cant</th><th class="n">$ unit.</th><th class="n">Subtotal</th></tr></thead>
-    <tbody>${rows}</tbody><tfoot><tr><td colspan="4" class="n"><b>TOTAL</b></td><td class="n"><b data-total></b></td></tr></tfoot></table>
-    <p class="sub">Perfilería en barras comerciales (6 m steel · 3,05 m wood). Cargá el precio de tu corralón — se guarda en este navegador. Sólo estructura.</p>
+    ${cuerpo}
+    <tfoot><tr><td colspan="4" class="n"><b>TOTAL estimado</b></td><td class="n"><b data-total></b></td></tr></tfoot></table>
+    <p class="sub">Presupuesto <b>estimativo</b> con precios de referencia del mercado (${PRECIOS_REF.vigenteDesde}). El precio que cargues manda sobre el estimado y se guarda en este navegador. Sólo estructura.</p>
   </form>`;
   const recompute = () => {
-    let total = 0;
-    body.querySelectorAll(".pinput").forEach(inp => { const st = (+inp.dataset.cant) * parseNum(inp.value); total += st; inp.closest("tr").querySelector("[data-sub]").textContent = money(st); });
+    let total = 0; const subs = {};
+    body.querySelectorAll(".pinput").forEach(inp => {
+      const pu = parseNum(inp.value) || +inp.dataset.ref || 0, st = (+inp.dataset.cant) * pu;
+      total += st; const r = inp.closest("tbody").dataset.rubro; subs[r] = (subs[r] || 0) + st;
+      inp.closest("tr").querySelector("[data-sub]").textContent = money(st);
+    });
+    body.querySelectorAll("[data-rubrosub]").forEach(el => el.textContent = money(subs[el.dataset.rubrosub] || 0));
     body.querySelector("[data-total]").textContent = money(total);
   };
   body.querySelectorAll(".pinput").forEach(inp => inp.addEventListener("input", () => { setPrice(inp.dataset.key, parseNum(inp.value)); recompute(); }));

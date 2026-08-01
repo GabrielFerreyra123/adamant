@@ -5,6 +5,7 @@ import autoTable from "jspdf-autotable";
 import { computeProject, cutPlan, cutOpts, getModule } from "../engine/index.mjs";
 import { cortesPorEtapaVsGlobal } from "../engine/modules/combinado.mjs";
 import { buildBraces } from "../engine/brace.mjs";
+import { precioRef, PRECIOS_REF, rubroDe, RUBROS_ORDEN } from "../config/precios-referencia.js";
 
 const TEAL = [27,182,164], OBS = [10,26,34], TANG = [232,93,42], MUT = [110,128,136];
 const unidadBarra = len => `${len >= 6000 ? "barra" : "tira"} ${(len/1000).toFixed(2).replace(".", ",")} m`;
@@ -141,19 +142,32 @@ function drawHeader(doc, titulo, subt){
   doc.setFontSize(9); doc.text(subt || new Date().toLocaleDateString("es-AR"), W - M, y, { align: "right" });
   return y + 8;
 }
-// Lista de compra (unidades de venta) desde `materiales`. Devuelve la y siguiente.
+// Lista de compra (unidades de venta) desde `materiales`, AGRUPADA por rubro con subtotales. Devuelve la y siguiente.
 function drawCompra(doc, materiales, y){
-  const W = doc.internal.pageSize.getWidth(), M = 14;
-  doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...OBS); doc.text("Lista de compra", M, y);
-  const rows = []; let total = 0;
-  const push = (label, unidad, cant, key) => { const pu = getPrice(key), st = cant * pu; total += st; rows.push([label, unidad, String(cant), pu ? money(pu) : "—", st ? money(st) : "—"]); };
-  materiales.perfiles.forEach(p => push(p.perfil, unidadBarra(p.largoBarra), p.barras, `perf:${p.perfil}`));
-  if (materiales.tornillos?.t1) push("Tornillo T1 (estructura)", "u", materiales.tornillos.t1, "t1");
-  (materiales.otros || []).forEach(o => push(o.label, o.unidad, o.cantidad, o.key));
-  autoTable(doc, { startY: y + 2, head: [["Material", "Unidad", "Cant", "$ unit.", "Subtotal"]], body: rows, foot: [["", "", "", "TOTAL", money(total)]],
+  const M = 14;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...OBS); doc.text("Presupuesto estimado", M, y);
+  const items = [];
+  materiales.perfiles.forEach(p => items.push({ label: p.perfil, unidad: unidadBarra(p.largoBarra), cant: p.barras, key: `perf:${p.perfil}` }));
+  if (materiales.tornillos?.t1) items.push({ label: "Tornillo T1 (estructura)", unidad: "u", cant: materiales.tornillos.t1, key: "t1" });
+  (materiales.otros || []).forEach(o => items.push({ label: o.label, unidad: o.unidad, cant: o.cantidad, key: o.key }));
+  const grupos = {}; items.forEach(it => { (grupos[rubroDe(it.key)] = grupos[rubroDe(it.key)] || []).push(it); });
+  const body = []; let total = 0;
+  const GRIS = [236, 240, 241];
+  RUBROS_ORDEN.filter(r => grupos[r]).forEach(r => {
+    let sub = 0;
+    const filas = grupos[r].map(it => { const pu = getPrice(it.key), st = it.cant * pu; sub += st; total += st;
+      return [it.label, it.unidad, String(it.cant), pu ? money(pu) : "—", st ? money(st) : "—"]; });
+    body.push([{ content: r, colSpan: 4, styles: { fontStyle: "bold", fillColor: GRIS, textColor: OBS } },
+               { content: money(sub), styles: { halign: "right", fontStyle: "bold", fillColor: GRIS, textColor: TEAL } }]);
+    body.push(...filas);
+  });
+  autoTable(doc, { startY: y + 2, head: [["Material", "Unidad", "Cant", "$ unit.", "Subtotal"]], body, foot: [["", "", "", "TOTAL estimado", money(total)]],
     styles: { fontSize: 8.5, cellPadding: 1.6 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 }, footStyles: { fillColor: [255,255,255], textColor: TEAL, fontStyle: "bold" },
     columnStyles: { 2:{halign:"right"}, 3:{halign:"right"}, 4:{halign:"right"} }, margin: { left: M, right: M } });
-  return doc.lastAutoTable.finalY + 6;
+  let yn = doc.lastAutoTable.finalY + 5;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...MUT);
+  doc.text(`Presupuesto estimativo · precios de referencia de mercado (${PRECIOS_REF.vigenteDesde}). Verificá con tu corralón.`, M, yn);
+  return yn + 5;
 }
 // Lista de cortes para un conjunto de piezas. Devuelve la y siguiente.
 function drawCortesTabla(doc, piezas, input, titulo, y){
@@ -253,7 +267,8 @@ async function pdfCombinado(doc, input, piezas, materiales, metadatos, img3d){
 // opts: { img: dataURL del 3D (el WebGL vive en el cliente), precios: mapa clave→$, out: "save"|"buffer" }
 // Devuelve { doc, nombre }; con out:"save" además dispara la descarga (solo navegador).
 export async function exportPDF(input, opts = {}){
-  getPrice = k => (opts.precios || {})[k] ?? 0;
+  // Precio: el que cargó el usuario manda; si no cargó, cae al de referencia (presupuesto completo).
+  getPrice = k => { const v = (opts.precios || {})[k]; return v ? v : precioRef(k); };
   const { piezas, materiales, metadatos } = computeProject(input);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   if (input.kind === "combinado"){
@@ -312,22 +327,8 @@ export async function exportPDF(input, opts = {}){
     y += 4;
   }
 
-  // lista de compra
-  doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...OBS);
-  doc.text("Lista de compra", M, y); y += 2;
-  const rows = []; let total = 0;
-  const push = (label, unidad, cant, key) => { const pu = getPrice(key), st = cant * pu; total += st; rows.push([label, unidad, String(cant), pu ? money(pu) : "—", st ? money(st) : "—"]); };
-  materiales.perfiles.forEach(p => push(p.perfil, unidadBarra(p.largoBarra), p.barras, `perf:${p.perfil}`));
-  if (materiales.tornillos?.t1) push("Tornillo T1 (estructura)", "u", materiales.tornillos.t1, "t1");
-  (materiales.otros || []).forEach(o => push(o.label, o.unidad, o.cantidad, o.key));
-  autoTable(doc, {
-    startY: y + 1, head: [["Material", "Unidad", "Cant", "$ unit.", "Subtotal"]],
-    body: rows, foot: [["", "", "", "TOTAL", money(total)]],
-    styles: { fontSize: 8.5, cellPadding: 1.6 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 },
-    footStyles: { fillColor: [255,255,255], textColor: TEAL, fontStyle: "bold" },
-    columnStyles: { 2:{halign:"right"}, 3:{halign:"right"}, 4:{halign:"right"} }, margin: { left: M, right: M }
-  });
-  y = doc.lastAutoTable.finalY + 6;
+  // presupuesto estimado (agrupado por rubro, con precios de referencia)
+  y = drawCompra(doc, materiales, y);
 
   // lista de cortes
   if (y > 250){ doc.addPage(); y = 16; }
