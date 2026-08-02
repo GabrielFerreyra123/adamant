@@ -366,6 +366,27 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .cmpwin{ margin:0 0 4px; padding-left:18px; display:flex; flex-direction:column; gap:6px; }
 .cmpwin li{ font-size:12.5px; line-height:1.5; color:var(--paper); }
 .cmpwin li::marker{ color:var(--teal); }
+/* planos por muro (overlay imprimible) */
+.printsheets{ position:fixed; inset:0; z-index:200; background:var(--panel); overflow:auto; }
+.printbar{ position:sticky; top:0; display:flex; gap:10px; align-items:center; padding:12px 16px; background:var(--panel2); border-bottom:1px solid var(--line); }
+.printbar b{ flex:1; color:var(--paper); }
+.sheets{ padding:18px 16px 40px; }
+.sheetnote{ max-width:820px; margin:0 auto 16px; font-size:13px; color:var(--muted); }
+.sheet{ max-width:820px; margin:0 auto 26px; }
+.sheet h3{ font-size:14px; color:var(--paper); margin:0 0 8px; }
+.sheet svg{ display:block; width:100%; border:1px solid var(--line); border-radius:6px; background:#fff; }
+.sheetleg{ display:flex; flex-wrap:wrap; gap:14px; margin-top:8px; font-size:12px; color:var(--muted); }
+.sheetleg span{ display:flex; align-items:center; gap:6px; }
+.sheetleg i{ width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid rgba(0,0,0,.25); }
+@media print{
+  body > *:not(.printsheets){ display:none !important; }
+  .printsheets{ position:static; overflow:visible; background:#fff; }
+  .printbar, .sheetnote{ display:none !important; }
+  .sheet{ page-break-after:always; margin:0 0 10mm; }
+  .sheet h3{ color:#000; }
+  .sheet svg{ border:none; }
+  .sheetleg{ color:#333; }
+}
 /* planta del vano de piso: líneas de viga + hueco arrastrable */
 .plantasvg .vpvig{ stroke:var(--outline2); stroke-width:1; }
 .plantasvg .vphole rect{ fill:rgba(232,93,42,.35); stroke:var(--tangerine); stroke-width:2; cursor:grab; }

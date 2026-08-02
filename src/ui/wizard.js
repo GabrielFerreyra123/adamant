@@ -11,7 +11,8 @@ import { aislacion, AISLANTES, ESPESORES } from "../engine/aislacion.mjs";
 import { fasesDeObra } from "../engine/fases.mjs";
 import { comparar } from "../engine/comparador.mjs";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
-import { secDims } from "../engine/geometry.mjs";
+import { secDims, pieceBoxEngine } from "../engine/geometry.mjs";
+import { buildBraces } from "../engine/brace.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { precioRef, PRECIOS_REF, rubroDe, RUBROS_ORDEN } from "../config/precios-referencia.js";
 import { estadoLicencia, autorizado, iniciarPago, generarPDF, generarDXF, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
@@ -746,13 +747,15 @@ function stepResultado(){
   const drawer = state.editOpen ? `<aside class="editpanel" id="editpanel">${editorHTML()}</aside>` : "";
   return `<div class="reswrap ${state.editOpen?'editing':''}">${drawer}
     <div class="result">
-      <div class="resbar"><button class="btn ghost sm" id="toggleEdit">${state.editOpen?"✕ Cerrar edición":"✎ Editar proyecto"}</button></div>
+      <div class="resbar"><button class="btn ghost sm" id="toggleEdit">${state.editOpen?"✕ Cerrar edición":"✎ Editar proyecto"}</button>
+        ${(state.kind==="muro"||state.kind==="combinado")?`<button class="btn ghost sm" id="planosBtn">🖨️ Planos por muro</button>`:""}</div>
       <div class="tabs">${tabs.map(tabHTML).join("")}</div>
       <div class="tabbody" id="tabbody"></div>
     </div></div>`;
 }
 function wireResultado(){
   const t = document.getElementById("toggleEdit"); if (t) t.onclick = () => { state.editOpen = !state.editOpen; render(); };
+  const pl = document.getElementById("planosBtn"); if (pl) pl.onclick = abrirPlanos;
   if (state.editOpen) wireEditor();
   document.querySelectorAll(".tabs .tab").forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderTab(); });
   renderTab();
@@ -1112,6 +1115,72 @@ function renderAislacion(body){
   body.querySelectorAll("[data-aisesp]").forEach(b => b.onclick = () => { state.aisl.espesor = +b.dataset.aisesp; renderAislacion(body); });
   body.querySelectorAll("[data-aisubic]").forEach(b => b.onclick = () => { state.aisl.ubicacion = b.dataset.aisubic; renderAislacion(body); });
   body.querySelectorAll("[data-aisfix]").forEach(b => b.onclick = () => { Object.assign(state.aisl, _aisFixes[+b.dataset.aisfix]); renderAislacion(body); });
+}
+// ---- Planos por muro (láminas imprimibles para llevar a obra) ----
+// Descompone el proyecto en muros individuales (elevación local de cada paño).
+function murosParaLamina(input){
+  if (input.kind === "muro") return [{ nombre: "Muro", input }];
+  if (input.kind === "combinado"){
+    const base = { kind: "muro", sistema: input.sistema, tipoMuro: "exterior", alto: input.alto, opciones: input.opciones };
+    return [
+      { nombre: "Frente",       input: { ...base, largo: +input.largo, vanos: input.vanoFrente || [], arriostramiento: input.arriostraFrente || "cruz" } },
+      { nombre: "Fondo",        input: { ...base, largo: +input.largo, vanos: input.vanoFondo || [],  arriostramiento: input.arriostraFondo || "cruz" } },
+      { nombre: "Lateral izq.", input: { ...base, largo: +input.ancho, vanos: input.vanoIzq || [],   arriostramiento: input.arriostraIzq || "cruz" } },
+      { nombre: "Lateral der.", input: { ...base, largo: +input.ancho, vanos: input.vanoDer || [],   arriostramiento: input.arriostraDer || "cruz" } }
+    ];
+  }
+  return [];
+}
+// Elevación acotada de un muro como SVG (montantes, vanos, soleras, cruces + cotas). Escala a ancho fijo.
+function svgMuro(muroInput){
+  const { piezas } = computeProject(muroInput);
+  const L = +muroInput.largo, A = +muroInput.alto;
+  if (!(L > 0 && A > 0)) return "";
+  const W = 760, sc = W / L, H = A * sc, pad = 48;
+  const col = t => /MONTANTE/.test(t) ? "#6b7d84"
+    : /KING|JACK|DINTEL|CRIPPLE|CABEZAL|SOL\.VANO|SOL\.DINTEL/.test(t) ? "#e85d2a"
+    : /SOL\.PANEL|SOLERA/.test(t) ? "#1bb6a4" : "#8aa0a8";
+  let rects = "";
+  (piezas || []).forEach(p => {
+    if (p.superficie) return;
+    const { size, center } = pieceBoxEngine(p), w = size[0] * sc, h = size[2] * sc;
+    if (!(w > 0.2 && h > 0.2)) return;
+    const x = pad + (center[0] - size[0] / 2) * sc, y = pad + H - (center[2] + size[2] / 2) * sc;
+    rects += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${col(p.tipo)}" stroke="#0A1A22" stroke-width="0.4"/>`;
+  });
+  const braces = (buildBraces(muroInput).zonas || []).map(z => {
+    const x0 = pad + z.x0 * sc, x1 = pad + (z.x0 + z.ancho) * sc, yb = pad + H, yt = pad + H - z.alto * sc;
+    return `<line x1="${x0}" y1="${yb}" x2="${x1}" y2="${yt}" stroke="#6b7d84" stroke-width="1"/><line x1="${x0}" y1="${yt}" x2="${x1}" y2="${yb}" stroke="#6b7d84" stroke-width="1"/>`;
+  }).join("");
+  const vanos = (muroInput.vanos || []).map(v => {
+    const cx = pad + ((+v.x1 + +v.x2) / 2) * sc, an = +v.x2 - +v.x1, al = +v.h - (+v.sill || 0);
+    const cy = pad + H - ((+v.h + (+v.sill || 0)) / 2) * sc;
+    return `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" font-size="11" fill="#0A1A22">${an}×${al}</text>`;
+  }).join("");
+  const cotas = `<line x1="${pad}" y1="${pad+H+18}" x2="${pad+W}" y2="${pad+H+18}" stroke="#1bb6a4"/>
+    <text x="${pad+W/2}" y="${pad+H+33}" text-anchor="middle" font-size="12" fill="#5c7178">${(L/1000).toFixed(2)} m</text>
+    <line x1="${pad-18}" y1="${pad}" x2="${pad-18}" y2="${pad+H}" stroke="#1bb6a4"/>
+    <text x="${pad-26}" y="${pad+H/2}" text-anchor="middle" font-size="12" fill="#5c7178" transform="rotate(-90 ${pad-26} ${pad+H/2})">${(A/1000).toFixed(2)} m</text>`;
+  return `<svg viewBox="0 0 ${W+pad*2} ${H+pad*2+24}" width="100%" xmlns="http://www.w3.org/2000/svg">${rects}${braces}${vanos}${cotas}</svg>`;
+}
+// Overlay imprimible: una lámina por muro (con @media print, una por página).
+function abrirPlanos(){
+  const muros = murosParaLamina(toEngineInput());
+  if (!muros.length) return;
+  const sheets = muros.map(m => `<div class="sheet">
+    <h3>${m.nombre} · ${state.params.sistema === "wood" ? "Wood frame" : "Steel frame"} · modulación ${m.input.opciones?.modulo || 400} mm</h3>
+    ${svgMuro(m.input)}
+    <div class="sheetleg"><span><i style="background:#1bb6a4"></i>Solera</span><span><i style="background:#6b7d84"></i>Montante</span><span><i style="background:#e85d2a"></i>Vano (medidas en mm)</span></div>
+  </div>`).join("");
+  const ov = document.createElement("div");
+  ov.className = "printsheets";
+  ov.innerHTML = `<div class="printbar"><b>Planos por muro</b>
+    <button class="btn sm" id="pimp">🖨️ Imprimir / PDF</button>
+    <button class="btn ghost sm" id="pcerrar">Cerrar</button></div>
+    <div class="sheets"><p class="sheetnote">Elevación acotada de cada muro para replantear en obra. Imprimí (o guardá como PDF): sale una hoja por muro.</p>${sheets}</div>`;
+  document.body.appendChild(ov);
+  ov.querySelector("#pcerrar").onclick = () => ov.remove();
+  ov.querySelector("#pimp").onclick = () => window.print();
 }
 // Comparador de sistemas (steel · wood · tradicional): costo, tiempo y peso sobre la misma obra.
 function renderComparar(body){
