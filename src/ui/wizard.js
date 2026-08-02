@@ -7,6 +7,7 @@ import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.mjs";
 import { validarTecho } from "../engine/modules/techo.mjs";
 import { predimensionar } from "../engine/predimensionado.mjs";
+import { aislacion, AISLANTES, ESPESORES } from "../engine/aislacion.mjs";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
@@ -732,7 +733,9 @@ function drawPlanta4(){
 
 // ---------- paso resultado (común a todos los módulos) ----------
 function stepResultado(){
-  const tabs = [["3d","3D"],["mat","Materiales"],["chk","Chequeo"],["cut","Cortes"],["pdf","PDF"]];
+  const tabs = [["3d","3D"],["mat","Materiales"],["chk","Chequeo"]];
+  if (state.kind === "muro" || state.kind === "combinado") tabs.push(["ais","Aislación"]);
+  tabs.push(["cut","Cortes"],["pdf","PDF"]);
   // Estado del chequeo → punto de color en la pestaña (se ve sin entrar).
   let chkPeor = null;
   try { chkPeor = predimensionar(toEngineInput(), { zona: state.zonaViento || "alta" }).resumen.peor; } catch {}
@@ -879,6 +882,7 @@ function renderTab(){
     }
   } else if (state.tab === "mat"){ renderMateriales(body); }
   else if (state.tab === "chk"){ renderChequeo(body); }
+  else if (state.tab === "ais"){ renderAislacion(body); }
   else if (state.tab === "cut"){ renderCortes(body); }
   else { renderExport(body); }
 }
@@ -1062,6 +1066,48 @@ function renderChequeo(body){
   </div>`;
   body.querySelectorAll("[data-zona]").forEach(b => b.onclick = () => { state.zonaViento = b.dataset.zona; renderChequeo(body); });
   body.querySelectorAll("[data-chkfix]").forEach(b => b.onclick = () => aplicarFixChequeo(_chkFixes[+b.dataset.chkfix]));
+}
+// Calculadora de aislación térmica (orientativa, NO dibuja). Para muros / ambientes.
+const AIS_UBIC = { continua: "Continua por fuera", entre: "Entre montantes" };
+let _aisFixes = [];
+function renderAislacion(body){
+  if (!state.aisl) state.aisl = { tipo: "Lana de vidrio", espesor: 100, ubicacion: "continua" };
+  const r = aislacion(toEngineInput(), state.aisl);
+  if (!(r.area > 0)){ body.innerHTML = `<div class="pane"><p class="sub">La calculadora de aislación cubre por ahora muros y ambientes.</p></div>`; return; }
+  _aisFixes = [];
+  const seg = (attr, items, sel) => items.map(([v, l]) =>
+    `<button class="zbtn ${sel===v?'on':''}" data-${attr}="${v}">${l}</button>`).join("");
+  const tipoSeg = seg("aistipo", Object.keys(AISLANTES).map(t => [t, t]), state.aisl.tipo);
+  const espSeg = seg("aisesp", ESPESORES.map(e => [e, e + " mm"]), state.aisl.espesor);
+  const ubicSeg = seg("aisubic", Object.entries(AIS_UBIC), state.aisl.ubicacion);
+  const cards = r.avisos.map(a => {
+    let btn = "";
+    if (a.fix){ const i = _aisFixes.push(a.fix) - 1; btn = `<div class="chkacts"><button type="button" class="btn sm" data-aisfix="${i}">${a.fixLabel}</button></div>`; }
+    const tono = a.tono === "info" ? "atencion" : a.tono;
+    return `<div class="chkcard ${tono}"><b>${a.tono==="info"?"ℹ️":SEM[tono]||"⚠️"} ${a.titulo}</b><span class="chkwhy">${a.texto}</span>${btn}</div>`;
+  }).join("");
+  body.innerHTML = `<div class="pane">
+    <div class="chkhead">
+      <div><h3 class="chktitle">${SEM[r.estado]} ${r.resumen}</h3>
+        <p class="sub">Cuánto abriga tu muro (transmitancia K) y cuánto aislante comprar. Es orientativo, no reemplaza el cálculo higrotérmico.</p></div>
+    </div>
+    <div class="aisctrl">
+      <div class="aisrow"><span class="zlbl">Aislante</span><div class="zbtns">${tipoSeg}</div></div>
+      <div class="aisrow"><span class="zlbl">Espesor</span><div class="zbtns">${espSeg}</div></div>
+      <div class="aisrow"><span class="zlbl">Dónde va</span><div class="zbtns">${ubicSeg}</div></div>
+    </div>
+    <div class="aisnums">
+      <div class="aisk ${r.estado}"><b>${r.K.toFixed(2).replace(".",",")}</b><span>K (W/m²K)<br>recom. ≤ ${r.nivel.B.toFixed(2).replace(".",",")}</span></div>
+      <div class="aisstat"><b>${r.m2} m²</b><span>de aislante a comprar</span></div>
+      <div class="aisstat"><b>${r.area.toFixed(1).replace(".",",")} m²</b><span>de muro (neto)</span></div>
+    </div>
+    <div class="chklist">${cards}</div>
+    <p class="chkdisc">⚠ Cálculo aproximado según IRAM 11601/11605 (zona de Bahía Blanca). El proyecto higrotérmico y la barrera de vapor los define un profesional.</p>
+  </div>`;
+  body.querySelectorAll("[data-aistipo]").forEach(b => b.onclick = () => { state.aisl.tipo = b.dataset.aistipo; renderAislacion(body); });
+  body.querySelectorAll("[data-aisesp]").forEach(b => b.onclick = () => { state.aisl.espesor = +b.dataset.aisesp; renderAislacion(body); });
+  body.querySelectorAll("[data-aisubic]").forEach(b => b.onclick = () => { state.aisl.ubicacion = b.dataset.aisubic; renderAislacion(body); });
+  body.querySelectorAll("[data-aisfix]").forEach(b => b.onclick = () => { Object.assign(state.aisl, _aisFixes[+b.dataset.aisfix]); renderAislacion(body); });
 }
 function renderMateriales(body){
   const { materiales, metadatos } = computeProject(toEngineInput());

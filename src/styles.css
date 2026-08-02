@@ -327,6 +327,17 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .chktable .mono{ font-family:"JetBrains Mono", monospace; }
 .chktable .chkrng{ color:var(--muted); font-size:11.5px; }
 .chkdisc{ margin-top:14px; font-size:12px; line-height:1.5; color:var(--muted); border-left:3px solid var(--tangerine); padding-left:11px; }
+/* calculadora de aislación */
+.aisctrl{ display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+.aisrow{ display:flex; flex-direction:column; gap:5px; }
+.aisnums{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.aisk, .aisstat{ flex:1; min-width:120px; display:flex; flex-direction:column; gap:2px; padding:12px 14px; border:1px solid var(--line); border-radius:2px; background:var(--panel2); }
+.aisk{ border-left:4px solid var(--line); }
+.aisk.ok{ border-left-color:#3ecf8e; }
+.aisk.atencion{ border-left-color:#f5c451; }
+.aisk.fuera{ border-left-color:#ff6b5e; }
+.aisk b, .aisstat b{ font-family:"JetBrains Mono", monospace; font-size:22px; color:var(--paper); font-weight:700; line-height:1.1; }
+.aisk span, .aisstat span{ font-size:11.5px; color:var(--muted); line-height:1.35; }
 /* planta del vano de piso: líneas de viga + hueco arrastrable */
 .plantasvg .vpvig{ stroke:var(--outline2); stroke-width:1; }
 .plantasvg .vphole rect{ fill:rgba(232,93,42,.35); stroke:var(--tangerine); stroke-width:2; cursor:grab; }

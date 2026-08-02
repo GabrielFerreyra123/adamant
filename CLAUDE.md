@@ -244,8 +244,12 @@ habitaciones (Casa) o columnas/estantes/barrales (Mueble vía `applyMueble`). `i
 - Etiquetado 3D rotula cada pieza `código · largo` vía CODE_MAP (match por **prefijo de color + largo**);
   las soleras SP/SV/SD comparten el prefijo `S`, así que a igual largo pueden colisionar en el código.
 - Optimizador de corte: no descuenta ancho de sierra ni resuelve empalmes de piezas > barra.
-- Revestimientos, terminaciones y aislación: **eliminados** (F11-bis.2, decisión definitiva). Adamant
-  calcula y dibuja solo estructura. El «despiece real de placas» queda **descartado** del backlog.
+- Revestimientos y terminaciones: **eliminados** (F11-bis.2, decisión definitiva). Adamant dibuja solo
+  estructura. El «despiece real de placas» queda **descartado** del backlog.
+- Aislación térmica: vuelve **solo como calculadora** (`src/engine/aislacion.mjs` + tab «Aislación»):
+  estima la transmitancia K, el m² de aislante y avisa de puente térmico y condensación. **No dibuja**
+  aislación en el 3D → sigue respetando «Adamant dibuja solo estructura». Umbrales IRAM 11601/11605
+  (zona Bahía Blanca), a calibrar. Cubre muro y ambiente (techo/piso, pendiente).
 - Cuatro aguas: sin cabios secundarios (jack rafters) ni correas en faldones de las puntas; **no lleva
   hastial** (es a 4 aguas). El apoyo del techo (hastiales/muro alto) se resuelve en dos aguas y una agua.
 - Cruz de San Andrés: se omite en paños con vano.
