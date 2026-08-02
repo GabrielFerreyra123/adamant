@@ -18,3 +18,10 @@ if (reduce || !("IntersectionObserver" in window)){
 
 const anio = document.getElementById("anio");
 if (anio) anio.textContent = new Date().getFullYear();
+
+// CTA sticky en mobile: se muestra una vez que el hero salió de vista (no tapa el CTA principal).
+const sticky = document.querySelector(".cta-sticky"), hero = document.querySelector(".hero");
+if (sticky && hero){
+  if (!("IntersectionObserver" in window)) sticky.classList.add("show");
+  else new IntersectionObserver(([e]) => sticky.classList.toggle("show", !e.isIntersecting), { threshold: 0 }).observe(hero);
+}

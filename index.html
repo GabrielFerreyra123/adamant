@@ -75,8 +75,8 @@
           <p class="hero-note">Sin instalar nada y sin cuenta. Diseñar y ver el 3D no se paga.</p>
         </div>
 
-        <div class="hero-visual reveal">
-          <div class="browser">
+        <div class="hero-visual reveal" role="img" aria-label="Vista de la app: un muro de steel frame en 3D con seis montantes, solera superior e inferior y una ventana, acotado 3,50 m por 2,40 m.">
+          <div class="browser" aria-hidden="true">
             <div class="browser-bar">
               <i></i><i></i><i></i>
               <span class="url">adamant.app/app/muro_01</span>
@@ -382,6 +382,8 @@
   ]
 }
 </script>
+<!-- CTA persistente en mobile: aparece al scrollear (clase .show la pone landing.js). -->
+<a class="cta-sticky" href="/app" aria-label="Empezar gratis">Empezar gratis <span class="arw" aria-hidden="true">→</span></a>
 <script type="module" src="/src/landing/landing.js"></script>
 </body>
 </html>

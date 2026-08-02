@@ -114,6 +114,24 @@ img,svg{ max-width:100%; }
 @media (max-width:420px){ .hero-cta .btn{ width:100%; } }
 .hero-note{ font-family:var(--font-mono); font-size:var(--fs-data); letter-spacing:var(--ls-data); color:color-mix(in srgb, var(--on-surface-variant) 60%, transparent); }
 
+/* CTA persistente en mobile (aparece al scrollear; desktop no lo usa) */
+.cta-sticky{ display:none; }
+@media (max-width:768px){
+  .cta-sticky{
+    position:fixed; left:16px; right:16px; bottom:16px; z-index:60;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:14px 20px; border-radius:var(--r-default,10px);
+    background:var(--primary); color:var(--on-primary);
+    font-family:var(--font-title,inherit); font-weight:700; font-size:16px; text-transform:uppercase; letter-spacing:.02em;
+    text-decoration:none; box-shadow:0 8px 30px rgba(0,0,0,.4);
+    transform:translateY(140%); opacity:0; transition:transform .28s ease, opacity .28s ease;
+  }
+  .cta-sticky.show{ transform:translateY(0); opacity:1; }
+}
+@media (max-width:768px) and (prefers-reduced-motion:reduce){
+  .cta-sticky{ transition:none; }
+}
+
 /* resplandor detrás del mockup */
 .hero-visual{ position:relative; }
 .hero-visual::before{
