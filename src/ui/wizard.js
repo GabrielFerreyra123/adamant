@@ -736,14 +736,12 @@ function drawPlanta4(){
 
 // ---------- paso resultado (común a todos los módulos) ----------
 function stepResultado(){
-  const tabs = [["3d","3D"],["mat","Materiales"],["chk","Chequeo"]];
-  if (state.kind === "muro" || state.kind === "combinado") tabs.push(["ais","Aislación"], ["cmp","Comparar"]);
-  tabs.push(["fas","Fases"],["cut","Cortes"],["pdf","PDF"]);
-  // Estado del chequeo → punto de color en la pestaña (se ve sin entrar).
+  const tabs = [["3d","3D"],["mat","Materiales"],["guia","Guía"],["cut","Cortes"],["pdf","PDF"]];
+  // Estado del chequeo → punto de color en la solapa Guía (se ve sin entrar).
   let chkPeor = null;
   try { chkPeor = predimensionar(toEngineInput(), { zona: state.zonaViento || "alta" }).resumen.peor; } catch {}
   const tabHTML = ([k,l]) => `<button class="tab ${state.tab===k?'on':''}" data-tab="${k}">${
-    k === "chk" && chkPeor ? `<span class="tabdot ${chkPeor}"></span>` : ""}${l}</button>`;
+    k === "guia" && chkPeor ? `<span class="tabdot ${chkPeor}"></span>` : ""}${l}</button>`;
   const drawer = state.editOpen ? `<aside class="editpanel" id="editpanel">${editorHTML()}</aside>` : "";
   return `<div class="reswrap ${state.editOpen?'editing':''}">${drawer}
     <div class="result">
@@ -886,10 +884,7 @@ function renderTab(){
       const r = document.getElementById("retry3d"); if (r) r.onclick = () => renderTab();
     }
   } else if (state.tab === "mat"){ renderMateriales(body); }
-  else if (state.tab === "chk"){ renderChequeo(body); }
-  else if (state.tab === "ais"){ renderAislacion(body); }
-  else if (state.tab === "fas"){ renderFases(body); }
-  else if (state.tab === "cmp"){ renderComparar(body); }
+  else if (state.tab === "guia"){ renderGuia(body); }
   else if (state.tab === "cut"){ renderCortes(body); }
   else { renderExport(body); }
 }
@@ -1115,6 +1110,20 @@ function renderAislacion(body){
   body.querySelectorAll("[data-aisesp]").forEach(b => b.onclick = () => { state.aisl.espesor = +b.dataset.aisesp; renderAislacion(body); });
   body.querySelectorAll("[data-aisubic]").forEach(b => b.onclick = () => { state.aisl.ubicacion = b.dataset.aisubic; renderAislacion(body); });
   body.querySelectorAll("[data-aisfix]").forEach(b => b.onclick = () => { Object.assign(state.aisl, _aisFixes[+b.dataset.aisfix]); renderAislacion(body); });
+}
+// Solapa "Guía": consolida los análisis (Chequeo · Aislación · Comparar · Fases) con sub-navegación.
+function renderGuia(body){
+  const esMuroAmb = state.kind === "muro" || state.kind === "combinado";
+  const subs = [["chk", "Chequeo"]];
+  if (esMuroAmb) subs.push(["ais", "Aislación"], ["cmp", "Comparar"]);
+  subs.push(["fas", "Fases"]);
+  if (!state.guiaSub || !subs.some(s => s[0] === state.guiaSub)) state.guiaSub = "chk";
+  body.innerHTML = `<div class="guianav">${subs.map(([k, l]) =>
+    `<button class="gbtn ${state.guiaSub===k?'on':''}" data-gsub="${k}">${l}</button>`).join("")}</div>
+    <div id="guiabody"></div>`;
+  const gb = body.querySelector("#guiabody");
+  ({ chk: renderChequeo, ais: renderAislacion, cmp: renderComparar, fas: renderFases }[state.guiaSub] || renderChequeo)(gb);
+  body.querySelectorAll("[data-gsub]").forEach(b => b.onclick = () => { state.guiaSub = b.dataset.gsub; renderGuia(body); });
 }
 // ---- Planos por muro (láminas imprimibles para llevar a obra) ----
 // Descompone el proyecto en muros individuales (elevación local de cada paño).
