@@ -6,6 +6,7 @@ import { cutList } from "../engine/cuts.mjs";
 import { murosDelAmbiente } from "../engine/modules/combinado.mjs";
 import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.mjs";
 import { validarTecho } from "../engine/modules/techo.mjs";
+import { predimensionar } from "../engine/predimensionado.mjs";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
@@ -731,7 +732,7 @@ function drawPlanta4(){
 
 // ---------- paso resultado (común a todos los módulos) ----------
 function stepResultado(){
-  const tabs = [["3d","3D"],["mat","Materiales"],["cut","Cortes"],["pdf","PDF"]];
+  const tabs = [["3d","3D"],["mat","Materiales"],["chk","Chequeo"],["cut","Cortes"],["pdf","PDF"]];
   const drawer = state.editOpen ? `<aside class="editpanel" id="editpanel">${editorHTML()}</aside>` : "";
   return `<div class="reswrap ${state.editOpen?'editing':''}">${drawer}
     <div class="result">
@@ -872,6 +873,7 @@ function renderTab(){
       const r = document.getElementById("retry3d"); if (r) r.onclick = () => renderTab();
     }
   } else if (state.tab === "mat"){ renderMateriales(body); }
+  else if (state.tab === "chk"){ renderChequeo(body); }
   else if (state.tab === "cut"){ renderCortes(body); }
   else { renderExport(body); }
 }
@@ -999,6 +1001,62 @@ function shoppingList(mat){
   if (mat.tornillos?.t1) items.push({ key:"t1", label:"Tornillo T1 (estructura)", unidad:"u", cant:mat.tornillos.t1 });
   (mat.otros || []).forEach(o => items.push({ key:o.key, label:o.label, unidad:o.unidad, cant:o.cantidad })); // ítems propios del módulo (placa de piso, implantación…)
   return items;
+}
+// Semáforo de pre-dimensionado (orientativo, NO cálculo). Zona de viento con default alta (Bahía Blanca).
+const ZONA_LBL = { baja: "Baja", media: "Media", alta: "Alta (Bahía Blanca)" };
+const SEM = { ok: "🟢", atencion: "🟡", fuera: "🔴" };
+// Aplica un `fix` que devuelve el motor (predimensionado) sobre los parámetros del proyecto.
+function aplicarFixChequeo(fix){
+  const p = state.params;
+  if (fix.tipo === "modulo") p.opciones = { ...p.opciones, modulo: fix.valor };
+  else if (fix.tipo === "pendiente") p.pendiente = fix.valor;
+  else if (fix.tipo === "arriostrar"){
+    if (state.kind === "muro") p.arriostramiento = "cruz";
+    else ["Frente", "Fondo", "Izq", "Der"].forEach(l => p["arriostra" + l] = "cruz");
+  } else if (fix.tipo === "seccion"){
+    if (p.sistema === "wood") p.opciones = { ...p.opciones, lumber: fix.valor };
+    else p.opciones = { ...p.opciones, pgc: fix.valor };
+  }
+  render();
+}
+let _chkFixes = [];
+function renderChequeo(body){
+  if (!state.zonaViento) state.zonaViento = "alta";
+  const { checks, resumen } = predimensionar(toEngineInput(), { zona: state.zonaViento });
+  _chkFixes = [];
+  const zonaSel = Object.keys(ZONA_LBL).map(z =>
+    `<button class="zbtn ${state.zonaViento===z?'on':''}" data-zona="${z}">${ZONA_LBL[z]}</button>`).join("");
+  const nMal = resumen.fuera, nRev = resumen.atencion;
+  const resTxt = resumen.peor === "ok" ? "Se puede construir así."
+    : resumen.peor === "atencion" ? `Ojo con ${nRev} cosa${nRev!==1?"s":""}: conviene revisarla${nRev!==1?"s":""}.`
+    : `Frená: ${nMal} cosa${nMal!==1?"s":""} que necesita${nMal!==1?"n":""} un cálculo antes de construir.`;
+  // Tarjetas en criollo (solo lo que no está 🟢, para no marear); si está todo bien, una tarjeta linda.
+  const alertas = checks.filter(c => c.estado !== "ok");
+  const cards = alertas.length ? alertas.map(c => {
+    let btn = "";
+    if (c.fix){ const i = _chkFixes.push(c.fix) - 1; btn = `<button type="button" class="btn sm" data-chkfix="${i}">${c.fix.label}</button>`; }
+    return `<div class="chkcard ${c.estado}"><b>${SEM[c.estado]} ${c.titulo}</b>
+      <span class="chkwhy">${c.detalle}</span>${btn ? `<div class="chkacts">${btn}</div>` : ""}</div>`;
+  }).join("")
+    : `<div class="chkcard ok"><b>🟢 Todo en rango</b><span class="chkwhy">Las medidas de tu proyecto entran dentro de lo típico de manual. Igual, el cálculo final lo firma un profesional.</span></div>`;
+  // Detalle técnico (para el calculista): tabla plegable.
+  const filas = checks.map(c => `<tr class="e-${c.estado}"><td>${SEM[c.estado]}</td><td>${c.label}</td>
+    <td class="mono">${c.valor}</td><td class="chkrng">${c.rango}</td></tr>`).join("");
+  const tecnico = checks.length ? `<details class="chktec"><summary>Ver detalle técnico (para tu calculista)</summary>
+    <table class="chktable"><thead><tr><th></th><th>Ítem</th><th>Tu proyecto</th><th>Rango de manual</th></tr></thead>
+    <tbody>${filas}</tbody></table></details>` : "";
+  body.innerHTML = `<div class="pane">
+    <div class="chkhead">
+      <div><h3 class="chktitle">${SEM[resumen.peor]} ${resTxt}</h3>
+        <p class="sub">Revisión rápida contra medidas de manual. <b>No reemplaza el cálculo</b> de un profesional.</p></div>
+      <div class="zona"><span class="zlbl">¿Cuánto viento hay en tu zona?</span><div class="zbtns">${zonaSel}</div></div>
+    </div>
+    <div class="chklist">${cards}</div>
+    ${tecnico}
+    <p class="chkdisc">⚠ Compara con valores típicos publicados (ConsulSteel · IRAM-IAS U 500-205 · manuales de wood frame). El <b>cálculo estructural, los arriostres y los anclajes los define un profesional habilitado</b> según viento, nieve y cargas (CIRSOC).</p>
+  </div>`;
+  body.querySelectorAll("[data-zona]").forEach(b => b.onclick = () => { state.zonaViento = b.dataset.zona; renderChequeo(body); });
+  body.querySelectorAll("[data-chkfix]").forEach(b => b.onclick = () => aplicarFixChequeo(_chkFixes[+b.dataset.chkfix]));
 }
 function renderMateriales(body){
   const { materiales, metadatos } = computeProject(toEngineInput());

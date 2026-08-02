@@ -296,6 +296,33 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .solcard .solacts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
 .solcard .solacts .btn{ background:var(--teal); color:var(--on-primary,#04231f); border-color:transparent; }
 .solcard.error .solacts .btn{ background:#ff8a80; }
+/* semáforo de pre-dimensionado */
+.chkhead{ display:flex; flex-wrap:wrap; gap:14px; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
+.chktitle{ margin:0 0 3px; font-size:16px; font-weight:700; color:var(--paper); }
+.zona{ display:flex; flex-direction:column; gap:5px; }
+.zlbl{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.zbtns{ display:flex; gap:6px; flex-wrap:wrap; }
+.zbtn{ appearance:none; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--paper); background:var(--panel2); border:1px solid var(--line); border-radius:2px; padding:6px 11px; transition:.12s; }
+.zbtn:hover{ border-color:var(--teal); }
+.zbtn.on{ background:var(--teal); color:var(--on-primary,#04231f); border-color:var(--teal); }
+.chklist{ display:flex; flex-direction:column; gap:9px; }
+.chkcard{ display:flex; flex-direction:column; gap:6px; padding:12px 14px; border:1px solid var(--line); border-left-width:4px; border-radius:2px; background:var(--panel2); }
+.chkcard.ok{ border-left-color:#3ecf8e; }
+.chkcard.atencion{ border-left-color:#f5c451; }
+.chkcard.fuera{ border-left-color:#ff6b5e; background:rgba(255,107,94,.07); }
+.chkcard b{ font-size:14px; color:var(--paper); font-weight:600; line-height:1.35; }
+.chkwhy{ font-size:12.5px; line-height:1.5; color:var(--muted); }
+.chkacts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
+.chkacts .btn{ background:var(--teal); color:var(--on-primary,#04231f); border-color:transparent; }
+.chktec{ margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
+.chktec summary{ cursor:pointer; font-size:12.5px; font-weight:600; color:var(--muted); }
+.chktec summary:hover{ color:var(--teal); }
+.chktable{ width:100%; border-collapse:collapse; margin-top:10px; font-size:12.5px; }
+.chktable th{ text-align:left; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:4px 8px; border-bottom:1px solid var(--line); }
+.chktable td{ padding:5px 8px; border-bottom:1px solid var(--line); color:var(--paper); vertical-align:top; }
+.chktable .mono{ font-family:"JetBrains Mono", monospace; }
+.chktable .chkrng{ color:var(--muted); font-size:11.5px; }
+.chkdisc{ margin-top:14px; font-size:12px; line-height:1.5; color:var(--muted); border-left:3px solid var(--tangerine); padding-left:11px; }
 /* planta del vano de piso: líneas de viga + hueco arrastrable */
 .plantasvg .vpvig{ stroke:var(--outline2); stroke-width:1; }
 .plantasvg .vphole rect{ fill:rgba(232,93,42,.35); stroke:var(--tangerine); stroke-width:2; cursor:grab; }
