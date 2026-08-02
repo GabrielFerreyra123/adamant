@@ -9,6 +9,7 @@ import { validarTecho } from "../engine/modules/techo.mjs";
 import { predimensionar } from "../engine/predimensionado.mjs";
 import { aislacion, AISLANTES, ESPESORES } from "../engine/aislacion.mjs";
 import { fasesDeObra } from "../engine/fases.mjs";
+import { comparar } from "../engine/comparador.mjs";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
@@ -735,7 +736,7 @@ function drawPlanta4(){
 // ---------- paso resultado (común a todos los módulos) ----------
 function stepResultado(){
   const tabs = [["3d","3D"],["mat","Materiales"],["chk","Chequeo"]];
-  if (state.kind === "muro" || state.kind === "combinado") tabs.push(["ais","Aislación"]);
+  if (state.kind === "muro" || state.kind === "combinado") tabs.push(["ais","Aislación"], ["cmp","Comparar"]);
   tabs.push(["fas","Fases"],["cut","Cortes"],["pdf","PDF"]);
   // Estado del chequeo → punto de color en la pestaña (se ve sin entrar).
   let chkPeor = null;
@@ -885,6 +886,7 @@ function renderTab(){
   else if (state.tab === "chk"){ renderChequeo(body); }
   else if (state.tab === "ais"){ renderAislacion(body); }
   else if (state.tab === "fas"){ renderFases(body); }
+  else if (state.tab === "cmp"){ renderComparar(body); }
   else if (state.tab === "cut"){ renderCortes(body); }
   else { renderExport(body); }
 }
@@ -1110,6 +1112,29 @@ function renderAislacion(body){
   body.querySelectorAll("[data-aisesp]").forEach(b => b.onclick = () => { state.aisl.espesor = +b.dataset.aisesp; renderAislacion(body); });
   body.querySelectorAll("[data-aisubic]").forEach(b => b.onclick = () => { state.aisl.ubicacion = b.dataset.aisubic; renderAislacion(body); });
   body.querySelectorAll("[data-aisfix]").forEach(b => b.onclick = () => { Object.assign(state.aisl, _aisFixes[+b.dataset.aisfix]); renderAislacion(body); });
+}
+// Comparador de sistemas (steel · wood · tradicional): costo, tiempo y peso sobre la misma obra.
+function renderComparar(body){
+  const r = comparar(toEngineInput());
+  if (!(r.area > 0)){ body.innerHTML = `<div class="pane"><p class="sub">El comparador cubre por ahora muros y ambientes.</p></div>`; return; }
+  const card = (v, seco) => `<div class="cmpcard ${seco?'on':''}">
+    <h4>${v.label}${seco?' <span class="cmptag">en seco</span>':''}</h4>
+    <div class="cmpbig">${money(v.costoObra)}</div>
+    <div class="cmpsubt">obra estimada · ${money(v.costoM2)}/m²</div>
+    <div class="cmprow"><span>Tiempo</span><b>${v.dias} días</b></div>
+    <div class="cmprow"><span>Peso estructura</span><b>${v.peso.toLocaleString("es-AR")} kg</b></div>
+    ${v.estructura != null
+      ? `<div class="cmprow"><span>Estructura (Adamant)</span><b>${money(v.estructura)}</b></div>`
+      : `<div class="cmprow muted"><span>Estructura</span><b>otro sistema</b></div>`}
+  </div>`;
+  const cards = card(r.sistemas.steel, true) + card(r.sistemas.wood, true) + card(r.sistemas.tradicional, false);
+  const dest = r.destacados.map(d => `<li>${d}</li>`).join("");
+  body.innerHTML = `<div class="pane">
+    <p class="sub">Tu obra de <b>${r.area.toFixed(1).replace(".",",")} m²</b> en tres sistemas. El <b>costo de estructura y el peso</b> de steel/wood los calcula Adamant; el costo de obra y el tiempo son estimación de mercado.</p>
+    <div class="cmpgrid">${cards}</div>
+    <ul class="cmpwin">${dest}</ul>
+    <p class="chkdisc">⚠ Costo de obra y tiempo: estimación de mercado AR (a calibrar). La mampostería es referencia (Adamant calcula estructura en seco).</p>
+  </div>`;
 }
 // Fases de obra: timeline de montaje derivado del modelo (qué va primero), para llevar a obra.
 function renderFases(body){
