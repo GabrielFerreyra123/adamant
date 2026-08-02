@@ -8,6 +8,7 @@ import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.m
 import { validarTecho } from "../engine/modules/techo.mjs";
 import { predimensionar } from "../engine/predimensionado.mjs";
 import { aislacion, AISLANTES, ESPESORES } from "../engine/aislacion.mjs";
+import { fasesDeObra } from "../engine/fases.mjs";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
@@ -735,7 +736,7 @@ function drawPlanta4(){
 function stepResultado(){
   const tabs = [["3d","3D"],["mat","Materiales"],["chk","Chequeo"]];
   if (state.kind === "muro" || state.kind === "combinado") tabs.push(["ais","Aislación"]);
-  tabs.push(["cut","Cortes"],["pdf","PDF"]);
+  tabs.push(["fas","Fases"],["cut","Cortes"],["pdf","PDF"]);
   // Estado del chequeo → punto de color en la pestaña (se ve sin entrar).
   let chkPeor = null;
   try { chkPeor = predimensionar(toEngineInput(), { zona: state.zonaViento || "alta" }).resumen.peor; } catch {}
@@ -883,6 +884,7 @@ function renderTab(){
   } else if (state.tab === "mat"){ renderMateriales(body); }
   else if (state.tab === "chk"){ renderChequeo(body); }
   else if (state.tab === "ais"){ renderAislacion(body); }
+  else if (state.tab === "fas"){ renderFases(body); }
   else if (state.tab === "cut"){ renderCortes(body); }
   else { renderExport(body); }
 }
@@ -1108,6 +1110,21 @@ function renderAislacion(body){
   body.querySelectorAll("[data-aisesp]").forEach(b => b.onclick = () => { state.aisl.espesor = +b.dataset.aisesp; renderAislacion(body); });
   body.querySelectorAll("[data-aisubic]").forEach(b => b.onclick = () => { state.aisl.ubicacion = b.dataset.aisubic; renderAislacion(body); });
   body.querySelectorAll("[data-aisfix]").forEach(b => b.onclick = () => { Object.assign(state.aisl, _aisFixes[+b.dataset.aisfix]); renderAislacion(body); });
+}
+// Fases de obra: timeline de montaje derivado del modelo (qué va primero), para llevar a obra.
+function renderFases(body){
+  const { fases } = fasesDeObra(toEngineInput());
+  if (!fases.length){ body.innerHTML = `<div class="pane"><p class="sub">Todavía no hay etapas para mostrar.</p></div>`; return; }
+  const items = fases.map(f => `<div class="faseit">
+    <div class="fasenum">${f.orden}</div>
+    <div class="fasebody"><b>${f.titulo}</b><span class="fasenota">${f.nota}</span>
+      <span class="fasepz">${f.piezas} pieza${f.piezas!==1?"s":""}</span></div>
+  </div>`).join("");
+  body.innerHTML = `<div class="pane">
+    <p class="sub">El orden para armar en obra, de la fundación al cierre. Sale de tu propio modelo.</p>
+    <div class="fases">${items}</div>
+    <p class="chkdisc">Es la secuencia típica de montaje en seco (platform framing). Ajustala según tu obra y tu profesional.</p>
+  </div>`;
 }
 function renderMateriales(body){
   const { materiales, metadatos } = computeProject(toEngineInput());
