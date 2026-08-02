@@ -305,6 +305,10 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .zbtn{ appearance:none; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--paper); background:var(--panel2); border:1px solid var(--line); border-radius:2px; padding:6px 11px; transition:.12s; }
 .zbtn:hover{ border-color:var(--teal); }
 .zbtn.on{ background:var(--teal); color:var(--on-primary,#04231f); border-color:var(--teal); }
+.tabdot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+.tabdot.ok{ background:#3ecf8e; }
+.tabdot.atencion{ background:#f5c451; }
+.tabdot.fuera{ background:#ff6b5e; }
 .chklist{ display:flex; flex-direction:column; gap:9px; }
 .chkcard{ display:flex; flex-direction:column; gap:6px; padding:12px 14px; border:1px solid var(--line); border-left-width:4px; border-radius:2px; background:var(--panel2); }
 .chkcard.ok{ border-left-color:#3ecf8e; }

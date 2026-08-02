@@ -733,11 +733,16 @@ function drawPlanta4(){
 // ---------- paso resultado (común a todos los módulos) ----------
 function stepResultado(){
   const tabs = [["3d","3D"],["mat","Materiales"],["chk","Chequeo"],["cut","Cortes"],["pdf","PDF"]];
+  // Estado del chequeo → punto de color en la pestaña (se ve sin entrar).
+  let chkPeor = null;
+  try { chkPeor = predimensionar(toEngineInput(), { zona: state.zonaViento || "alta" }).resumen.peor; } catch {}
+  const tabHTML = ([k,l]) => `<button class="tab ${state.tab===k?'on':''}" data-tab="${k}">${
+    k === "chk" && chkPeor ? `<span class="tabdot ${chkPeor}"></span>` : ""}${l}</button>`;
   const drawer = state.editOpen ? `<aside class="editpanel" id="editpanel">${editorHTML()}</aside>` : "";
   return `<div class="reswrap ${state.editOpen?'editing':''}">${drawer}
     <div class="result">
       <div class="resbar"><button class="btn ghost sm" id="toggleEdit">${state.editOpen?"✕ Cerrar edición":"✎ Editar proyecto"}</button></div>
-      <div class="tabs">${tabs.map(([k,l]) => `<button class="tab ${state.tab===k?'on':''}" data-tab="${k}">${l}</button>`).join("")}</div>
+      <div class="tabs">${tabs.map(tabHTML).join("")}</div>
       <div class="tabbody" id="tabbody"></div>
     </div></div>`;
 }
@@ -1042,13 +1047,13 @@ function renderChequeo(body){
   // Detalle técnico (para el calculista): tabla plegable.
   const filas = checks.map(c => `<tr class="e-${c.estado}"><td>${SEM[c.estado]}</td><td>${c.label}</td>
     <td class="mono">${c.valor}</td><td class="chkrng">${c.rango}</td></tr>`).join("");
-  const tecnico = checks.length ? `<details class="chktec"><summary>Ver detalle técnico (para tu calculista)</summary>
-    <table class="chktable"><thead><tr><th></th><th>Ítem</th><th>Tu proyecto</th><th>Rango de manual</th></tr></thead>
+  const tecnico = checks.length ? `<details class="chktec"><summary>Ver los números</summary>
+    <table class="chktable"><thead><tr><th></th><th>Ítem</th><th>Tu proyecto</th><th>Lo normal</th></tr></thead>
     <tbody>${filas}</tbody></table></details>` : "";
   body.innerHTML = `<div class="pane">
     <div class="chkhead">
       <div><h3 class="chktitle">${SEM[resumen.peor]} ${resTxt}</h3>
-        <p class="sub">Revisión rápida contra medidas de manual. <b>No reemplaza el cálculo</b> de un profesional.</p></div>
+        <p class="sub">Revisamos que tus medidas entren dentro de lo normal antes de que compres o armes. Es orientativo.</p></div>
       <div class="zona"><span class="zlbl">¿Cuánto viento hay en tu zona?</span><div class="zbtns">${zonaSel}</div></div>
     </div>
     <div class="chklist">${cards}</div>
