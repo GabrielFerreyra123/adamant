@@ -1349,7 +1349,9 @@ function pagoHTML(){
       <button class="btn" data-sku="pase90">Comprar pase de obra</button>
     </div>
   </div>
-  <p class="planlegal">No es suscripción. Se paga una vez y no se renueva solo.</p>`;
+  <p class="planlegal">No es suscripción. Se paga una vez y no se renueva solo.<br>
+    Al comprar aceptás los <a href="/legal#terminos" target="_blank" rel="noopener">términos</a> ·
+    <a href="/legal#arrepentimiento" target="_blank" rel="noopener">botón de arrepentimiento</a> (10 días).</p>`;
 }
 function wirePago(root, msg){
   root.querySelectorAll("[data-sku]").forEach(b => b.onclick = () => {

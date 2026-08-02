@@ -41,7 +41,8 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         landing: resolve(process.cwd(), "index.html"),
-        app: resolve(process.cwd(), "app/index.html")
+        app: resolve(process.cwd(), "app/index.html"),
+        legal: resolve(process.cwd(), "legal/index.html")
       }
     }
   }

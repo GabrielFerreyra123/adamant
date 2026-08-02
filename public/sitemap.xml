@@ -3,8 +3,14 @@
   <!-- Solo la landing es indexable. /app es noindex (shell client-side), no va en el sitemap. -->
   <url>
     <loc>https://adamant-livid.vercel.app/</loc>
-    <lastmod>2026-07-29</lastmod>
+    <lastmod>2026-08-02</lastmod>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://adamant-livid.vercel.app/legal</loc>
+    <lastmod>2026-08-02</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>

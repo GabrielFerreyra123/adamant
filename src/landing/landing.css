@@ -289,7 +289,8 @@ img,svg{ max-width:100%; }
 .pie-links{ display:flex; flex-wrap:wrap; gap:var(--md); font-family:var(--font-mono); font-size:var(--fs-data); letter-spacing:var(--ls-data); }
 .pie-links a{ color:var(--on-surface-variant); text-decoration:none; }
 .pie-links a:hover{ color:var(--tertiary); }
-.pie-copy{ font-family:var(--font-mono); font-size:10px; color:color-mix(in srgb, var(--on-surface-variant) 60%, transparent); }
+.pie-legal{ margin-top:10px; gap:var(--sm); opacity:.85; }
+.pie-copy{ font-family:var(--font-mono); font-size:10px; color:color-mix(in srgb, var(--on-surface-variant) 60%, transparent); margin-top:10px; }
 
 /* ============ aparición al hacer scroll (JS agrega .visible; .js lo pone a prueba de fallos) ====== */
 .js .reveal{ opacity:0; transform:translateY(20px); transition:opacity .6s ease-out, transform .6s ease-out; }
