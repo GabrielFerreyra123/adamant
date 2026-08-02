@@ -134,3 +134,17 @@ export async function generarPDF(input, extras = {}){
   if (perp) guardarPerpetuo(ph, perp);
   return r.blob();
 }
+
+// DXF de despiece (server-side; misma pared de pago que el PDF). Para el proyectista/calculista.
+export async function generarDXF(input){
+  const ph = getProyId(), token = tokenPara(ph);
+  if (!token) throw new Error("sin licencia");
+  const r = await fetch("/api/generar", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, projectHash: ph, tipo: "dxf", input })
+  });
+  if (!r.ok){ const d = await r.json().catch(() => ({})); throw new Error(d.error || `Error ${r.status}`); }
+  const perp = r.headers.get("X-Adamant-Perpetuo");
+  if (perp) guardarPerpetuo(ph, perp);
+  return r.blob();
+}

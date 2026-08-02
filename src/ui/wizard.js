@@ -10,7 +10,7 @@ import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
 import { secDims } from "../engine/geometry.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { precioRef, PRECIOS_REF, rubroDe, RUBROS_ORDEN } from "../config/precios-referencia.js";
-import { estadoLicencia, autorizado, iniciarPago, generarPDF, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
+import { estadoLicencia, autorizado, iniciarPago, generarPDF, generarDXF, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
 import { PRICING } from "../config/pricing.js";
 import { glossHTML, glossForTipo, glossKeyForTipo } from "../content/glosario.js";
 import { initGlosario } from "./glosario-ui.js";
@@ -1166,6 +1166,8 @@ function renderExport(body){
   body.innerHTML = `<div class="pane center">
     <p class="sub">${estado} Descargá el PDF de obra completo (resumen, 3D, esquema acotado, lista de compra y cortes optimizados).</p>
     <button class="btn" id="dlpdf">🧾 Descargar PDF de obra</button>
+    <button class="btn ghost" id="dldxf">📐 Descargar DXF para tu proyectista</button>
+    <p class="expnote">El DXF abre en AutoCAD/cualquier CAD (en mm) para que tu calculista verifique y selle. Adamant arma la geometría; el cálculo estructural lo define un profesional habilitado.</p>
     ${renov}
     <div class="expsep">Otro proyecto</div>
     <button class="btn ghost" id="nuevoproy">✚ Empezar un proyecto nuevo</button>
@@ -1197,6 +1199,15 @@ function renderExport(body){
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = `adamant-${state.kind}-${state.params.sistema}.pdf`; a.click(); URL.revokeObjectURL(a.href);
       msg.textContent = "✓ PDF descargado";
+    } catch (e) { fallo(e); }
+  };
+  document.getElementById("dldxf").onclick = async () => {
+    msg.textContent = "Generando DXF…";
+    try {
+      const blob = await generarDXF(toEngineInput());
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = `adamant-${state.kind}-${state.params.sistema}.dxf`; a.click(); URL.revokeObjectURL(a.href);
+      msg.textContent = "✓ DXF descargado";
     } catch (e) { fallo(e); }
   };
 }

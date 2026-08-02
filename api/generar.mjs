@@ -3,6 +3,7 @@
 // (el cliente no incluye el generador del PDF en su bundle).
 import { verificarLicencia, perpetuoDesdePase, limpiarProy, json, soloPost } from "./_lib.mjs";
 import { exportPDF } from "../src/export/pdf.mjs";
+import { exportDXF } from "../src/export/dxf.mjs";
 
 export const config = { api: { bodyParser: { sizeLimit: "8mb" } } }; // img del 3D viaja como dataURL
 
@@ -26,7 +27,15 @@ export default async function handler(req, res){
       res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
       return res.end(buf);
     }
-    json(res, 400, { error: "tipo debe ser pdf" });
+    if (tipo === "dxf"){
+      const { dxf, nombre } = exportDXF(input);
+      const perp = perpetuoDesdePase(lic, ph);
+      if (perp) res.setHeader("X-Adamant-Perpetuo", perp);
+      res.status(200).setHeader("Content-Type", "application/dxf");
+      res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
+      return res.end(dxf);
+    }
+    json(res, 400, { error: "tipo debe ser pdf o dxf" });
   } catch (e) {
     console.error("[generar]", e);
     json(res, 500, { error: e.message });
