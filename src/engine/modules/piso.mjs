@@ -40,6 +40,7 @@ const APOYO = {
 // Todas llevan `capa:"apoyos"` + `superficie:true` (fuera de cómputo) y su AABB en `box`.
 function apoyosPiso(apoyo, corrida, luz){
   const A = APOYO, P = [];
+  if (apoyo === "entrepiso") return P;                    // entrepiso: apoya sobre los muros, sin fundación
   if (apoyo === "pilotines"){
     const ins = A.soleraAncho / 2;                       // el pilotín va centrado bajo la solera
     const zTopS = 0, zBotS = -A.soleraAlto;              // solera de asiento, pegada bajo el entramado

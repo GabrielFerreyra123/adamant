@@ -30,7 +30,11 @@ const VANO_INI = { puerta:"P", ventana:"V", arcada:"A" };
 const VANO_COL = { puerta:"var(--tangerine)", ventana:"#e8b53a", arcada:"#27b0c9" };
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
-const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null, tabSel: null, drawMode: false, quePieza: false, editOpen: false };
+const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null, tabSel: null, drawMode: false, nivel: "pb", quePieza: false, editOpen: false };
+// Sufijo del array de vanos según el nivel activo (PB = "", PA = "PA") en el ambiente con planta alta.
+const nivelSuf = () => (state.kind === "combinado" && state.params?.plantaAlta && state.nivel === "pa") ? "PA" : "";
+// Array de tabiques del nivel activo (PB → `tabiques`, PA → `tabiquesPA`).
+function tabsArr(){ const k = nivelSuf() ? "tabiquesPA" : "tabiques"; return (state.params[k] = state.params[k] || []); }
 // Superficies estructurales conmutables del visor: id de capa → etiqueta y tipo (para color de leyenda).
 // Superficies conmutables del visor: apoyos de fundación y placa de piso (diafragma estructural).
 const CAPA_INFO = {
@@ -103,6 +107,7 @@ function pasoValido(paso){
 
 // Vanos del wizard {tipo,ancho,alto,sill,pos} → formato del motor {tipo,x1,x2,h,sill}.
 const mapVanos = arr => (arr || []).map(v => ({ tipo:v.tipo, x1:Math.round(v.pos - v.ancho/2), x2:Math.round(v.pos + v.ancho/2), h:v.sill + v.alto, sill:v.sill }));
+const mapTabs = arr => (arr || []).map(t => ({ dir:t.dir, at:t.at, desde:t.desde, hasta:t.hasta, vanos:mapVanos(t.vanos) }));
 // Genérico: pasa todos los params tal cual; transforma vanos al formato del motor. El combinado lleva
 // un array de vanos por muro (vanoFrente/Fondo/Izq/Der).
 function toEngineInput(){
@@ -110,7 +115,8 @@ function toEngineInput(){
   if (state.kind === "combinado")
     return { ...p, kind: "combinado", opciones: { ...p.opciones },
       vanoFrente: mapVanos(p.vanoFrente), vanoFondo: mapVanos(p.vanoFondo), vanoIzq: mapVanos(p.vanoIzq), vanoDer: mapVanos(p.vanoDer),
-      tabiques: (p.tabiques || []).map(t => ({ dir: t.dir, at: t.at, desde: t.desde, hasta: t.hasta, vanos: mapVanos(t.vanos) })) };
+      vanoFrentePA: mapVanos(p.vanoFrentePA), vanoFondoPA: mapVanos(p.vanoFondoPA), vanoIzqPA: mapVanos(p.vanoIzqPA), vanoDerPA: mapVanos(p.vanoDerPA),
+      tabiques: mapTabs(p.tabiques), tabiquesPA: mapTabs(p.tabiquesPA) };
   return { ...p, kind: state.kind, vanos: mapVanos(p.vanos), opciones: { ...p.opciones } };
 }
 
@@ -515,11 +521,11 @@ function wirePaso(paso){
 // seleccionado (vanoFrente/Fondo/Izq/Der) y el largo real de ese muro.
 function vanoCtx(){
   if (state.kind === "combinado" && state.tabSel != null){
-    const t = state.params.tabiques[state.tabSel]; t.vanos = t.vanos || [];
+    const t = tabsArr()[state.tabSel]; t.vanos = t.vanos || [];
     return { arr: t.vanos, largo: Math.max(200, (+t.hasta) - (+t.desde)), alto: +state.params.alto };
   }
   if (state.kind === "combinado" && state.muroSel){
-    const key = "vano" + cap(state.muroSel);
+    const key = "vano" + cap(state.muroSel) + nivelSuf();
     state.params[key] = state.params[key] || [];
     const m = murosDelAmbiente(state.params).find(x => x.parte === state.muroSel);
     return { arr: state.params[key], largo: m.largo, alto: +state.params.alto };
@@ -719,25 +725,29 @@ function wireVanoPiso(){
 
 // ---------- combinado: aberturas por muro (esquema en planta) ----------
 function murosPlantaHTML(){
+  const pa = state.params.plantaAlta && state.nivel === "pa";
   if (state.tabSel != null){
-    const t = state.params.tabiques[state.tabSel];
+    const t = tabsArr()[state.tabSel];
     return `<div class="muroedit"><button class="btn ghost sm" id="volverPlanta">← Planta</button>
-      <b>Tabique ${state.tabSel+1} · ${((t.hasta-t.desde)/1000).toFixed(2)} m ${t.dir==="x"?"(horizontal)":"(vertical)"}</b></div>${vanosHTML()}`;
+      <b>${pa?"PA · ":""}Tabique ${state.tabSel+1} · ${((t.hasta-t.desde)/1000).toFixed(2)} m ${t.dir==="x"?"(horizontal)":"(vertical)"}</b></div>${vanosHTML()}`;
   }
   if (state.muroSel){
     const m = murosDelAmbiente(state.params).find(x => x.parte === state.muroSel);
     return `<div class="muroedit"><button class="btn ghost sm" id="volverPlanta">← Planta</button>
-      <b>${m.l} · ${(m.largo/1000).toFixed(2)} m</b></div>${vanosHTML()}`;
+      <b>${pa?"PA · ":""}${m.l} · ${(m.largo/1000).toFixed(2)} m</b></div>${vanosHTML()}`;
   }
-  const n = (state.params.tabiques || []).length;
-  return `<div class="planttools">
+  const nivSwitch = state.params.plantaAlta ? `<div class="nivsw">
+      <button class="nvb ${!pa?'on':''}" data-niv="pb">Planta baja</button>
+      <button class="nvb ${pa?'on':''}" data-niv="pa">Planta alta</button></div>` : "";
+  const n = tabsArr().length;
+  const tools = `<div class="planttools">
       <button class="btn sm ${state.drawMode?'on':''}" id="drawWall">✏️ Dibujar pared <kbd>D</kbd></button>
       <span class="planthint">${state.drawMode
-        ? "Arrastrá dentro del ambiente para trazar la pared (se endereza sola y muestra la medida)."
-        : "Dibujá una pared interna (tecla D), o tocá una existente para editar sus aberturas."}</span>
-    </div>
-    <div class="planta4" id="planta4"></div>
-    <p class="sub planttip">${n ? "Arrastrá una pared para moverla · tirá de las puntas para acortarla · tocala para las aberturas · ✕ la quita." : "Todavía no hay paredes internas."}</p>`;
+        ? `Arrastrá dentro ${pa?"de la planta alta":"del ambiente"} para trazar la pared (se endereza sola y muestra la medida).`
+        : `Dibujá una pared${pa?" en la planta alta":""} (tecla D), o tocá una existente para editar sus aberturas.`}</span>
+    </div>`;
+  const tip = `<p class="sub planttip">${n ? "Arrastrá una pared para moverla · tirá de las puntas para acortarla · tocala para las aberturas · ✕ la quita." : "Tocá un muro para sus aberturas, o dibujá paredes internas."}</p>`;
+  return `${nivSwitch}${tools}<div class="planta4" id="planta4"></div>${tip}`;
 }
 function wireMurosPlanta(){
   if (state.tabSel != null){
@@ -748,11 +758,12 @@ function wireMurosPlanta(){
     document.getElementById("volverPlanta").onclick = () => { state.muroSel = null; state.tabSel = null; emitEdit(); };
     wireVanos(); return;
   }
+  document.querySelectorAll("[data-niv]").forEach(b => b.onclick = () => { state.nivel = b.dataset.niv; state.drawMode = false; emitEdit(); });
   const db = document.getElementById("drawWall");
   if (db) db.onclick = () => { state.drawMode = !state.drawMode; emitEdit(); };
   drawPlanta4();
 }
-function nVanosMuro(parte){ return (state.params["vano" + cap(parte)] || []).length; }
+function nVanosMuro(parte){ return (state.params["vano" + cap(parte) + nivelSuf()] || []).length; }
 let _planDrag = null; // arrastre activo en la planta: {mode:'new'|'move'|'end'|'wtap', ...}
 // Planta interactiva del ambiente: dibujar/mover/acortar paredes internas con el mouse.
 function drawPlanta4(){
@@ -760,8 +771,17 @@ function drawPlanta4(){
   const p = state.params, muros = murosDelAmbiente(p), largo = +p.largo, ancho = +p.ancho;
   const W = box.clientWidth || 340, H = Math.max(200, Math.min(340, W * ancho/largo)), t = 26;
   const e = espesorAmb(), GRID = 50;
+  const pa = state.params.plantaAlta && state.nivel === "pa";
+  const TB = tabsArr();                                   // tabiques del nivel activo (PB/PA)
   const sx = v => t + (v / largo) * (W - 2*t), sy = v => (H - t) - (v / ancho) * (H - 2*t);
   const snap = v => Math.round(v / GRID) * GRID, clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  // Hueco de escalera (sólo en el plano de PA con escalera activa): se inicializa centrado y se edita
+  // moviéndolo / redimensionándolo con el mouse. Coords del entramado (x sobre largo, y sobre ancho).
+  const hole = pa && state.params.escalera
+    ? (state.params.vanoEscalera || (state.params.vanoEscalera = {
+        x: Math.round(clamp(largo/2 - 500, e, largo - e - 1000)), y: Math.round(clamp(ancho/2 - 1200, e, ancho - e - 2400)),
+        ancho: Math.min(1000, largo - 2*e), largo: Math.min(2400, ancho - 2*e) }))
+    : null;
   box.innerHTML = `<svg id="plantaSvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="plantasvg ${state.drawMode?'drawing':''}"></svg>`;
   const svg = box.querySelector("#plantaSvg");
   // pantalla → mm (contempla escalado CSS del svg)
@@ -773,7 +793,7 @@ function drawPlanta4(){
   // Pega un punto (mm) a cualquier tabique o a la cara interior del perímetro → permite arrancar/terminar
   // una pared perpendicular EN CUALQUIER punto de otra pared (encuentro en T).
   function snapWalls(x, y){
-    (p.tabiques || []).forEach(tb => {
+    (TB || []).forEach(tb => {
       if (tb.dir === "x"){ if (Math.abs(y - tb.at) < thY && dentro(x, tb.desde, tb.hasta, thX)) y = tb.at; }
       else { if (Math.abs(x - tb.at) < thX && dentro(y, tb.desde, tb.hasta, thY)) x = tb.at; }
     });
@@ -796,7 +816,7 @@ function drawPlanta4(){
     const wall = (parte, x, y, w, h, tx, ty) => `<g class="wtap" data-parte="${parte}">
         <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3"/>
         <text x="${tx}" y="${ty}" text-anchor="middle">${muros.find(m=>m.parte===parte).l}${nVanosMuro(parte)?` (${nVanosMuro(parte)})`:""}</text></g>`;
-    const tabs = (p.tabiques || []).map((tb, i) => {
+    const tabs = (TB || []).map((tb, i) => {
       const horiz = tb.dir === "x";
       const a = horiz ? [sx(tb.desde), sy(tb.at)] : [sx(tb.at), sy(tb.desde)];
       const b = horiz ? [sx(tb.hasta), sy(tb.at)] : [sx(tb.at), sy(tb.hasta)];
@@ -823,25 +843,40 @@ function drawPlanta4(){
       const b = w.dir === "x" ? [sx(w.hasta), sy(w.at)] : [sx(w.at), sy(w.hasta)];
       band = `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="tabline band"/>${medida(a, b, w.hasta - w.desde)}`;
     } else if (_planDrag && _planDrag.mode === "end"){
-      const tb = p.tabiques[_planDrag.i];
+      const tb = TB[_planDrag.i];
       const a = tb.dir === "x" ? [sx(tb.desde), sy(tb.at)] : [sx(tb.at), sy(tb.desde)];
       const b = tb.dir === "x" ? [sx(tb.hasta), sy(tb.at)] : [sx(tb.at), sy(tb.hasta)];
       band = medida(a, b, tb.hasta - tb.desde);
     }
+    let holeSVG = "";
+    if (hole){
+      const x1 = sx(hole.x), x2 = sx(hole.x + hole.ancho), yb = sy(hole.y), yt = sy(hole.y + hole.largo);
+      const hs = [[hole.x, hole.y, 0, 0], [hole.x + hole.ancho, hole.y, 1, 0], [hole.x, hole.y + hole.largo, 0, 1], [hole.x + hole.ancho, hole.y + hole.largo, 1, 1]]
+        .map(([mx, my, cx, cy]) => `<circle cx="${sx(mx).toFixed(1)}" cy="${sy(my).toFixed(1)}" r="6" class="holeh" data-cx="${cx}" data-cy="${cy}"/>`).join("");
+      holeSVG = `<g class="holeg"><rect x="${x1.toFixed(1)}" y="${yt.toFixed(1)}" width="${(x2-x1).toFixed(1)}" height="${(yb-yt).toFixed(1)}" class="hole holebody"/>
+        <text x="${((x1+x2)/2).toFixed(1)}" y="${((yt+yb)/2+4).toFixed(1)}" text-anchor="middle" class="holetxt">escalera ${Math.round(hole.ancho)}×${Math.round(hole.largo)}</text>${hs}</g>`;
+    }
     svg.innerHTML = `<rect x="${t}" y="${t}" width="${W-2*t}" height="${H-2*t}" class="room"/>
-      ${tabs}${band}
+      ${tabs}${holeSVG}${band}
       ${wall("fondo",  t, 0,     W-2*t, t, W/2, t-8)}
       ${wall("frente", t, H-t,   W-2*t, t, W/2, H-8)}
       ${wall("izq",    0, t,     t, H-2*t, 12, H/2)}
       ${wall("der",    W-t, t,   t, H-2*t, W-12, H/2)}
-      ${(p.tabiques||[]).length?"":`<text x="${W/2}" y="${H/2}" text-anchor="middle" class="plantahint">${state.drawMode?"dibujá acá":"planta"}</text>`}`;
+      ${(TB||[]).length?"":`<text x="${W/2}" y="${H/2}" text-anchor="middle" class="plantahint">${state.drawMode?"dibujá acá":"planta"}</text>`}`;
   }
   paint();
 
   svg.onpointerdown = ev => {
     const c = mm(ev);
     const del = ev.target.closest(".tabdel");
-    if (del){ p.tabiques.splice(+del.dataset.i, 1); emitEdit(); return; }
+    if (del){ TB.splice(+del.dataset.i, 1); emitEdit(); return; }
+    // Hueco de escalera (sólo PA): mover/redimensionar cuando NO estás dibujando pared.
+    if (hole && !state.drawMode){
+      const hr = ev.target.closest(".holeh");
+      if (hr){ _planDrag = { mode:"holeR", cx:+hr.dataset.cx, cy:+hr.dataset.cy }; svg.setPointerCapture(ev.pointerId); return; }
+      const hb = ev.target.closest(".holebody");
+      if (hb){ _planDrag = { mode:"holeM", ox:hole.x, oy:hole.y, mx:c.x, my:c.y }; svg.setPointerCapture(ev.pointerId); return; }
+    }
     // En modo dibujar, TODO el plano dibuja (las puntas/paredes no resizean): permite arrancar en una punta.
     if (state.drawMode){ const s = snapWalls(c.x, c.y); _planDrag = { mode:"new", x0:s.x, y0:s.y, x1:s.x, y1:s.y }; svg.setPointerCapture(ev.pointerId); return; }
     const end = ev.target.closest(".tabend");
@@ -855,12 +890,20 @@ function drawPlanta4(){
     if (!_planDrag) return;
     const c = mm(ev), d = _planDrag;
     if (d.mode === "new"){ const s = snapWalls(c.x, c.y); d.x1 = s.x; d.y1 = s.y; paint(); return; }
+    if (d.mode === "holeM"){
+      hole.x = Math.round(clamp(snap(d.ox + (c.x - d.mx)), e, largo - e - hole.ancho));
+      hole.y = Math.round(clamp(snap(d.oy + (c.y - d.my)), e, ancho - e - hole.largo)); paint(); return; }
+    if (d.mode === "holeR"){
+      const gx = snap(clamp(c.x, e, largo - e)), gy = snap(clamp(c.y, e, ancho - e));
+      if (d.cx === 0){ const r = hole.x + hole.ancho; hole.x = Math.min(gx, r - 300); hole.ancho = r - hole.x; } else hole.ancho = Math.max(300, gx - hole.x);
+      if (d.cy === 0){ const f = hole.y + hole.largo; hole.y = Math.min(gy, f - 300); hole.largo = f - hole.y; } else hole.largo = Math.max(300, gy - hole.y);
+      paint(); return; }
     if (d.mode === "move" || d.mode === "wtap"){ if (Math.hypot(c.px-d.px0, c.py-d.py0) > 5) d.moved = true; }
-    if (d.mode === "move"){ const tb = p.tabiques[d.i];
+    if (d.mode === "move"){ const tb = TB[d.i];
       tb.at = tb.dir === "x" ? snap(clamp(c.y, e, ancho-e)) : snap(clamp(c.x, e, largo-e)); paint(); return; }
-    if (d.mode === "end"){ const tb = p.tabiques[d.i], horiz = tb.dir === "x";
+    if (d.mode === "end"){ const tb = TB[d.i], horiz = tb.dir === "x";
       let val = horiz ? c.x : c.y;                       // snap del extremo a paredes perpendiculares que cruzan
-      (p.tabiques || []).forEach((o, j) => { if (j === d.i) return;
+      (TB || []).forEach((o, j) => { if (j === d.i) return;
         if (horiz && o.dir === "y" && Math.abs(val - o.at) < thX) val = o.at;
         if (!horiz && o.dir === "x" && Math.abs(val - o.at) < thY) val = o.at; });
       val = snap(clamp(val, e, (horiz ? largo : ancho) - e));
@@ -871,7 +914,7 @@ function drawPlanta4(){
     const d = _planDrag; _planDrag = null; if (!d) return;
     if (d.mode === "new"){
       const w = newWall(d);
-      if (w.hasta - w.desde >= 300){ (p.tabiques = p.tabiques || []).push({ ...w, vanos: [] }); state.drawMode = false; }
+      if (w.hasta - w.desde >= 300){ TB.push({ ...w, vanos: [] }); state.drawMode = false; }
       emitEdit(); return;
     }
     if (d.mode === "move" && !d.moved){ state.tabSel = d.i; emitEdit(); return; }

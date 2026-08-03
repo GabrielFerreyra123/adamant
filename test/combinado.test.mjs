@@ -247,7 +247,29 @@ test("F13: cielorraso y techo son opcionales dentro del ambiente", () => {
   assert.ok(con.piezas.some(p => p.parte === "cielo"), "cielo presente");
   assert.ok(con.piezas.some(p => p.parte === "techo"), "techo presente");
   assert.deepEqual(con.metadatos.partes.map(p => p.id), ["piso","frente","fondo","izq","der","cielo","techo"]);
-  assert.deepEqual(con.metadatos.niveles, { cielo: true, techo: true });
+  assert.deepEqual(con.metadatos.niveles, { cielo: true, techo: true, plantaAlta: false });
+});
+
+// Planta alta (misma huella): entrepiso + muros PA apilados; el techo se muda al tope de la PA.
+test("planta alta: entrepiso y muros PA se apilan sobre la planta baja", () => {
+  const base = amb("steel", 6000, 4000, { llevaTecho: true, techoTipo: "dosAguas", techoCubierta: true });
+  const pb = combinado.generar(base);
+  const pa = combinado.generar({ ...base, plantaAlta: true, escalera: true,
+    vanoFrentePA: [{ tipo: "ventana", x1: 2400, x2: 3600, h: 1100, sill: 900 }] });
+  assert.ok(pa.piezas.length > pb.piezas.length, "PA agrega entrepiso + muros de arriba");
+  assert.ok(pa.metadatos.niveles.plantaAlta);
+  for (const id of ["entrepiso", "pa-frente", "pa-fondo", "pa-izq", "pa-der"])
+    assert.ok(pa.metadatos.partes.some(p => p.id === id), `falta la parte ${id}`);
+  const zTop = parte => Math.max(...pa.piezas.filter(p => p.parte === parte && !p.superficie)
+    .map(p => { const b = pieceBoxEngine(p); return b.center[2] + b.size[2]/2; }));
+  const zBot = parte => Math.min(...pa.piezas.filter(p => p.parte === parte && !p.superficie)
+    .map(p => { const b = pieceBoxEngine(p); return b.center[2] - b.size[2]/2; }));
+  // apilado: PB muro < entrepiso < PA muro < techo
+  assert.ok(zBot("entrepiso") >= zTop("frente") - 50, "entrepiso sobre los muros de PB");
+  assert.ok(zBot("pa-frente") >= zTop("entrepiso") - 50, "muros PA sobre el entrepiso");
+  assert.ok(zBot("techo") >= zTop("pa-frente") - 50, "techo sobre los muros de PA");
+  // el hueco de escalera arma su enmarcado en el entrepiso
+  assert.ok(pa.piezas.some(p => p.parte === "entrepiso" && (p.tipo === "CABEZAL" || p.tipo === "TRIMMER")), "hueco de escalera");
 });
 
 // 8) Elevación: el techo apoya sobre la solera superior de los muros; el cielo cuelga por debajo.

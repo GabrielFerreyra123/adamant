@@ -7,7 +7,7 @@
 // largo = largo, corren en X) + 2 ENCAJADOS (izq/der, largo = ancho − 2·espesor, corren en Y). El muro
 // encajado butt-ea contra el pasante → cada esquina queda con 2 montantes de extremo (el del pasante y
 // el del encajado), sin superponerse.  Montaje platform framing: los muros apoyan SOBRE la placa de piso.
-import { piso } from "./piso.mjs";
+import { piso, encajarVano } from "./piso.mjs";
 import { muro } from "./muro.mjs";
 import { cielo } from "./cielo.mjs";
 import { techo } from "./techo.mjs";
@@ -18,6 +18,17 @@ import { pieceBoxEngine, boundsEngine } from "../geometry.mjs";
 import { cutList, optimizeCuts } from "../cuts.mjs";
 
 const PLACA_ESP = 18;        // espesor de la placa de piso (diafragma) (mm); el muro apoya sobre ella
+
+// Placa de piso (diafragma) como SUPERFICIE, teselada alrededor de un hueco opcional (trampa/escalera):
+// si no hay hueco es un rectángulo; con hueco, 4 tiras que lo dejan libre. `zc` = centro Z de la placa.
+function placaStrips(largo, ancho, hueco, zc){
+  const mk = (x0, x1, y0, y1) => (x1 - x0 > 1 && y1 - y0 > 1) ? [{ tipo: "PLACA", perfil: "Placa de piso (diafragma) 18 mm",
+    largo: Math.round(x1 - x0), axis: "z", capa: "placa-piso", superficie: true,
+    box: { size: [x1 - x0, y1 - y0, PLACA_ESP], center: [(x0 + x1) / 2, (y0 + y1) / 2, zc] } }] : [];
+  if (!hueco) return mk(0, largo, 0, ancho);
+  const hx0 = +hueco.x, hx1 = +hueco.x + +hueco.ancho, hy0 = +hueco.y, hy1 = +hueco.y + +hueco.largo;
+  return [...mk(0, largo, 0, hy0), ...mk(0, largo, hy1, ancho), ...mk(0, hx0, hy0, hy1), ...mk(hx1, largo, hy0, hy1)];
+}
 
 // Reubica piezas de un submódulo: rot 0|90 (CCW en Z) + traslación. Setea:
 //   p.box   — AABB en coords del motor (para el visor y el test AABB),
@@ -162,20 +173,47 @@ function descomponer(input){
   // Tabiques crudos: parciales (`desde`..`hasta`) sobre su eje, ubicados en `at`, dentro de la cara
   // interior del perímetro ([e, dim−e]). Se resuelven las uniones (T/L/cruce) antes de generarlos.
   const cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const rawTabs = (input.tabiques || []).map(t => {
-    const dir = t.dir === "x" ? "x" : "y", axisMax = dir === "x" ? largo : ancho, perpMax = dir === "x" ? ancho : largo;
-    const desde = cl(+t.desde || e, e, axisMax - e);
-    const hasta = cl(t.hasta == null ? axisMax - e : +t.hasta, desde + 100, axisMax - e);
-    return { dir, at: cl(+t.at || 0, e, perpMax - e), desde, hasta, vanos: (t.vanos || []).map(v => ({ ...v })) };
-  });
-  const tabiques = resolverUniones(rawTabs, { largo, ancho, e }).map((tb, i) => {
-    const place = tb.dir === "x" ? { rot: 0, tx: tb.desde, ty: tb.at - e / 2 } : { rot: 90, tx: tb.at + e / 2, ty: tb.desde };
-    return { parte: `tab${i}`, dir: tb.dir, at: tb.at, desde: tb.desde, hasta: tb.hasta, n: i + 1, place,
-      input: { ...muroBase, largo: tb.hasta - tb.desde, vanos: tb.vanos, arriostramiento: "ninguno" } };
-  });
+  const buildTabs = (arr, prefix) => {
+    const raw = (arr || []).map(t => {
+      const dir = t.dir === "x" ? "x" : "y", axisMax = dir === "x" ? largo : ancho, perpMax = dir === "x" ? ancho : largo;
+      const desde = cl(+t.desde || e, e, axisMax - e);
+      const hasta = cl(t.hasta == null ? axisMax - e : +t.hasta, desde + 100, axisMax - e);
+      return { dir, at: cl(+t.at || 0, e, perpMax - e), desde, hasta, vanos: (t.vanos || []).map(v => ({ ...v })) };
+    });
+    return resolverUniones(raw, { largo, ancho, e }).map((tb, i) => {
+      const place = tb.dir === "x" ? { rot: 0, tx: tb.desde, ty: tb.at - e / 2 } : { rot: 90, tx: tb.at + e / 2, ty: tb.desde };
+      return { parte: `${prefix}${i}`, dir: tb.dir, at: tb.at, desde: tb.desde, hasta: tb.hasta, n: i + 1, place,
+        input: { ...muroBase, largo: tb.hasta - tb.desde, vanos: tb.vanos, arriostramiento: "ninguno" } };
+    });
+  };
+  const tabiques = buildTabs(input.tabiques, "tab");
+
+  // PLANTA ALTA (opcional, misma huella): muros de arriba alineados con los de abajo (mismos `place`),
+  // con sus propios vanos, y un ENTREPISO (entramado sin fundación) que hace de piso de la PA. El hueco
+  // de escalera reusa el vano del módulo Piso (`vanoEscalera`).
+  const plantaAlta = !!input.plantaAlta;
+  const vanoPA = { frente: input.vanoFrentePA, fondo: input.vanoFondoPA, izq: input.vanoIzqPA, der: input.vanoDerPA };
+  const murosPA = plantaAlta ? muros.map(m => ({ parte: "pa-" + m.parte, place: m.place,
+    input: { ...m.input, vanos: vanoPA[m.parte] || [] } })) : [];
+  const tabiquesPA = plantaAlta ? buildTabs(input.tabiquesPA, "patab") : [];
+  // Hueco de escalera en el entrepiso, ENCAJADO al entramado (para que SIEMPRE corte las viguetas) y
+  // pasado al marco del módulo Piso (corrida = lado mayor · luz = lado menor). Se convierte desde coords
+  // del ambiente (x sobre largo, y sobre ancho) y se usa EL MISMO vano para viguetas y para la placa.
+  const rotEntre = largo < ancho;
+  const holeAmb = input.vanoEscalera || (input.escalera
+    ? { x: Math.round(largo/2 - 500), y: Math.round(ancho/2 - 1200), ancho: 1000, largo: 2400 } : null);
+  const holePiso = holeAmb ? (rotEntre
+    ? { x: holeAmb.y, y: holeAmb.x, ancho: holeAmb.largo, largo: holeAmb.ancho }
+    : { x: holeAmb.x, y: holeAmb.y, ancho: holeAmb.ancho, largo: holeAmb.largo }) : null;
+  const entrepisoVano = (plantaAlta && holePiso) ? encajarVano({ largo, ancho, separacion: input.separacion || 400 }, holePiso).vano : null;
+  const entrepisoInput = plantaAlta
+    ? { sistema: input.sistema, largo, ancho, separacion: input.separacion || 400, apoyo: "entrepiso",
+        placa, opciones: input.opciones, vano: entrepisoVano }
+    : null;
 
   return {
     largo, ancho, alto, placa, e, encaj, front, modulo, techoInput, techoMap, cieloInput, tabiques,
+    plantaAlta, murosPA, tabiquesPA, entrepisoInput, entrepisoVano,
     interior: { x: Math.max(largo - 2*e, 0), y: Math.max(ancho - 2*e, 0) }, corners,
     // `vano`: passthrough del vano de escalera/trampa del piso (mismas coords que el entramado).
     pisoInput: { sistema: input.sistema, largo, ancho, separacion: input.separacion || 400,
@@ -195,6 +233,8 @@ export const combinado = {
       opciones: { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90", lumber: "2x6 (38×140)", modulo: 400 },
       vanoFrente: [], vanoFondo: [], vanoIzq: [], vanoDer: [],
       arriostraFrente: "cruz", arriostraFondo: "cruz", arriostraIzq: "cruz", arriostraDer: "cruz",
+      // planta alta (misma huella): entrepiso + muros de arriba + hueco de escalera
+      plantaAlta: false, escalera: false, vanoFrentePA: [], vanoFondoPA: [], vanoIzqPA: [], vanoDerPA: [], tabiquesPA: [], vanoEscalera: null,
       // niveles opcionales (F13)
       llevaCielo: false, cieloSusp: 400, cieloPerfil: "Solera/montante 70",
       llevaTecho: false, techoTipo: "dosAguas", techoPendiente: 30, techoAlero: 400,
@@ -215,14 +255,17 @@ export const combinado = {
         { k: "alto",  tipo: "medida", label: "Alto de muros", rango: [2400, 3000] }
       ], avanzado: [
         { k: "apoyo", tipo: "seg", label: "Apoyo", opciones: [{ v: "platea", l: "Platea" }, { v: "pilotines", l: "Pilotines" }] },
-        { k: "placa", tipo: "seg", label: "Placa de piso", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] },
-        // Cuáles de las 4 paredes cruzan enteras en la esquina (las otras encajan entre ellas). Detalle
-        // del encuentro de esquina; no cambia qué paredes hay. Por eso va en avanzadas, no en el plano.
-        { k: "pasante", tipo: "seg", label: "Paredes que cruzan enteras (esquinas)",
-          opciones: [{ v: "frenteFondo", l: "Frente y Fondo" }, { v: "laterales", l: "Laterales" }] }
+        { k: "placa", tipo: "seg", label: "Placa de piso", opciones: [{ v: true, l: "Sí" }, { v: false, l: "No" }] }
+        // (El armado de esquina —qué pared cruza entera— se resuelve solo con el default; era confuso.)
       ] },
       { id: "muros", titulo: "Muros y vanos", componente: "murosPlanta",
-        intro: "Ahora las paredes. Cada muro es una grilla de montantes parados entre dos soleras. Donde va una puerta o ventana se arma el vano: king a los lados, jack sosteniendo el dintel, y cripples para completar la modulación." },
+        intro: "Ahora las paredes. Cada muro es una grilla de montantes parados entre dos soleras. Donde va una puerta o ventana se arma el vano: king a los lados, jack sosteniendo el dintel, y cripples para completar la modulación. Si activás planta alta, arriba del plano podés cambiar entre PB y PA para editar las aberturas de cada nivel." },
+      { id: "plantaAlta", titulo: "Planta alta",
+        intro: "Opcional: una segunda planta con la misma huella. Se arma un entrepiso (entramado apoyado sobre los muros de abajo) y otro juego de muros arriba; el techo pasa al tope de la planta alta. El hueco de escalera se marca en el entrepiso (los escalones no se dibujan).",
+        campos: [
+        { k: "plantaAlta", tipo: "seg", label: "¿Lleva planta alta?", opciones: [{ v: false, l: "No" }, { v: true, l: "Sí" }] },
+        { k: "escalera", tipo: "seg", label: "Hueco de escalera en el entrepiso", soloSi: p => p.plantaAlta, opciones: [{ v: false, l: "No" }, { v: true, l: "Sí" }] }
+      ] },
       { id: "cielo", titulo: "Cielorraso",
         intro: "El cielorraso cuelga de la estructura de arriba con velas y vigas maestras; abajo lleva los montantes que reciben la placa. Es opcional: si este ambiente no lleva, seguí de largo.",
         campos: [
@@ -268,9 +311,9 @@ export const combinado = {
     // Placa de piso (diafragma estructural, 18 mm) como SUPERFICIE sobre el entramado, si el toggle está
     // activo. Es una CAPA visual conmutable (arranca apagada); su geometría igual eleva los muros. El
     // cómputo lo lleva piso.materiales en `otros`; no entra en cortes (skip en cutList por `superficie`).
-    if (d.placa) P.push({ tipo: "PLACA", perfil: "Placa de piso (diafragma) 18 mm", largo: d.largo, axis: "z", parte: "piso",
-      capa: "placa-piso", superficie: true,
-      box: { size: [d.largo, d.ancho, PLACA_ESP], center: [d.largo/2, d.ancho/2, hEntramado + PLACA_ESP/2] } });
+    const corrida = Math.max(d.largo, d.ancho), luz = Math.min(d.largo, d.ancho);
+    const xfPiso = rotPiso ? { rot: 90, tx: d.largo, ty: 0 } : {};
+    if (d.placa) P.push(...reubicar(placaStrips(corrida, luz, d.pisoInput.vano, hEntramado + PLACA_ESP/2), { ...xfPiso, parte: "piso" }));
 
     // --- MUROS --- apoyan SOBRE la placa si va (entramado + 18 mm) o directamente sobre el entramado.
     // En ambos casos el borde inferior del muro queda en CONTACTO con lo que tiene debajo. Cada muro se
@@ -292,6 +335,27 @@ export const combinado = {
     d.corners.forEach(k => P.push(...postesEsquina({
       c: k.c, p: k.p, q: k.q, e, cf: s.cf, perfil: s.perfilMont, hmon, zb: hp + zb, mat: "montante", parteP: k.pP, parteE: k.pE })));
 
+    // --- PLANTA ALTA (opcional) --- entrepiso (entramado SIN fundación) sobre el tope de la PB, su placa
+    // de piso, y los muros de PA alineados con los de abajo + postes de esquina. El techo/cielo se mudan
+    // al tope de la PA. `tope` = cota sobre la que apoya el techo (PB si no hay PA; PA si la hay).
+    let tope = hp + d.alto;
+    if (d.plantaAlta){
+      const entreGen = piso.generar(d.entrepisoInput);
+      const hEntre = boundsEngine(entreGen.piezas.filter(p => !p.superficie)).size[2];
+      const xfE = rotPiso ? { rot: 90, tx: d.largo, ty: 0 } : {};
+      P.push(...reubicar(entreGen.piezas, { ...xfE, tz: tope, parte: "entrepiso" }));
+      if (d.placa){ const corrida = Math.max(d.largo, d.ancho), luz = Math.min(d.largo, d.ancho);
+        P.push(...reubicar(placaStrips(corrida, luz, d.entrepisoVano, hEntre + PLACA_ESP/2), { ...xfE, tz: tope, parte: "entrepiso" })); }
+      const hp2 = tope + hEntre + (d.placa ? PLACA_ESP : 0);
+      d.murosPA.forEach(m => { const g = muro.generar(m.input); gens[m.parte] = g;
+        P.push(...reubicar(g.piezas, { ...m.place, tz: hp2, parte: m.parte })); });
+      d.tabiquesPA.forEach(t => { const g = muro.generar(t.input); gens[t.parte] = g;
+        P.push(...reubicar(g.piezas, { ...t.place, tz: hp2, parte: t.parte })); });
+      d.corners.forEach(k => P.push(...postesEsquina({
+        c: k.c, p: k.p, q: k.q, e, cf: s.cf, perfil: s.perfilMont, hmon, zb: hp2 + zb, mat: "montante", parteP: "pa-" + k.pP, parteE: "pa-" + k.pE })));
+      tope = hp2 + d.alto;
+    }
+
     // --- CIELORRASO (opcional) --- grilla interior que cuelga hasta su cota. La referencia de cuelgue
     // es el tope de los muros (cara inferior del cordón de la cabriada si hay techo, o la losa): las
     // velas llegan ahí y la grilla queda `2·alma + suspensión` más abajo.
@@ -299,14 +363,14 @@ export const combinado = {
     if (d.cieloInput){
       const cieloGen = cielo.generar(d.cieloInput);
       const alma = cieloGen.metadatos.planoSuperior, susp = +d.cieloInput.suspension;
-      const ref = hp + d.alto, elev = ref - (2 * alma + susp);
+      const ref = tope, elev = ref - (2 * alma + susp);
       P.push(...reubicar(cieloGen.piezas, { rot: 0, tx: e, ty: e, tz: elev, parte: "cielo" }));
     }
 
     // --- TECHO (opcional) --- el cordón inferior apoya sobre la solera superior de los muros (z = tope
     // de muros). Si la luz corre en Y (ancho), el techo se rota 90° igual que el piso transpuesto.
     if (d.techoInput){
-      const techoGen = techo.generar(d.techoInput), tz = hp + d.alto;
+      const techoGen = techo.generar(d.techoInput), tz = tope;
       P.push(...(d.techoMap.luzEnX
         ? reubicar(techoGen.piezas, { rot: 0,  tx: 0,       ty: 0, tz, parte: "techo" })
         : reubicar(techoGen.piezas, { rot: 90, tx: d.largo, ty: 0, tz, parte: "techo" })));
@@ -318,16 +382,21 @@ export const combinado = {
     const bb = boundsEngine(P.filter(p => !p.superficie && p.categoria !== "fleje"));
     // Avisos de arriostramiento de los 4 muros, prefijados con el lado (los consume la UI y el PDF).
     const LADO = { frente: "Frente", fondo: "Fondo", izq: "Lateral izq.", der: "Lateral der." };
-    const nombreParte = k => LADO[k] || (k.startsWith("tab") ? `Tabique ${+k.slice(3) + 1}` : k);
+    const nombreParte = k => k.startsWith("patab") ? `PA Tabique ${+k.slice(5) + 1}`
+      : k.startsWith("pa-") ? `PA ${LADO[k.slice(3)] || k.slice(3)}`
+      : LADO[k] || (k.startsWith("tab") ? `Tabique ${+k.slice(3) + 1}` : k);
     const avisos = [...Object.entries(gens).flatMap(([k, g]) => (g.metadatos.avisos || []).map(a => `${nombreParte(k)}: ${a}`)), ...nivelAvisos];
     const partes = [{ id: "piso", l: "Piso" }, { id: "frente", l: "Frente" }, { id: "fondo", l: "Fondo" }, { id: "izq", l: "Lateral izq." }, { id: "der", l: "Lateral der." }];
     d.tabiques.forEach(t => partes.push({ id: t.parte, l: `Tabique ${t.n}` }));
+    if (d.plantaAlta){ partes.push({ id: "entrepiso", l: "Entrepiso" });
+      ["frente", "fondo", "izq", "der"].forEach(k => partes.push({ id: "pa-" + k, l: `PA ${LADO[k]}` }));
+      d.tabiquesPA.forEach(t => partes.push({ id: t.parte, l: `PA Tabique ${t.n}` })); }
     if (d.cieloInput) partes.push({ id: "cielo", l: "Cielorraso" });
     if (d.techoInput) partes.push({ id: "techo", l: "Techo" });
 
     return { piezas: P, metadatos: { nombre: "Ambiente completo", esquema: "planta", avisos, notas: nivelNotas,
       sistema: input.sistema, planta: { x: d.largo, y: d.ancho }, elevacion: 0,
-      barLen: pisoGen.metadatos.barLen, espesorMuro: e, hMuro: hp, niveles: { cielo: !!d.cieloInput, techo: !!d.techoInput },
+      barLen: pisoGen.metadatos.barLen, espesorMuro: e, hMuro: hp, niveles: { cielo: !!d.cieloInput, techo: !!d.techoInput, plantaAlta: !!d.plantaAlta },
       exterior: { x: d.largo, y: d.ancho }, interior: d.interior, esquinas: d.corners.map(k => k.c),
       partes, vistaDefault: "iso", bbox: bb.size } };
   },
@@ -339,7 +408,10 @@ export const combinado = {
     const pisoMat = piso.materiales(sub("piso"), d.pisoInput);
     const muroMats = d.muros.map(m => muro.materiales(sub(m.parte), m.input));
     const tabMats = d.tabiques.map(t => muro.materiales(sub(t.parte), t.input));
-    const all = [pisoMat, ...muroMats, ...tabMats];
+    const paMats = d.plantaAlta ? d.murosPA.map(m => muro.materiales(sub(m.parte), m.input)) : [];
+    const paTabMats = d.plantaAlta ? d.tabiquesPA.map(t => muro.materiales(sub(t.parte), t.input)) : [];
+    const entreMat = d.plantaAlta ? piso.materiales(sub("entrepiso"), d.entrepisoInput) : null;
+    const all = [pisoMat, ...muroMats, ...tabMats, ...paMats, ...paTabMats, ...(entreMat ? [entreMat] : [])];
     if (d.cieloInput) all.push(cielo.materiales(sub("cielo"), d.cieloInput));
     if (d.techoInput) all.push(techo.materiales(sub("techo"), d.techoInput));
 
@@ -370,11 +442,11 @@ export const combinado = {
       otros.push({ key:"fleje-cielo-rollo", label:`Fleje ${FLEJE_CIELO.ancho}x${FLEJE_CIELO.esp} arriostre de cielo (rollo ${FLEJE_CIELO.rollo/1000} m) — ${flejeCielo.metros} m`,
         unidad:"rollo", cantidad: flejeCielo.rollos });
     // T1 de esquinas: 4 esquinas × (unión del doble + unión arranque↔doble), cada una cada 600 mm en altura.
-    const t1Esq = d.corners.length * t1Esquina(d.alto, 600);
+    const t1Esq = d.corners.length * t1Esquina(d.alto, 600) * (d.plantaAlta ? 2 : 1);
     const tornillos = { t1: all.reduce((a, m) => a + (m.tornillos?.t1 || 0), 0) + t1Esq };
     const peso = +all.reduce((a, m) => a + (m.peso || 0), 0).toFixed(1);
-    const nMont = [...muroMats, ...tabMats].reduce((a, m) => a + (m.nMont || 0), 0);
-    const nVanos = [...d.muros, ...d.tabiques].reduce((a, m) => a + (m.input.vanos?.length || 0), 0);
+    const nMont = [...muroMats, ...tabMats, ...paMats, ...paTabMats].reduce((a, m) => a + (m.nMont || 0), 0);
+    const nVanos = [...d.muros, ...d.tabiques, ...(d.plantaAlta ? [...d.murosPA, ...d.tabiquesPA] : [])].reduce((a, m) => a + (m.input.vanos?.length || 0), 0);
 
     return { sistema: input.sistema, area: +(d.largo * d.ancho / 1e6).toFixed(2), peso, nMont, nVanos,
       perfiles, tornillos, otros, flejes, barLen: perfiles[0]?.largoBarra || 6000 };
@@ -405,6 +477,9 @@ export function cortesPorEtapaVsGlobal(input){
     { parte: "piso", piezas: piso.generar(d.pisoInput).piezas },
     ...d.muros.map(m => ({ parte: m.parte, piezas: muro.generar(m.input).piezas })),
     ...d.tabiques.map(t => ({ parte: t.parte, piezas: muro.generar(t.input).piezas })),
+    ...(d.plantaAlta ? [{ parte: "entrepiso", piezas: piso.generar(d.entrepisoInput).piezas },
+      ...d.murosPA.map(m => ({ parte: m.parte, piezas: muro.generar(m.input).piezas })),
+      ...d.tabiquesPA.map(t => ({ parte: t.parte, piezas: muro.generar(t.input).piezas }))] : []),
     { parte: "esquinas", piezas: esquinasP },
     ...(d.cieloInput ? [{ parte: "cielo", piezas: cielo.generar(d.cieloInput).piezas }] : []),
     ...(d.techoInput ? [{ parte: "techo", piezas: techo.generar(d.techoInput).piezas }] : [])
