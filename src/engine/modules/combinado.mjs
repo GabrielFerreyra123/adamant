@@ -39,6 +39,51 @@ function reubicar(piezas, { rot = 0, tx = 0, ty = 0, tz = 0, parte } = {}){
   });
 }
 
+// Resuelve las UNIONES entre tabiques internos para que las soleras no se superpongan ni los montantes
+// se pisen. Reglas (framing en seco): la pared que LLEGA butt-ea contra la que PASA, recortando su
+// solera a la CARA de ésta (encuentros en T y en L); en un CRUCE (+), la de menor prioridad se PARTE a
+// cada lado dejando pasar la otra. Prioridad = orden de dibujo (índice menor = pasante). Puro y testeable.
+export function resolverUniones(tabs, { largo, ancho, e }){
+  const half = e / 2, TOL = e;
+  const list = tabs.map(t => ({ ...t, vanos: (t.vanos || []).map(v => ({ ...v })) }));
+  const rng = w => [Math.min(w.desde, w.hasta), Math.max(w.desde, w.hasta)];
+  // Coordenada sobre el eje de B donde A (perpendicular) la cruza, o null si no se cruzan.
+  const cruce = (B, A) => {
+    const cB = A.at, [bd, bh] = rng(B), [ad, ah] = rng(A);
+    return (cB >= bd - TOL && cB <= bh + TOL && B.at >= ad - TOL && B.at <= ah + TOL) ? cB : null;
+  };
+  // 1) TRIM de extremos (T / L): si B termina sobre A y A es pasante, recorta B a la cara de A.
+  list.forEach((B, bi) => {
+    list.forEach((A, ai) => {
+      if (ai === bi || A.dir === B.dir) return;
+      const cB = cruce(B, A); if (cB == null) return;
+      const endDesde = Math.abs(cB - B.desde) <= TOL, endHasta = Math.abs(cB - B.hasta) <= TOL;
+      if (!endDesde && !endHasta) return;                       // B pasa de largo → lo maneja el split
+      const aEnds = Math.abs(B.at - A.desde) <= TOL || Math.abs(B.at - A.hasta) <= TOL;
+      if (aEnds && ai > bi) return;                             // ambos terminan (L): pasa el de menor índice
+      if (endDesde){ const nd = A.at + half; if (nd < B.hasta - 100){ const d = nd - B.desde; B.desde = nd; B.vanos.forEach(v => { v.x1 -= d; v.x2 -= d; }); } }
+      else { const nh = A.at - half; if (nh > B.desde + 100) B.hasta = nh; }
+    });
+    B.vanos = (B.vanos || []).filter(v => v.x2 > 0 && v.x1 < (B.hasta - B.desde));
+  });
+  // 2) SPLIT en cruces (+): un pasante de menor índice que cruza a B por el medio la parte en dos.
+  const out = [];
+  list.forEach((B, bi) => {
+    const cortes = [];
+    list.forEach((A, ai) => { if (ai >= bi || A.dir === B.dir) return; const cB = cruce(B, A);
+      if (cB != null && cB > B.desde + TOL && cB < B.hasta - TOL) cortes.push(A.at); });
+    if (!cortes.length){ out.push(B); return; }
+    cortes.sort((a, b) => a - b);
+    let s = B.desde; const tramos = [];
+    cortes.forEach(c => { if (c - half - s >= 200) tramos.push([s, c - half]); s = c + half; });
+    if (B.hasta - s >= 200) tramos.push([s, B.hasta]);
+    tramos.forEach(([d, h]) => out.push({ ...B, desde: d, hasta: h,
+      vanos: B.vanos.filter(v => { const c = B.desde + (v.x1 + v.x2) / 2; return c >= d && c <= h; })
+        .map(v => ({ ...v, x1: v.x1 - (d - B.desde), x2: v.x2 - (d - B.desde) })) }));
+  });
+  return out;
+}
+
 // Descompone el ambiente en sub-inputs (piso + 4 muros) y el espesor de muro. Usado por generar y
 // materiales para no duplicar la lógica de esquinas.
 function descomponer(input){
@@ -110,8 +155,27 @@ function descomponer(input){
     { c: [largo, ancho], p: [0, -1], q: [-1, 0], pP: "der", pE: "fondo" }
   ];
 
+  // TABIQUES INTERNOS (F-tabiques): muros divisorios dentro del ambiente. Cada uno corre en X
+  // ("dir":"x", entre laterales, largo = interior en X) o en Y ("dir":"y", entre frente/fondo). `at` es
+  // la posición del EJE del tabique sobre el otro eje. Se apoyan sobre la placa/entramado (tz = hp) y
+  // butt-ean contra los muros perimetrales (MVP: sin poste especial de encuentro en T). Sin arriostre.
+  // Tabiques crudos: parciales (`desde`..`hasta`) sobre su eje, ubicados en `at`, dentro de la cara
+  // interior del perímetro ([e, dim−e]). Se resuelven las uniones (T/L/cruce) antes de generarlos.
+  const cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const rawTabs = (input.tabiques || []).map(t => {
+    const dir = t.dir === "x" ? "x" : "y", axisMax = dir === "x" ? largo : ancho, perpMax = dir === "x" ? ancho : largo;
+    const desde = cl(+t.desde || e, e, axisMax - e);
+    const hasta = cl(t.hasta == null ? axisMax - e : +t.hasta, desde + 100, axisMax - e);
+    return { dir, at: cl(+t.at || 0, e, perpMax - e), desde, hasta, vanos: (t.vanos || []).map(v => ({ ...v })) };
+  });
+  const tabiques = resolverUniones(rawTabs, { largo, ancho, e }).map((tb, i) => {
+    const place = tb.dir === "x" ? { rot: 0, tx: tb.desde, ty: tb.at - e / 2 } : { rot: 90, tx: tb.at + e / 2, ty: tb.desde };
+    return { parte: `tab${i}`, dir: tb.dir, at: tb.at, desde: tb.desde, hasta: tb.hasta, n: i + 1, place,
+      input: { ...muroBase, largo: tb.hasta - tb.desde, vanos: tb.vanos, arriostramiento: "ninguno" } };
+  });
+
   return {
-    largo, ancho, alto, placa, e, encaj, front, modulo, techoInput, techoMap, cieloInput,
+    largo, ancho, alto, placa, e, encaj, front, modulo, techoInput, techoMap, cieloInput, tabiques,
     interior: { x: Math.max(largo - 2*e, 0), y: Math.max(ancho - 2*e, 0) }, corners,
     // `vano`: passthrough del vano de escalera/trampa del piso (mismas coords que el entramado).
     pisoInput: { sistema: input.sistema, largo, ancho, separacion: input.separacion || 400,
@@ -217,6 +281,9 @@ export const combinado = {
     const gens = {};
     d.muros.forEach(m => { const g = muro.generar(m.input); gens[m.parte] = g;
       P.push(...reubicar(g.piezas, { ...m.place, tz: hp, parte: m.parte })); });
+    // Tabiques internos: mismo apoyo (tz = hp) que los perimetrales.
+    d.tabiques.forEach(t => { const g = muro.generar(t.input); gens[t.parte] = g;
+      P.push(...reubicar(g.piezas, { ...t.place, tz: hp, parte: t.parte })); });
 
     // --- POSTES DE ESQUINA --- 3 montantes por esquina en contacto real (doble del pasante + arranque
     // del encajado). El solver es puro; el orquestador sólo le pasa la geometría del encuentro.
@@ -251,8 +318,10 @@ export const combinado = {
     const bb = boundsEngine(P.filter(p => !p.superficie && p.categoria !== "fleje"));
     // Avisos de arriostramiento de los 4 muros, prefijados con el lado (los consume la UI y el PDF).
     const LADO = { frente: "Frente", fondo: "Fondo", izq: "Lateral izq.", der: "Lateral der." };
-    const avisos = [...Object.entries(gens).flatMap(([k, g]) => (g.metadatos.avisos || []).map(a => `${LADO[k]}: ${a}`)), ...nivelAvisos];
+    const nombreParte = k => LADO[k] || (k.startsWith("tab") ? `Tabique ${+k.slice(3) + 1}` : k);
+    const avisos = [...Object.entries(gens).flatMap(([k, g]) => (g.metadatos.avisos || []).map(a => `${nombreParte(k)}: ${a}`)), ...nivelAvisos];
     const partes = [{ id: "piso", l: "Piso" }, { id: "frente", l: "Frente" }, { id: "fondo", l: "Fondo" }, { id: "izq", l: "Lateral izq." }, { id: "der", l: "Lateral der." }];
+    d.tabiques.forEach(t => partes.push({ id: t.parte, l: `Tabique ${t.n}` }));
     if (d.cieloInput) partes.push({ id: "cielo", l: "Cielorraso" });
     if (d.techoInput) partes.push({ id: "techo", l: "Techo" });
 
@@ -269,7 +338,8 @@ export const combinado = {
     // materiales por submódulo (tornillos T1 / otros); los perfiles se optimizan GLOBAL. Sólo estructura.
     const pisoMat = piso.materiales(sub("piso"), d.pisoInput);
     const muroMats = d.muros.map(m => muro.materiales(sub(m.parte), m.input));
-    const all = [pisoMat, ...muroMats];
+    const tabMats = d.tabiques.map(t => muro.materiales(sub(t.parte), t.input));
+    const all = [pisoMat, ...muroMats, ...tabMats];
     if (d.cieloInput) all.push(cielo.materiales(sub("cielo"), d.cieloInput));
     if (d.techoInput) all.push(techo.materiales(sub("techo"), d.techoInput));
 
@@ -303,8 +373,8 @@ export const combinado = {
     const t1Esq = d.corners.length * t1Esquina(d.alto, 600);
     const tornillos = { t1: all.reduce((a, m) => a + (m.tornillos?.t1 || 0), 0) + t1Esq };
     const peso = +all.reduce((a, m) => a + (m.peso || 0), 0).toFixed(1);
-    const nMont = muroMats.reduce((a, m) => a + (m.nMont || 0), 0);
-    const nVanos = d.muros.reduce((a, m) => a + (m.input.vanos?.length || 0), 0);
+    const nMont = [...muroMats, ...tabMats].reduce((a, m) => a + (m.nMont || 0), 0);
+    const nVanos = [...d.muros, ...d.tabiques].reduce((a, m) => a + (m.input.vanos?.length || 0), 0);
 
     return { sistema: input.sistema, area: +(d.largo * d.ancho / 1e6).toFixed(2), peso, nMont, nVanos,
       perfiles, tornillos, otros, flejes, barLen: perfiles[0]?.largoBarra || 6000 };
@@ -334,6 +404,7 @@ export function cortesPorEtapaVsGlobal(input){
   const etapas = [
     { parte: "piso", piezas: piso.generar(d.pisoInput).piezas },
     ...d.muros.map(m => ({ parte: m.parte, piezas: muro.generar(m.input).piezas })),
+    ...d.tabiques.map(t => ({ parte: t.parte, piezas: muro.generar(t.input).piezas })),
     { parte: "esquinas", piezas: esquinasP },
     ...(d.cieloInput ? [{ parte: "cielo", piezas: cielo.generar(d.cieloInput).piezas }] : []),
     ...(d.techoInput ? [{ parte: "techo", piezas: techo.generar(d.techoInput).piezas }] : [])

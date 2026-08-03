@@ -290,3 +290,62 @@ test("F13: materiales y cortes absorben techo y cielorraso", () => {
   const r = cortesPorEtapaVsGlobal(inp);
   assert.ok(r.global <= r.porEtapa && r.ahorro === r.porEtapa - r.global);
 });
+
+// --- Tabiques internos (muros divisorios) ---
+test("combinado: los tabiques internos suman piezas, se ubican y se computan", () => {
+  const base = amb("steel", 6000, 4000);
+  const sin = computeProject(base);
+  const con = computeProject({ ...base, tabiques: [
+    { dir: "y", at: 3000, desde: 100, hasta: 3900, vanos: [{ tipo: "puerta", x1: 1200, x2: 2000, h: 2000, sill: 0 }] },
+    { dir: "x", at: 2000, desde: 100, hasta: 5900 }
+  ] });
+  // agrega piezas de dos muros divisorios
+  assert.ok(con.piezas.length > sin.piezas.length);
+  const tab0 = con.piezas.filter(p => p.parte === "tab0");
+  const tab1 = con.piezas.filter(p => p.parte === "tab1");
+  assert.ok(tab0.length > 0 && tab1.length > 0);
+  // tab0 corre en Y (thin en X centrado en at=3000); tab1 corre en X (thin en Y centrado en at=2000)
+  const cx0 = tab0.map(p => p.box.center[0]);
+  assert.ok(Math.max(...cx0) - Math.min(...cx0) < 200, "tab dir:y es delgado en X");
+  assert.ok(Math.min(...cx0) > 2800 && Math.max(...cx0) < 3200, "tab dir:y centrado en at");
+  const cy1 = tab1.map(p => p.box.center[1]);
+  assert.ok(Math.max(...cy1) - Math.min(...cy1) < 200, "tab dir:x es delgado en Y");
+  // la puerta del tabique se cuenta como vano
+  assert.equal(con.materiales.nVanos, 1);
+  // aparece en las partes (para "ver por partes")
+  assert.ok(con.metadatos.partes.some(p => p.id === "tab0" && /Tabique 1/.test(p.l)));
+});
+
+test("combinado sin tabiques = comportamiento previo (no rompe)", () => {
+  const p = computeProject(amb("steel", 5000, 4000));
+  assert.ok(!p.piezas.some(x => String(x.parte).startsWith("tab")));
+});
+
+// --- Resolver de uniones entre tabiques (T / L / cruce) ---
+import { resolverUniones } from "../src/engine/modules/combinado.mjs";
+test("resolverUniones: en L la pared que llega se recorta a la cara de la pasante", () => {
+  const cfg = { largo: 6000, ancho: 4000, e: 100 };
+  const [h, v] = resolverUniones([
+    { dir: "x", at: 2000, desde: 100, hasta: 5900, vanos: [] },
+    { dir: "y", at: 3000, desde: 2000, hasta: 3900, vanos: [] }
+  ], cfg);
+  assert.equal(h.hasta, 5900);                 // la pasante (índice 0) queda intacta
+  assert.equal(v.desde, 2000 + cfg.e / 2);     // la que llega arranca en la cara (no en el eje)
+});
+test("resolverUniones: en un cruce, la pared de menor prioridad se parte en dos", () => {
+  const cfg = { largo: 6000, ancho: 4000, e: 100 };
+  const out = resolverUniones([
+    { dir: "x", at: 2000, desde: 100, hasta: 5900, vanos: [] },
+    { dir: "y", at: 3000, desde: 100, hasta: 3900, vanos: [] }
+  ], cfg);
+  assert.equal(out.length, 3);                 // 1 pasante + 2 mitades
+  const vs = out.filter(w => w.dir === "y");
+  assert.equal(vs.length, 2);
+  assert.ok(vs[0].hasta <= 2000 && vs[1].desde >= 2000); // hueco a cada lado del cruce
+});
+test("resolverUniones: sin cruces, no toca nada", () => {
+  const cfg = { largo: 6000, ancho: 4000, e: 100 };
+  const out = resolverUniones([{ dir: "x", at: 2000, desde: 500, hasta: 3000, vanos: [] }], cfg);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].hasta, 3000);
+});

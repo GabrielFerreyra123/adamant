@@ -283,8 +283,8 @@ export const techo = {
     if (c.moduloMuro && c.separacion !== c.moduloMuro)
       avisos.push("Las cabriadas no caen sobre los montantes del muro.");
     // Nota informativa fija (no es una advertencia del proyecto: aplica a TODO techo).
-    const notas = ["Los anclajes del techo al muro resisten la succión del viento; en Bahía Blanca, " +
-      "una de las zonas de mayor viento del país, conviene sobredimensionarlos."];
+    const notas = ["Los anclajes del techo al muro resisten la succión del viento; en zonas de viento " +
+      "fuerte conviene sobredimensionarlos."];
 
     const alturaCumbrera = (c.tipo === "dosAguas" ? c.luz/2 : c.luz) * p;
     return { piezas: P, metadatos: { nombre: "Techo", esquema: "cabriada", sistema: input.sistema,

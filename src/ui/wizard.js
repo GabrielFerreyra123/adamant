@@ -30,7 +30,7 @@ const VANO_INI = { puerta:"P", ventana:"V", arcada:"A" };
 const VANO_COL = { puerta:"var(--tangerine)", ventana:"#e8b53a", arcada:"#27b0c9" };
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
-const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null, quePieza: false, editOpen: false };
+const state = { kind: null, step: 0, params: null, adv: false, tab: "3d", vista3d: null, parte3d: "todo", capas: {}, muroSel: null, tabSel: null, drawMode: false, quePieza: false, editOpen: false };
 // Superficies estructurales conmutables del visor: id de capa → etiqueta y tipo (para color de leyenda).
 // Superficies conmutables del visor: apoyos de fundación y placa de piso (diafragma estructural).
 const CAPA_INFO = {
@@ -109,7 +109,8 @@ function toEngineInput(){
   const p = state.params;
   if (state.kind === "combinado")
     return { ...p, kind: "combinado", opciones: { ...p.opciones },
-      vanoFrente: mapVanos(p.vanoFrente), vanoFondo: mapVanos(p.vanoFondo), vanoIzq: mapVanos(p.vanoIzq), vanoDer: mapVanos(p.vanoDer) };
+      vanoFrente: mapVanos(p.vanoFrente), vanoFondo: mapVanos(p.vanoFondo), vanoIzq: mapVanos(p.vanoIzq), vanoDer: mapVanos(p.vanoDer),
+      tabiques: (p.tabiques || []).map(t => ({ dir: t.dir, at: t.at, desde: t.desde, hasta: t.hasta, vanos: mapVanos(t.vanos) })) };
   return { ...p, kind: state.kind, vanos: mapVanos(p.vanos), opciones: { ...p.opciones } };
 }
 
@@ -129,6 +130,13 @@ export function startWizard(el){
      <nav class="wnav" id="wnav"></nav>`;
   restaurarProyecto(); // si volvemos del pago (o recarga), recuperar el proyecto en curso
   initGlosario();      // glosario integrado: tarjeta al tocar un término subrayado
+  // Atajo "D": activa/desactiva Dibujar pared cuando la planta del ambiente está visible.
+  document.addEventListener("keydown", ev => {
+    if (ev.key.toLowerCase() !== "d" || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (/^(input|textarea|select)$/i.test(document.activeElement?.tagName || "")) return;
+    if (!document.getElementById("planta4")) return; // sólo con la planta interactiva a la vista
+    ev.preventDefault(); state.drawMode = !state.drawMode; emitEdit();
+  });
   cargarVisor();       // precarga en segundo plano: el 3D queda listo antes de llegar al paso 1
   // Link compartido (?p=<medidas>): reabre el proyecto exacto (viene de WhatsApp / lo comparte el usuario).
   const shared = new URLSearchParams(location.search).get("p");
@@ -268,9 +276,9 @@ function renderNav(){
   const total = nPasos + 1, frac = total ? Math.min(1, state.step / total) : 0;
   const mid = `<div class="wprog"><span>Progreso del proyecto</span><div class="segbar" style="--p:${Math.round(frac*100)}%"></div></div>`;
   document.getElementById("wnav").innerHTML = prev + mid + right;
-  const p = document.getElementById("prev"); if (p) p.onclick = () => { state.step--; state.muroSel = null; render(); };
-  const n = document.getElementById("next"); if (n) n.onclick = () => { state.step++; state.muroSel = null; render(); };
-  const e = document.getElementById("edit"); if (e) e.onclick = () => { state.step = 1; state.muroSel = null; render(); };
+  const p = document.getElementById("prev"); if (p) p.onclick = () => { state.step--; state.muroSel = null; state.tabSel = null; render(); };
+  const n = document.getElementById("next"); if (n) n.onclick = () => { state.step++; state.muroSel = null; state.tabSel = null; render(); };
+  const e = document.getElementById("edit"); if (e) e.onclick = () => { state.step = 1; state.muroSel = null; state.tabSel = null; render(); };
 }
 
 // ---------- paso 0: grilla de módulos ----------
@@ -305,7 +313,7 @@ function abrirProyecto(kind, params){
   if (!KINDS.has(kind)) return;
   state.kind = kind; state.params = params;
   nuevoProyecto(); // projectHash propio → gate normal del entregable
-  state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tab = "3d";
+  state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tabSel = null; state.tab = "3d";
   state.editOpen = true;             // preset/compartido abre con el editor a mano (tocar medidas al toque)
   state.step = pasosOf().length + 1; // salta al resultado
   render();
@@ -351,7 +359,7 @@ function stepGrid(){
 }
 function wireGrid(){
   document.querySelectorAll(".mods .mod").forEach(b => b.onclick = () => {
-    if (state.kind !== b.dataset.id){ state.kind = b.dataset.id; state.params = structuredClone(getModule(state.kind).defaults()); state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; }
+    if (state.kind !== b.dataset.id){ state.kind = b.dataset.id; state.params = structuredClone(getModule(state.kind).defaults()); state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tabSel = null; }
     state.step = 1; render();
   });
   document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => cargarPreset(+b.dataset.preset));
@@ -506,6 +514,10 @@ function wirePaso(paso){
 // Contexto de edición: el muro (single) usa params.vanos/largo/alto; el combinado, el array del muro
 // seleccionado (vanoFrente/Fondo/Izq/Der) y el largo real de ese muro.
 function vanoCtx(){
+  if (state.kind === "combinado" && state.tabSel != null){
+    const t = state.params.tabiques[state.tabSel]; t.vanos = t.vanos || [];
+    return { arr: t.vanos, largo: Math.max(200, (+t.hasta) - (+t.desde)), alto: +state.params.alto };
+  }
   if (state.kind === "combinado" && state.muroSel){
     const key = "vano" + cap(state.muroSel);
     state.params[key] = state.params[key] || [];
@@ -514,6 +526,11 @@ function vanoCtx(){
   }
   state.params.vanos = state.params.vanos || [];
   return { arr: state.params.vanos, largo: +state.params.largo, alto: +state.params.alto };
+}
+// Espesor del muro del ambiente derivado del largo del lateral (izq = ancho − 2·e).
+function espesorAmb(){
+  const izq = murosDelAmbiente(state.params).find(x => x.parte === "izq");
+  return Math.max(50, Math.round((+state.params.ancho - (izq?.largo || +state.params.ancho)) / 2));
 }
 // Clampea la posición de un vano dentro del muro y sin solaparse con los otros.
 function clampPos(v, arr, largo){
@@ -702,36 +719,165 @@ function wireVanoPiso(){
 
 // ---------- combinado: aberturas por muro (esquema en planta) ----------
 function murosPlantaHTML(){
+  if (state.tabSel != null){
+    const t = state.params.tabiques[state.tabSel];
+    return `<div class="muroedit"><button class="btn ghost sm" id="volverPlanta">← Planta</button>
+      <b>Tabique ${state.tabSel+1} · ${((t.hasta-t.desde)/1000).toFixed(2)} m ${t.dir==="x"?"(horizontal)":"(vertical)"}</b></div>${vanosHTML()}`;
+  }
   if (state.muroSel){
     const m = murosDelAmbiente(state.params).find(x => x.parte === state.muroSel);
     return `<div class="muroedit"><button class="btn ghost sm" id="volverPlanta">← Planta</button>
       <b>${m.l} · ${(m.largo/1000).toFixed(2)} m</b></div>${vanosHTML()}`;
   }
-  return `<p class="sub">Tocá un muro para agregarle puertas, ventanas o arcadas.</p><div class="planta4" id="planta4"></div>`;
+  const n = (state.params.tabiques || []).length;
+  return `<div class="planttools">
+      <button class="btn sm ${state.drawMode?'on':''}" id="drawWall">✏️ Dibujar pared <kbd>D</kbd></button>
+      <span class="planthint">${state.drawMode
+        ? "Arrastrá dentro del ambiente para trazar la pared (se endereza sola y muestra la medida)."
+        : "Dibujá una pared interna (tecla D), o tocá una existente para editar sus aberturas."}</span>
+    </div>
+    <div class="planta4" id="planta4"></div>
+    <p class="sub planttip">${n ? "Arrastrá una pared para moverla · tirá de las puntas para acortarla · tocala para las aberturas · ✕ la quita." : "Todavía no hay paredes internas."}</p>`;
 }
 function wireMurosPlanta(){
-  if (state.muroSel){
-    document.getElementById("volverPlanta").onclick = () => { state.muroSel = null; emitEdit(); };
+  if (state.tabSel != null){
+    document.getElementById("volverPlanta").onclick = () => { state.tabSel = null; emitEdit(); };
     wireVanos(); return;
   }
+  if (state.muroSel){
+    document.getElementById("volverPlanta").onclick = () => { state.muroSel = null; state.tabSel = null; emitEdit(); };
+    wireVanos(); return;
+  }
+  const db = document.getElementById("drawWall");
+  if (db) db.onclick = () => { state.drawMode = !state.drawMode; emitEdit(); };
   drawPlanta4();
 }
 function nVanosMuro(parte){ return (state.params["vano" + cap(parte)] || []).length; }
+let _planDrag = null; // arrastre activo en la planta: {mode:'new'|'move'|'end'|'wtap', ...}
+// Planta interactiva del ambiente: dibujar/mover/acortar paredes internas con el mouse.
 function drawPlanta4(){
   const box = document.getElementById("planta4"); if (!box) return;
-  const muros = murosDelAmbiente(state.params), largo = +state.params.largo, ancho = +state.params.ancho;
-  const W = box.clientWidth || 340, H = Math.max(180, Math.min(300, W * ancho/largo)), t = 26;
-  const g = (parte, x, y, w, h, tx, ty) => `<g class="wtap" data-parte="${parte}">
-      <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3"/>
-      <text x="${tx}" y="${ty}" text-anchor="middle">${muros.find(m=>m.parte===parte).l}${nVanosMuro(parte)?` (${nVanosMuro(parte)})`:""}</text></g>`;
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="plantasvg">
-    <rect x="${t}" y="${t}" width="${W-2*t}" height="${H-2*t}" class="room"/>
-    ${g("fondo",  t, 0,     W-2*t, t, W/2, t-8)}
-    ${g("frente", t, H-t,   W-2*t, t, W/2, H-8)}
-    ${g("izq",    0, t,     t, H-2*t, 12, H/2)}
-    ${g("der",    W-t, t,   t, H-2*t, W-12, H/2)}
-    <text x="${W/2}" y="${H/2}" text-anchor="middle" class="plantahint">planta</text></svg>`;
-  box.querySelectorAll(".wtap").forEach(w => w.onclick = () => { state.muroSel = w.dataset.parte; emitEdit(); });
+  const p = state.params, muros = murosDelAmbiente(p), largo = +p.largo, ancho = +p.ancho;
+  const W = box.clientWidth || 340, H = Math.max(200, Math.min(340, W * ancho/largo)), t = 26;
+  const e = espesorAmb(), GRID = 50;
+  const sx = v => t + (v / largo) * (W - 2*t), sy = v => (H - t) - (v / ancho) * (H - 2*t);
+  const snap = v => Math.round(v / GRID) * GRID, clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  box.innerHTML = `<svg id="plantaSvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="plantasvg ${state.drawMode?'drawing':''}"></svg>`;
+  const svg = box.querySelector("#plantaSvg");
+  // pantalla → mm (contempla escalado CSS del svg)
+  const mm = ev => { const r = svg.getBoundingClientRect(); const px = (ev.clientX - r.left) * (W / r.width), py = (ev.clientY - r.top) * (H / r.height);
+    return { px, py, x: (px - t) / (W - 2*t) * largo, y: ((H - t) - py) / (H - 2*t) * ancho }; };
+  // Tolerancia de "imán" (≈14 px) en mm por eje, para pegar a otras paredes / al perímetro interior.
+  const thX = 14 * largo / (W - 2*t), thY = 14 * ancho / (H - 2*t);
+  const dentro = (v, a, b, tol) => v >= Math.min(a,b) - tol && v <= Math.max(a,b) + tol;
+  // Pega un punto (mm) a cualquier tabique o a la cara interior del perímetro → permite arrancar/terminar
+  // una pared perpendicular EN CUALQUIER punto de otra pared (encuentro en T).
+  function snapWalls(x, y){
+    (p.tabiques || []).forEach(tb => {
+      if (tb.dir === "x"){ if (Math.abs(y - tb.at) < thY && dentro(x, tb.desde, tb.hasta, thX)) y = tb.at; }
+      else { if (Math.abs(x - tb.at) < thX && dentro(y, tb.desde, tb.hasta, thY)) x = tb.at; }
+    });
+    [e, largo - e].forEach(v => { if (Math.abs(x - v) < thX) x = v; });
+    [e, ancho - e].forEach(v => { if (Math.abs(y - v) < thY) y = v; });
+    return { x, y };
+  }
+  // Pared nueva desde el arrastre: se endereza (H/V), ancla el eje al punto de INICIO y snapea a grilla.
+  function newWall(d){
+    const dx = Math.abs(d.x1 - d.x0), dy = Math.abs(d.y1 - d.y0);
+    return dx >= dy
+      ? { dir:"x", at: snap(clamp(d.y0, e, ancho-e)), desde: snap(clamp(Math.min(d.x0,d.x1), e, largo-e)), hasta: snap(clamp(Math.max(d.x0,d.x1), e, largo-e)) }
+      : { dir:"y", at: snap(clamp(d.x0, e, largo-e)), desde: snap(clamp(Math.min(d.y0,d.y1), e, ancho-e)), hasta: snap(clamp(Math.max(d.y0,d.y1), e, ancho-e)) };
+  }
+  // Etiqueta de medida (mm) centrada sobre un segmento a..b (px).
+  const medida = (a, b, val) => { const cx = (a[0]+b[0])/2, cy = (a[1]+b[1])/2, txt = `${Math.round(val)} mm`, w = txt.length*6.6 + 12;
+    return `<g class="tabmed"><rect x="${(cx-w/2).toFixed(1)}" y="${(cy-9).toFixed(1)}" width="${w.toFixed(1)}" height="17" rx="4"/><text x="${cx.toFixed(1)}" y="${(cy+3.5).toFixed(1)}" text-anchor="middle">${txt}</text></g>`; };
+
+  function paint(){
+    const wall = (parte, x, y, w, h, tx, ty) => `<g class="wtap" data-parte="${parte}">
+        <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3"/>
+        <text x="${tx}" y="${ty}" text-anchor="middle">${muros.find(m=>m.parte===parte).l}${nVanosMuro(parte)?` (${nVanosMuro(parte)})`:""}</text></g>`;
+    const tabs = (p.tabiques || []).map((tb, i) => {
+      const horiz = tb.dir === "x";
+      const a = horiz ? [sx(tb.desde), sy(tb.at)] : [sx(tb.at), sy(tb.desde)];
+      const b = horiz ? [sx(tb.hasta), sy(tb.at)] : [sx(tb.at), sy(tb.hasta)];
+      // puertas/ventanas como huecos (segmento del color del panel sobre la línea)
+      const gaps = (tb.vanos || []).map(v => {
+        const c1 = tb.desde + v.pos - v.ancho/2, c2 = tb.desde + v.pos + v.ancho/2;
+        const p1 = horiz ? [sx(c1), sy(tb.at)] : [sx(tb.at), sy(c1)];
+        const p2 = horiz ? [sx(c2), sy(tb.at)] : [sx(tb.at), sy(c2)];
+        return `<line x1="${p1[0]}" y1="${p1[1]}" x2="${p2[0]}" y2="${p2[1]}" class="tabgap"/>`;
+      }).join("");
+      const mid = [(a[0]+b[0])/2, (a[1]+b[1])/2];
+      return `<g class="tabg" data-i="${i}">
+        <line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="tabline"/>${gaps}
+        <line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="tabhit tabbody" data-i="${i}"/>
+        <circle cx="${a[0]}" cy="${a[1]}" r="6" class="tabend" data-i="${i}" data-end="0"/>
+        <circle cx="${b[0]}" cy="${b[1]}" r="6" class="tabend" data-i="${i}" data-end="1"/>
+        <g class="tabdel" data-i="${i}"><circle cx="${mid[0]}" cy="${mid[1]}" r="8"/><text x="${mid[0]}" y="${mid[1]+3.5}" text-anchor="middle">✕</text></g>
+      </g>`;
+    }).join("");
+    let band = "";
+    if (_planDrag && _planDrag.mode === "new"){
+      const w = newWall(_planDrag);
+      const a = w.dir === "x" ? [sx(w.desde), sy(w.at)] : [sx(w.at), sy(w.desde)];
+      const b = w.dir === "x" ? [sx(w.hasta), sy(w.at)] : [sx(w.at), sy(w.hasta)];
+      band = `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="tabline band"/>${medida(a, b, w.hasta - w.desde)}`;
+    } else if (_planDrag && _planDrag.mode === "end"){
+      const tb = p.tabiques[_planDrag.i];
+      const a = tb.dir === "x" ? [sx(tb.desde), sy(tb.at)] : [sx(tb.at), sy(tb.desde)];
+      const b = tb.dir === "x" ? [sx(tb.hasta), sy(tb.at)] : [sx(tb.at), sy(tb.hasta)];
+      band = medida(a, b, tb.hasta - tb.desde);
+    }
+    svg.innerHTML = `<rect x="${t}" y="${t}" width="${W-2*t}" height="${H-2*t}" class="room"/>
+      ${tabs}${band}
+      ${wall("fondo",  t, 0,     W-2*t, t, W/2, t-8)}
+      ${wall("frente", t, H-t,   W-2*t, t, W/2, H-8)}
+      ${wall("izq",    0, t,     t, H-2*t, 12, H/2)}
+      ${wall("der",    W-t, t,   t, H-2*t, W-12, H/2)}
+      ${(p.tabiques||[]).length?"":`<text x="${W/2}" y="${H/2}" text-anchor="middle" class="plantahint">${state.drawMode?"dibujá acá":"planta"}</text>`}`;
+  }
+  paint();
+
+  svg.onpointerdown = ev => {
+    const c = mm(ev);
+    const del = ev.target.closest(".tabdel");
+    if (del){ p.tabiques.splice(+del.dataset.i, 1); emitEdit(); return; }
+    // En modo dibujar, TODO el plano dibuja (las puntas/paredes no resizean): permite arrancar en una punta.
+    if (state.drawMode){ const s = snapWalls(c.x, c.y); _planDrag = { mode:"new", x0:s.x, y0:s.y, x1:s.x, y1:s.y }; svg.setPointerCapture(ev.pointerId); return; }
+    const end = ev.target.closest(".tabend");
+    if (end){ _planDrag = { mode:"end", i:+end.dataset.i, end:+end.dataset.end }; svg.setPointerCapture(ev.pointerId); return; }
+    const body = ev.target.closest(".tabbody");
+    if (body){ _planDrag = { mode:"move", i:+body.dataset.i, px0:c.px, py0:c.py, moved:false }; svg.setPointerCapture(ev.pointerId); return; }
+    const wt = ev.target.closest(".wtap");
+    if (wt){ _planDrag = { mode:"wtap", parte:wt.dataset.parte, px0:c.px, py0:c.py, moved:false }; svg.setPointerCapture(ev.pointerId); }
+  };
+  svg.onpointermove = ev => {
+    if (!_planDrag) return;
+    const c = mm(ev), d = _planDrag;
+    if (d.mode === "new"){ const s = snapWalls(c.x, c.y); d.x1 = s.x; d.y1 = s.y; paint(); return; }
+    if (d.mode === "move" || d.mode === "wtap"){ if (Math.hypot(c.px-d.px0, c.py-d.py0) > 5) d.moved = true; }
+    if (d.mode === "move"){ const tb = p.tabiques[d.i];
+      tb.at = tb.dir === "x" ? snap(clamp(c.y, e, ancho-e)) : snap(clamp(c.x, e, largo-e)); paint(); return; }
+    if (d.mode === "end"){ const tb = p.tabiques[d.i], horiz = tb.dir === "x";
+      let val = horiz ? c.x : c.y;                       // snap del extremo a paredes perpendiculares que cruzan
+      (p.tabiques || []).forEach((o, j) => { if (j === d.i) return;
+        if (horiz && o.dir === "y" && Math.abs(val - o.at) < thX) val = o.at;
+        if (!horiz && o.dir === "x" && Math.abs(val - o.at) < thY) val = o.at; });
+      val = snap(clamp(val, e, (horiz ? largo : ancho) - e));
+      if (d.end === 0) tb.desde = Math.min(val, tb.hasta - 100); else tb.hasta = Math.max(val, tb.desde + 100);
+      paint(); return; }
+  };
+  svg.onpointerup = () => {
+    const d = _planDrag; _planDrag = null; if (!d) return;
+    if (d.mode === "new"){
+      const w = newWall(d);
+      if (w.hasta - w.desde >= 300){ (p.tabiques = p.tabiques || []).push({ ...w, vanos: [] }); state.drawMode = false; }
+      emitEdit(); return;
+    }
+    if (d.mode === "move" && !d.moved){ state.tabSel = d.i; emitEdit(); return; }
+    if (d.mode === "wtap" && !d.moved){ state.muroSel = d.parte; emitEdit(); return; }
+    emitEdit();
+  };
 }
 
 // ---------- paso resultado (común a todos los módulos) ----------
@@ -739,7 +885,7 @@ function stepResultado(){
   const tabs = [["3d","3D"],["mat","Materiales"],["guia","Guía"],["cut","Cortes"],["pdf","PDF"]];
   // Estado del chequeo → punto de color en la solapa Guía (se ve sin entrar).
   let chkPeor = null;
-  try { chkPeor = predimensionar(toEngineInput(), { zona: state.zonaViento || "alta" }).resumen.peor; } catch {}
+  try { chkPeor = predimensionar(toEngineInput(), { zona: state.zonaViento || "media" }).resumen.peor; } catch {}
   const tabHTML = ([k,l]) => `<button class="tab ${state.tab===k?'on':''}" data-tab="${k}">${
     k === "guia" && chkPeor ? `<span class="tabdot ${chkPeor}"></span>` : ""}${l}</button>`;
   const drawer = state.editOpen ? `<aside class="editpanel" id="editpanel">${editorHTML()}</aside>` : "";
@@ -814,7 +960,7 @@ function abrirAberturasModal(compId){
     if (compId === "murosPlanta") wireMurosPlanta(); else if (compId === "vanoPiso") wireVanoPiso(); else wireVanos();
   };
   _onEdit = () => { pintar(); refrescarResultado(false); };  // los editores llaman emitEdit() → esto
-  const cerrar = () => { _onEdit = null; state.muroSel = null; cerrarModal(); refrescarResultado(false); };
+  const cerrar = () => { _onEdit = null; state.muroSel = null; state.tabSel = null; cerrarModal(); refrescarResultado(false); };
   const x = document.getElementById("modalx"); if (x) x.onclick = cerrar;
   ov.addEventListener("click", e => { if (e.target === ov) cerrar(); });
   pintar();
@@ -1013,8 +1159,8 @@ function shoppingList(mat){
   (mat.otros || []).forEach(o => items.push({ key:o.key, label:o.label, unidad:o.unidad, cant:o.cantidad })); // ítems propios del módulo (placa de piso, implantación…)
   return items;
 }
-// Semáforo de pre-dimensionado (orientativo, NO cálculo). Zona de viento con default alta (Bahía Blanca).
-const ZONA_LBL = { baja: "Baja", media: "Media", alta: "Alta (Bahía Blanca)" };
+// Semáforo de pre-dimensionado (orientativo, NO cálculo). Zona de viento (la elige el usuario).
+const ZONA_LBL = { baja: "Baja", media: "Media", alta: "Alta" };
 const SEM = { ok: "🟢", atencion: "🟡", fuera: "🔴" };
 // Aplica un `fix` que devuelve el motor (predimensionado) sobre los parámetros del proyecto.
 function aplicarFixChequeo(fix){
@@ -1032,7 +1178,7 @@ function aplicarFixChequeo(fix){
 }
 let _chkFixes = [];
 function renderChequeo(body){
-  if (!state.zonaViento) state.zonaViento = "alta";
+  if (!state.zonaViento) state.zonaViento = "media";
   const { checks, resumen } = predimensionar(toEngineInput(), { zona: state.zonaViento });
   _chkFixes = [];
   const zonaSel = Object.keys(ZONA_LBL).map(z =>
@@ -1104,7 +1250,7 @@ function renderAislacion(body){
       <div class="aisstat"><b>${r.area.toFixed(1).replace(".",",")} m²</b><span>de muro (neto)</span></div>
     </div>
     <div class="chklist">${cards}</div>
-    <p class="chkdisc">⚠ Cálculo aproximado según IRAM 11601/11605 (zona de Bahía Blanca). El proyecto higrotérmico y la barrera de vapor los define un profesional.</p>
+    <p class="chkdisc">⚠ Cálculo aproximado según IRAM 11601/11605 (zona bioambiental templado-fría). El proyecto higrotérmico y la barrera de vapor los define un profesional.</p>
   </div>`;
   body.querySelectorAll("[data-aistipo]").forEach(b => b.onclick = () => { state.aisl.tipo = b.dataset.aistipo; renderAislacion(body); });
   body.querySelectorAll("[data-aisesp]").forEach(b => b.onclick = () => { state.aisl.espesor = +b.dataset.aisesp; renderAislacion(body); });
@@ -1118,9 +1264,10 @@ function renderGuia(body){
   if (esMuroAmb) subs.push(["ais", "Aislación"], ["cmp", "Comparar"]);
   subs.push(["fas", "Fases"]);
   if (!state.guiaSub || !subs.some(s => s[0] === state.guiaSub)) state.guiaSub = "chk";
-  body.innerHTML = `<div class="guianav">${subs.map(([k, l]) =>
-    `<button class="gbtn ${state.guiaSub===k?'on':''}" data-gsub="${k}">${l}</button>`).join("")}</div>
-    <div id="guiabody"></div>`;
+  body.innerHTML = `<div class="guiawrap">
+    <div class="guianav">${subs.map(([k, l]) =>
+      `<button class="gbtn ${state.guiaSub===k?'on':''}" data-gsub="${k}">${l}</button>`).join("")}</div>
+    <div class="guiabody" id="guiabody"></div></div>`;
   const gb = body.querySelector("#guiabody");
   ({ chk: renderChequeo, ais: renderAislacion, cmp: renderComparar, fas: renderFases }[state.guiaSub] || renderChequeo)(gb);
   body.querySelectorAll("[data-gsub]").forEach(b => b.onclick = () => { state.guiaSub = b.dataset.gsub; renderGuia(body); });
@@ -1416,7 +1563,7 @@ function renderExport(body){
     nuevoProyecto();
     borrarProyectoGuardado();
     state.kind = null; state.step = 0; state.params = null;
-    state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tab = "3d";
+    state.vista3d = null; state.parte3d = "todo"; state.capas = {}; state.muroSel = null; state.tabSel = null; state.tab = "3d";
     render();
   };
   document.getElementById("dlpdf").onclick = async () => {

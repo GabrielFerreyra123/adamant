@@ -1,7 +1,7 @@
 // ADAMANT · aislación térmica ORIENTATIVA (calculadora, NO dibuja). Estima la transmitancia térmica K
 // (W/m²K) del muro según el aislante y su ubicación, el m² de material y avisa del PUENTE TÉRMICO
 // —el problema central del steel frame— y del riesgo de condensación. Se compara con los niveles de
-// la norma IRAM 11605 para la zona bioambiental de Bahía Blanca (IV/V, templado-frío).
+// la norma IRAM 11605 (zona bioambiental templado-fría, IV/V).
 //
 // Puro (sin DOM ni Three). Es análisis, no dibujo: respeta "Adamant dibuja solo estructura".
 // ⚠ Valores de literatura (IRAM 11601/11605). El cálculo higrotérmico fino lo hace un profesional.
@@ -19,7 +19,7 @@ export const ESPESORES = [50, 70, 100, 120];         // mm
 const Rsi = 0.13, Rse = 0.04, R_OTROS = 0.10;
 // Puente térmico: qué fracción del R del aislante sobrevive si va ENTRE montantes (el metal conduce).
 const PUENTE = { steel: 0.50, wood: 0.90 };          // acero: se pierde ~50%; madera puentea poco
-// IRAM 11605, muros, zona IV/V (Bahía Blanca): K máximo por nivel (W/m²K).
+// IRAM 11605, muros, zona bioambiental IV/V (templado-fría): K máximo por nivel (W/m²K).
 const NIVEL = { B: 1.00, C: 1.85 };                  // B = recomendado · C = mínimo
 
 const areaVanos = vanos => (vanos || []).reduce((a, v) => a + Math.max(0, (+v.x2 - +v.x1)) * Math.max(0, (+v.h - (+v.sill || 0))), 0);
@@ -66,7 +66,7 @@ export function aislacion(input, opts = {}){
     avisos.push({ tono: "fuera", titulo: "No llega al mínimo de norma",
       texto: `Con K=${K.toFixed(2)} el muro no alcanza el mínimo (K≤${NIVEL.C}). Subí el espesor o usá un aislante mejor (poliuretano/EPS).` });
   avisos.push({ tono: "info", titulo: "Condensación",
-    texto: "Bahía Blanca es fría y húmeda: poné barrera de vapor del lado caliente (interior) para que no condense adentro del muro." });
+    texto: "En clima frío o húmedo, poné barrera de vapor del lado caliente (interior) para que no condense adentro del muro." });
 
   return {
     area: +area.toFixed(1), m2, tipo, espesor, ubicacion, sistema,

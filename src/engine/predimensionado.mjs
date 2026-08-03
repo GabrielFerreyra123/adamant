@@ -60,7 +60,7 @@ function chkArriostre(tieneCruz, zona){
   return check({ id: "viento", titulo: "Resistencia al viento", label: "Arriostramiento (viento)",
     valor: "sin arriostrar", rango: "requerido en zona de viento", estado,
     detalle: zona === "alta"
-      ? "Bahía Blanca es zona de viento fuerte y esta pared no está arriostrada: el viento la puede desaplomar. Agregale una Cruz de San Andrés."
+      ? "En zona de viento fuerte, una pared sin arriostrar se puede desaplomar. Agregale una Cruz de San Andrés (o placa de corte)."
       : "Conviene arriostrar la pared (Cruz de San Andrés o placa) para el empuje del viento.",
     fix: { tipo: "arriostrar", label: "Agregar Cruz de San Andrés" } });
 }
@@ -114,7 +114,7 @@ function chkEntrepiso(input){
 
 // Pre-dimensionado del proyecto. → { zona, checks:[...], resumen:{ok,atencion,fuera,peor} }
 export function predimensionar(input, opts = {}){
-  const zona = opts.zona || "alta";                        // Bahía Blanca = alta por defecto
+  const zona = opts.zona || "media";                       // default neutro; el usuario ajusta su zona
   const kind = input.kind, checks = [];
   const add = c => c && checks.push(c);
 
