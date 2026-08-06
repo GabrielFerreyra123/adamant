@@ -7,6 +7,7 @@
 // `orient` = { c(centro), u(eje del largo), v(eje del ancho), n(eje del espesor), w, t }, y todo lo
 // que consume geometría (pieceBoxEngine, visor, export) resuelve la caja desde esa base.
 import { resolveSystem, FLEJE, FLEJE_PERFIL, rolloDe } from "./systems.mjs";
+import { secDims } from "./geometry.mjs";
 
 const rad = g => g * Math.PI / 180;
 export const anguloGrados = (ancho, alto) => Math.atan2(alto, ancho) * 180 / Math.PI;
@@ -67,13 +68,32 @@ function cruz(x0, ancho, alto, yCara, haciaAfuera){
   });
 }
 
+// Riostra RÍGIDA: una diagonal del mismo perfil del muro (PGC / escuadría), montada DENTRO del alma del
+// paño y en zigzag (K) — el `sentido` alterna por sub-tramo. A diferencia del fleje (rollo, apoyado sobre
+// la cara, atornillado sólo en las puntas), la diagonal rígida es BARRA: se computa como perfil normal
+// (metros / peso / lista de corte). El alma del perfil (h) atraviesa el espesor del muro (Y); el ala (b)
+// queda en el plano del paño (X-Z).
+function rigidDiag(x0, ancho, alto, e, perfil, sentido){
+  const { b, h } = secDims(perfil);              // b = ala (en el plano) · h = alma (atraviesa el muro)
+  const L = Math.hypot(ancho, alto);
+  const cx = x0 + ancho / 2, cz = alto / 2;
+  const u = [ancho / L, 0, (sentido * alto) / L];  // eje del largo, en el plano del muro
+  const v = [-u[2], 0, u[0]];                      // ala, perpendicular a u en el plano (u × v = [0,-1,0])
+  return {
+    tipo: "RIOSTRA", categoria: "riostra", perfil, mat: "acero",
+    largo: Math.round(L),
+    orient: { c: [cx, e / 2, cz], u, v, n: [0, -1, 0], w: b, t: h }
+  };
+}
+
 // Arriostramiento del muro. → { piezas, avisos, zonas }
-// `zonas` (para el PDF/esquema): [{ x0, ancho, alto, angulo }] de cada cruz colocada.
-// arriostramiento: "cruz" = Cruz de San Andrés (fleje, esta función); "ninguno" = sin arriostrar.
-// Sólo "cruz" materializa flejes.
+// `zonas` (para el PDF/esquema): [{ x0, ancho, alto, angulo }] de cada cruz/diagonal colocada.
+// arriostramiento: "cruz" = Cruz de San Andrés (fleje) · "diagonal" = riostra rígida de perfil (K/zigzag)
+// · "ninguno" = sin arriostrar.
 export function buildBraces(input){
   const piezas = [], avisos = [], zonas = [];
-  if ((input.arriostramiento || "ninguno") !== "cruz") return { piezas, avisos, zonas };
+  const modo = input.arriostramiento || "ninguno";
+  if (modo !== "cruz" && modo !== "diagonal") return { piezas, avisos, zonas };
 
   const largo = +input.largo, alto = +input.alto;
   if (!(largo > 0) || !(alto > 0)) return { piezas, avisos, zonas };
@@ -81,7 +101,8 @@ export function buildBraces(input){
   // Cara exterior del muro. Por defecto es Y=0 (el fleje sale hacia Y negativo). El orquestador del
   // ambiente pide `caraExterior:"ymax"` en los muros cuyo lado exterior es el opuesto (fondo/der),
   // para que el fleje no quede dentro del ambiente.
-  const eMuro = resolveSystem(input).a;
+  const s = resolveSystem(input);
+  const eMuro = s.a;
   const ymax = input.caraExterior === "ymax";
   const yCara = ymax ? eMuro : 0, haciaAfuera = ymax ? 1 : -1;
 
@@ -90,7 +111,9 @@ export function buildBraces(input){
   const zona = tramos.reduce((mej, t) => (!mej || (t[1] - t[0]) > (mej[1] - mej[0]) ? t : mej), null);
   const ancho = zona ? zona[1] - zona[0] : 0;
   if (!zona || ancho < FLEJE.tramoMin){
-    avisos.push("Sin tramo lleno suficiente para arriostrar con Cruz de San Andrés.");
+    avisos.push(modo === "diagonal"
+      ? "Sin tramo lleno suficiente para arriostrar con riostra rígida."
+      : "Sin tramo lleno suficiente para arriostrar con Cruz de San Andrés.");
     return { piezas, avisos, zonas };
   }
 
@@ -106,7 +129,10 @@ export function buildBraces(input){
   }
   for (let i = 0; i < n; i++){
     const x0 = zona[0] + i * wSub;
-    piezas.push(...cruz(x0, wSub, alto, yCara, haciaAfuera));
+    if (modo === "diagonal")
+      piezas.push(rigidDiag(x0, wSub, alto, eMuro, s.perfilMont, i % 2 ? -1 : 1)); // K/zigzag: alterna sentido
+    else
+      piezas.push(...cruz(x0, wSub, alto, yCara, haciaAfuera));
     zonas.push({ x0, ancho: wSub, alto, angulo: +angSub.toFixed(1) });
   }
   return { piezas, avisos, zonas };

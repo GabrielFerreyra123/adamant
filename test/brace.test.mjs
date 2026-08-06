@@ -135,6 +135,43 @@ test("arriostramiento 'ninguno' (default del muro) no agrega piezas", () => {
   assert.equal(muro.defaults().tipoMuro, "exterior");
 });
 
+// Riostra RÍGIDA (diagonal de perfil): barra normal (no rollo), del PGC del muro, en zigzag K.
+describe("riostra rígida (diagonal de perfil)", () => {
+  const rig = (largo, alto, extra = {}) => pared(largo, alto, { arriostramiento: "diagonal", ...extra });
+
+  test("muro sin vanos: 1 diagonal, largo = hipotenusa, perfil = PGC del muro", () => {
+    const { piezas } = buildBraces(rig(3000, 2600));
+    assert.equal(piezas.length, 1, "una diagonal por sub-tramo (no una X)");
+    const p = piezas[0];
+    assert.equal(p.tipo, "RIOSTRA");
+    assert.equal(p.categoria, "riostra");
+    assert.equal(p.perfil, "PGC 100x0.90", "usa el montante del muro, no un fleje");
+    assert.equal(p.largo, hip(3000, 2600));
+    assert.ok(!flejesDe(piezas).length, "no es fleje: entra al bin-packing de barras");
+  });
+
+  test("zona ancha 6,00×2,60 → 2 sub-tramos en zigzag (sentidos alternados)", () => {
+    const { piezas, zonas } = buildBraces(rig(6000, 2600));
+    assert.equal(zonas.length, 2);
+    assert.equal(piezas.length, 2, "una diagonal por sub-tramo");
+    assert.equal(Math.sign(piezas[0].orient.u[2]), 1);
+    assert.equal(Math.sign(piezas[1].orient.u[2]), -1, "el 2º alterna sentido (K)");
+  });
+
+  test("la riostra va al bin-packing como barra del PGC (no rollo)", () => {
+    const inp = rig(3000, 2600);
+    const piezas = muro.generar(inp).piezas;
+    const { byProfile } = cutList(piezas);
+    assert.ok(byProfile["PGC 100x0.90"].includes(hip(3000, 2600)), "el largo de la diagonal está entre las barras del PGC");
+  });
+
+  test("la diagonal queda dentro del espesor del muro (no apoyada sobre la cara)", () => {
+    const piezas = buildBraces(rig(3000, 2600)).piezas;
+    const b = pieceBoxEngine(piezas[0]);
+    assert.ok(b.center[1] > 0 && b.center[1] < 200, "centrada en el alma del muro");
+  });
+});
+
 // Wood usa el mismo fleje metálico y la misma lógica.
 test("wood frame: mismo fleje y misma geometría", () => {
   const w = buildBraces({ sistema: "wood", largo: 3000, alto: 2600, opciones: OPC, vanos: [], arriostramiento: "cruz" });

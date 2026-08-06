@@ -49,7 +49,7 @@ export const muro = {
           opciones: [{ v: 400, l: "400 mm" }, { v: 600, l: "600 mm" }] },
         // Arriostramiento: sólo en muros portantes. En un tabique no aplica → se oculta.
         { k: "arriostramiento", tipo: "seg", label: "Arriostramiento", soloSi: p => p.tipoMuro !== "tabique",
-          opciones: [{ v: "ninguno", l: "Ninguno" }, { v: "cruz", l: "Cruz de San Andrés" }] },
+          opciones: [{ v: "ninguno", l: "Ninguno" }, { v: "cruz", l: "Cruz de San Andrés" }, { v: "diagonal", l: "Riostra rígida" }] },
         { tipo: "perfil" }
       ]},
       { id: "aberturas", titulo: "Aberturas", componente: "vanos" }

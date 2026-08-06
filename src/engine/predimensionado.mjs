@@ -52,17 +52,44 @@ function chkAltura(input, tipoMuro){
       : estado === "atencion" ? "El muro es alto para esa perfilería. Puede necesitar un montante más grande o refuerzo."
       : "El muro es demasiado alto para esa perfilería. Subí la escuadría o pedí un cálculo." });
 }
-function chkArriostre(tieneCruz, zona){
-  if (tieneCruz) return check({ id: "viento", titulo: "Resistencia al viento", label: "Arriostramiento (viento)",
-    valor: "Cruz de San Andrés / placa", rango: "presente", estado: "ok",
-    detalle: "La pared tiene arriostramiento: aguanta el empuje del viento." });
-  const estado = zona === "alta" ? "fuera" : "atencion";
+// Recomendación de arriostramiento según VIENTO + ESTRUCTURA (orientativa, no reemplaza al calculista).
+// - Riostra RÍGIDA (diagonal de perfil): más rígida, trabaja a compresión Y tracción. Se recomienda con
+//   viento fuerte, en dos plantas (el empuje lateral se acumula) o en muros altos.
+// - Cruz de San Andrés (fleje): suficiente y más económica para viento medio/bajo en una sola planta.
+export function recomendarArriostre({ zona = "media", alto = 2600, plantaAlta = false } = {}){
+  const h = +alto || 2600;
+  if (zona === "alta") return { tipo: "diagonal", motivo: "zona de viento fuerte" };
+  if (plantaAlta)      return { tipo: "diagonal", motivo: "dos plantas: el empuje lateral se acumula" };
+  if (h > 3000)        return { tipo: "diagonal", motivo: "muro alto" };
+  if (zona === "baja") return { tipo: "cruz", motivo: "viento bajo: alcanza el fleje" };
+  return { tipo: "cruz", motivo: "viento medio: el fleje trabaja bien" };
+}
+const ARR_LBL = { diagonal: "Riostra rígida", cruz: "Cruz de San Andrés", ninguno: "sin arriostrar", placa: "placa de corte" };
+const arrRank = t => (t === "diagonal" || t === "placa") ? 2 : t === "cruz" ? 1 : 0;
+
+// `actual` = arriostre presente ("ninguno"|"cruz"|"diagonal"|"placa"). ctx = { zona, alto, plantaAlta }.
+function chkArriostre(actual, ctx){
+  const zona = ctx.zona, rec = recomendarArriostre(ctx);
+  const tieneAlgo = arrRank(actual) >= 1, cumple = arrRank(actual) >= arrRank(rec.tipo);
+  if (tieneAlgo && cumple)
+    return check({ id: "viento", titulo: "Resistencia al viento", label: "Arriostramiento (viento)",
+      valor: ARR_LBL[actual] || actual, rango: `recomendado: ${ARR_LBL[rec.tipo]}`, estado: "ok",
+      detalle: `La pared tiene arriostramiento suficiente para el empuje del viento (${rec.motivo}).` });
+  // Tiene fleje pero el caso pide riostra rígida (viento fuerte / dos plantas / muro alto).
+  if (tieneAlgo)
+    return check({ id: "viento", titulo: "Resistencia al viento", label: "Arriostramiento (viento)",
+      valor: ARR_LBL[actual] || actual, rango: `recomendado: ${ARR_LBL[rec.tipo]}`, estado: "atencion",
+      detalle: `Para tu caso (${rec.motivo}) conviene una riostra rígida de perfil: es más firme que el fleje, que sólo trabaja a la tracción.`,
+      fix: { tipo: "arriostrar-rigido", label: "Pasar a riostra rígida" } });
+  // Sin arriostrar.
+  const estado = (zona === "alta" || ctx.plantaAlta) ? "fuera" : "atencion";
+  const esRigido = rec.tipo === "diagonal";
   return check({ id: "viento", titulo: "Resistencia al viento", label: "Arriostramiento (viento)",
-    valor: "sin arriostrar", rango: "requerido en zona de viento", estado,
-    detalle: zona === "alta"
-      ? "En zona de viento fuerte, una pared sin arriostrar se puede desaplomar. Agregale una Cruz de San Andrés (o placa de corte)."
-      : "Conviene arriostrar la pared (Cruz de San Andrés o placa) para el empuje del viento.",
-    fix: { tipo: "arriostrar", label: "Agregar Cruz de San Andrés" } });
+    valor: "sin arriostrar", rango: `recomendado: ${ARR_LBL[rec.tipo]}`, estado,
+    detalle: estado === "fuera"
+      ? `Sin arriostrar, la pared se puede desaplomar (${rec.motivo}). Agregale ${esRigido ? "una riostra rígida de perfil" : "una Cruz de San Andrés"}.`
+      : `Conviene arriostrar la pared (${rec.motivo}). Recomendado: ${ARR_LBL[rec.tipo]}.`,
+    fix: { tipo: esRigido ? "arriostrar-rigido" : "arriostrar", label: `Agregar ${ARR_LBL[rec.tipo]}` } });
 }
 function chkAnclaje(zona){
   if (zona !== "alta") return null;
@@ -118,11 +145,12 @@ export function predimensionar(input, opts = {}){
   const kind = input.kind, checks = [];
   const add = c => c && checks.push(c);
 
+  const ctxArr = { zona, alto: input.alto, plantaAlta: !!input.plantaAlta };
   if (kind === "muro"){
     add(chkSeparacion(input.opciones?.modulo));
     add(chkAltura(input, input.tipoMuro));
     if (input.tipoMuro === "exterior"){                     // sólo el muro que ve el viento
-      add(chkArriostre(input.arriostramiento === "cruz" || input.arriostramiento === "placa", zona));
+      add(chkArriostre(input.arriostramiento || "ninguno", ctxArr));
       add(chkAnclaje(zona));
     }
     add(chkDintel(input.vanos));
@@ -130,8 +158,10 @@ export function predimensionar(input, opts = {}){
     add(chkSeparacion(input.opciones?.modulo));
     add(chkAltura(input, "exterior"));
     const lados = ["Frente", "Fondo", "Izq", "Der"];
-    const algo = lados.some(l => { const a = input["arriostra" + l]; return a === "cruz" || a === "placa"; });
-    add(chkArriostre(algo, zona));
+    // representa el perímetro por su muro MÁS DÉBIL (el mínimo rango de arriostre de los 4).
+    const rank = t => (t === "diagonal" || t === "placa") ? 2 : t === "cruz" ? 1 : 0;
+    const minR = Math.min(...lados.map(l => rank(input["arriostra" + l] || (input.arriostre || "cruz"))));
+    add(chkArriostre(minR === 2 ? "diagonal" : minR === 1 ? "cruz" : "ninguno", ctxArr));
     add(chkAnclaje(zona));
     add(chkDintel(lados.flatMap(l => input["vano" + l] || [])));
     if (input.llevaTecho) add(chkCabriada(Math.min(+input.largo || 0, +input.ancho || 0)));

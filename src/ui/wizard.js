@@ -492,6 +492,8 @@ function wirePaso(paso){
     if (key === "sistema"){ state.params.sistema = raw; render(); return; }
     const opt = key.startsWith("opt:"), k = opt ? key.slice(4) : key;
     if (opt) state.params.opciones[k] = val; else state.params[k] = val;
+    const campo = findCampo(paso, k);
+    if (campo && campo.onSet) campo.onSet(state.params, val);
     render();
   }));
   document.querySelectorAll("[data-cards]").forEach(cs => cs.querySelectorAll(".card").forEach(b => b.onclick = () => {
@@ -1210,9 +1212,10 @@ function aplicarFixChequeo(fix){
   const p = state.params;
   if (fix.tipo === "modulo") p.opciones = { ...p.opciones, modulo: fix.valor };
   else if (fix.tipo === "pendiente") p.pendiente = fix.valor;
-  else if (fix.tipo === "arriostrar"){
-    if (state.kind === "muro") p.arriostramiento = "cruz";
-    else ["Frente", "Fondo", "Izq", "Der"].forEach(l => p["arriostra" + l] = "cruz");
+  else if (fix.tipo === "arriostrar" || fix.tipo === "arriostrar-rigido"){
+    const tipo = fix.tipo === "arriostrar-rigido" ? "diagonal" : "cruz";
+    if (state.kind === "muro") p.arriostramiento = tipo;
+    else { p.arriostre = tipo; ["Frente", "Fondo", "Izq", "Der"].forEach(l => p["arriostra" + l] = tipo); }
   } else if (fix.tipo === "seccion"){
     if (p.sistema === "wood") p.opciones = { ...p.opciones, lumber: fix.valor };
     else p.opciones = { ...p.opciones, pgc: fix.valor };

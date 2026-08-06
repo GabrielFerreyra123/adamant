@@ -29,6 +29,7 @@ export const TIPO_COLOR = {
   // arriostramiento
   FLEJE:       0xd9dee2, // gris chapa galvanizada (cruz de San Andrés)
   FLEJE_CIELO: 0xb6c2c9, // gris más oscuro (arriostre del ala inferior del cordón)
+  RIOSTRA:     0x4a7fb5, // azul acero (riostra rígida de perfil, diagonal K)
   // apoyos / fundación (superficies visuales de hormigón)
   PLATEA:         0x8a9299, // gris hormigón
   PILOTIN:        0x7d858c, // gris hormigón (algo más oscuro)
@@ -44,7 +45,7 @@ export const TIPO_LABEL = {
   TRIMMER:"Trimmer (borde de vano)", CABEZAL:"Cabezal", VIGA_COLA:"Viga cola",
   SOLERA:"Solera", MONTANTE:"Montante", MAESTRA:"Viga maestra", VELA:"Vela", PLACA:"Placa de piso (diafragma)",
   PLATEA:"Platea de hormigón", PILOTIN:"Pilotín de hormigón", SOLERA_ASIENTO:"Solera de asiento",
-  FLEJE:"Fleje (Cruz de San Andrés)", FLEJE_CIELO:"Fleje arriostre de cielo",
+  FLEJE:"Fleje (Cruz de San Andrés)", FLEJE_CIELO:"Fleje arriostre de cielo", RIOSTRA:"Riostra rígida (diagonal)",
   CORDON_SUPERIOR:"Cordón superior", CORDON_INFERIOR:"Cordón inferior", DIAGONAL:"Diagonal (Fink)",
   MONTANTE_CABRIADA:"Montante de cabriada", MONTANTE_TIMPANO:"Montante de tímpano", CORREA:"Correa", CUBIERTA:"Chapa de cubierta"
 };

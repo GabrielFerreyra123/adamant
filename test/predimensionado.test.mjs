@@ -2,7 +2,7 @@
 // bien 🟢/🟡/🔴 por módulo y que la zona de viento module el chequeo de arriostramiento.
 import { test, describe } from "vitest";
 import assert from "node:assert/strict";
-import { predimensionar } from "../src/engine/predimensionado.mjs";
+import { predimensionar, recomendarArriostre } from "../src/engine/predimensionado.mjs";
 
 const OPC = { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90", lumber: "2x6 (38×140)", modulo: 400 };
 const de = (checks, label) => checks.find(c => c.label === label);
@@ -30,6 +30,35 @@ describe("pre-dimensionado · muro", () => {
     const base = { kind: "muro", sistema: "steel", tipoMuro: "exterior", largo: 4000, alto: 2600, arriostramiento: "ninguno", opciones: OPC };
     assert.equal(de(predimensionar(base, { zona: "alta" }).checks, "Arriostramiento (viento)").estado, "fuera");
     assert.equal(de(predimensionar(base, { zona: "baja" }).checks, "Arriostramiento (viento)").estado, "atencion");
+  });
+
+  test("recomienda riostra RÍGIDA con viento fuerte, dos plantas o muro alto; fleje si no", () => {
+    assert.equal(recomendarArriostre({ zona: "alta" }).tipo, "diagonal");
+    assert.equal(recomendarArriostre({ zona: "media", plantaAlta: true }).tipo, "diagonal");
+    assert.equal(recomendarArriostre({ zona: "media", alto: 3200 }).tipo, "diagonal");
+    assert.equal(recomendarArriostre({ zona: "media" }).tipo, "cruz");
+    assert.equal(recomendarArriostre({ zona: "baja" }).tipo, "cruz");
+  });
+
+  test("cruz en viento fuerte → 🟡 y ofrece pasar a riostra rígida", () => {
+    const r = predimensionar({ kind: "muro", sistema: "steel", tipoMuro: "exterior", largo: 3000, alto: 2600,
+      arriostramiento: "cruz", opciones: OPC }, { zona: "alta" });
+    const v = de(r.checks, "Arriostramiento (viento)");
+    assert.equal(v.estado, "atencion");
+    assert.equal(v.fix.tipo, "arriostrar-rigido");
+  });
+
+  test("riostra rígida en viento fuerte → 🟢 (cumple la recomendación)", () => {
+    const r = predimensionar({ kind: "muro", sistema: "steel", tipoMuro: "exterior", largo: 3000, alto: 2600,
+      arriostramiento: "diagonal", opciones: OPC }, { zona: "alta" });
+    assert.equal(de(r.checks, "Arriostramiento (viento)").estado, "ok");
+  });
+
+  test("ambiente: el perímetro se evalúa por su muro más débil", () => {
+    const base = { kind: "combinado", sistema: "steel", largo: 4000, ancho: 3000, alto: 2600, opciones: OPC,
+      arriostraFrente: "diagonal", arriostraFondo: "diagonal", arriostraIzq: "diagonal", arriostraDer: "cruz" };
+    // un muro con sólo fleje en viento fuerte baja al conjunto a 🟡
+    assert.equal(de(predimensionar(base, { zona: "alta" }).checks, "Arriostramiento (viento)").estado, "atencion");
   });
 
   test("tabique NO se marca por viento ni anclaje", () => {

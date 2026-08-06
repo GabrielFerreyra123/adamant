@@ -101,7 +101,7 @@ function descomponer(input){
   const largo = +input.largo, ancho = +input.ancho, alto = +input.alto || 2600, placa = input.placa !== false;
   const muroBase = { sistema: input.sistema, alto, opciones: input.opciones, tipo: input.tipo || "tabique" };
   // `arriostraFrente/Fondo/Izq/Der`: selector por muro (default 'cruz', son perimetrales portantes).
-  const arr = lado => input["arriostra" + lado] || "cruz";
+  const arr = lado => input["arriostra" + lado] || input.arriostre || "cruz";
   const front = muro.generar({ ...muroBase, largo, vanos: input.vanoFrente || [], arriostramiento: arr("Frente") });
   // Espesor del muro = profundidad (Y) del FRAME. Se miden sólo las piezas estructurales: los flejes
   // van apoyados por fuera de la cara y falsearían el espesor (y con él la posición de los 4 muros).
@@ -232,6 +232,7 @@ export const combinado = {
     return { sistema: "steel", largo: 4000, ancho: 3000, alto: 2600, apoyo: "platea", placa: true, pasante: "frenteFondo",
       opciones: { pgc: "PGC 100x0.90", pgu: "PGU 100x0.90", lumber: "2x6 (38×140)", modulo: 400 },
       vanoFrente: [], vanoFondo: [], vanoIzq: [], vanoDer: [],
+      arriostre: "cruz",
       arriostraFrente: "cruz", arriostraFondo: "cruz", arriostraIzq: "cruz", arriostraDer: "cruz",
       // planta alta (misma huella): entrepiso + muros de arriba + hueco de escalera
       plantaAlta: false, escalera: false, vanoFrentePA: [], vanoFondoPA: [], vanoIzqPA: [], vanoDerPA: [], tabiquesPA: [], vanoEscalera: null,
@@ -260,6 +261,13 @@ export const combinado = {
       ] },
       { id: "muros", titulo: "Muros y vanos", componente: "murosPlanta",
         intro: "Ahora las paredes. Cada muro es una grilla de montantes parados entre dos soleras. Donde va una puerta o ventana se arma el vano: king a los lados, jack sosteniendo el dintel, y cripples para completar la modulación. Si activás planta alta, arriba del plano podés cambiar entre PB y PA para editar las aberturas de cada nivel." },
+      { id: "arriostre", titulo: "Arriostramiento",
+        intro: "Las diagonales que mantienen los muros a escuadra ante el viento y los empujes laterales. La Cruz de San Andrés (fleje) alcanza para viento medio o bajo en una planta; la riostra rígida de perfil es más firme (trabaja a compresión y tracción) y conviene con viento fuerte, dos plantas o muros altos. En la Guía, el semáforo te recomienda cuál según la zona de viento que cargues.",
+        campos: [
+        { k: "arriostre", tipo: "seg", label: "Arriostramiento de los muros perimetrales",
+          opciones: [{ v: "cruz", l: "Cruz de San Andrés" }, { v: "diagonal", l: "Riostra rígida" }, { v: "ninguno", l: "Ninguno" }],
+          onSet: (p, v) => ["Frente", "Fondo", "Izq", "Der"].forEach(l => p["arriostra" + l] = v) }
+      ] },
       { id: "plantaAlta", titulo: "Planta alta",
         intro: "Opcional: una segunda planta con la misma huella. Se arma un entrepiso (entramado apoyado sobre los muros de abajo) y otro juego de muros arriba; el techo pasa al tope de la planta alta. El hueco de escalera se marca en el entrepiso (los escalones no se dibujan).",
         campos: [
