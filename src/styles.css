@@ -305,6 +305,11 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .zbtn{ appearance:none; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--paper); background:var(--panel2); border:1px solid var(--line); border-radius:2px; padding:6px 11px; transition:.12s; }
 .zbtn:hover{ border-color:var(--teal); }
 .zbtn.on{ background:var(--teal); color:var(--on-primary,#04231f); border-color:var(--teal); }
+.zsub{ margin-top:4px; }
+.ciudadsel{ appearance:none; cursor:pointer; font-size:13px; font-weight:600; color:var(--paper); background:var(--panel2); border:1px solid var(--line); border-radius:2px; padding:7px 11px; min-width:200px; }
+.ciudadsel:hover{ border-color:var(--teal); }
+.climaline{ margin:0 0 12px; font-size:13px; line-height:1.5; color:var(--paper); background:var(--panel2); border:1px solid var(--line); border-left:3px solid var(--teal); border-radius:2px; padding:9px 12px; }
+.climaline .muted{ color:var(--muted); }
 /* sub-navegación de la solapa Guía */
 .guiawrap{ position:absolute; inset:0; display:flex; flex-direction:column; }
 .guiabody{ position:relative; flex:1; min-height:0; }
@@ -335,6 +340,11 @@ select:focus, input[type=number]:focus{ outline:none; border-color:var(--teal); 
 .chktable .mono{ font-family:"JetBrains Mono", monospace; }
 .chktable .chkrng{ color:var(--muted); font-size:11.5px; }
 .chkdisc{ margin-top:14px; font-size:12px; line-height:1.5; color:var(--muted); border-left:3px solid var(--tangerine); padding-left:11px; }
+.chksec{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); }
+.chksec:first-of-type{ margin-top:6px; border-top:none; padding-top:0; }
+.chksub{ margin:0 0 8px; font-size:14px; font-weight:700; color:var(--paper); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.chksubk{ font-size:12px; font-weight:600; color:var(--muted); }
+.chksubk.ok{ color:var(--teal); } .chksubk.atencion{ color:#e8b53a; } .chksubk.fuera{ color:var(--tangerine); }
 /* calculadora de aislación */
 .aisctrl{ display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
 .aisrow{ display:flex; flex-direction:column; gap:5px; }

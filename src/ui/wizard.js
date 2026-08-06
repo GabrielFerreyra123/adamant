@@ -8,6 +8,7 @@ import { validarVanoPiso, encajarVano, zonaVano } from "../engine/modules/piso.m
 import { validarTecho } from "../engine/modules/techo.mjs";
 import { predimensionar } from "../engine/predimensionado.mjs";
 import { aislacion, AISLANTES, ESPESORES } from "../engine/aislacion.mjs";
+import { CIUDADES, CIUDAD_ORDEN, climaDeCiudad, VIENTO_LBL, NIEVE_LBL, BIO_LBL } from "../engine/clima.mjs";
 import { fasesDeObra } from "../engine/fases.mjs";
 import { comparar } from "../engine/comparador.mjs";
 import { TIPO_LABEL, colorHex } from "../viewer/palette.js";
@@ -930,7 +931,7 @@ function stepResultado(){
   const tabs = [["3d","3D"],["mat","Materiales"],["guia","Guía"],["cut","Cortes"],["pdf","PDF"]];
   // Estado del chequeo → punto de color en la solapa Guía (se ve sin entrar).
   let chkPeor = null;
-  try { chkPeor = predimensionar(toEngineInput(), { zona: state.zonaViento || "media" }).resumen.peor; } catch {}
+  try { chkPeor = predimensionar(toEngineInput(), { zona: state.zonaViento || "media", nieve: state.nieve || "baja" }).resumen.peor; } catch {}
   const tabHTML = ([k,l]) => `<button class="tab ${state.tab===k?'on':''}" data-tab="${k}">${
     k === "guia" && chkPeor ? `<span class="tabdot ${chkPeor}"></span>` : ""}${l}</button>`;
   const drawer = state.editOpen ? `<aside class="editpanel" id="editpanel">${editorHTML()}</aside>` : "";
@@ -1206,6 +1207,13 @@ function shoppingList(mat){
 }
 // Semáforo de pre-dimensionado (orientativo, NO cálculo). Zona de viento (la elige el usuario).
 const ZONA_LBL = { baja: "Baja", media: "Media", alta: "Alta" };
+// Ubicación → clima: elegir la ciudad autocompleta viento / nieve / zona bioambiental (state). El
+// usuario igual puede ajustar el viento a mano (eso "desengancha" la ciudad).
+function aplicarCiudad(id){
+  const c = climaDeCiudad(id);
+  state.ciudad = c ? id : "";
+  if (c){ state.zonaViento = c.viento; state.nieve = c.nieve; state.zonaBio = c.bio; }
+}
 const SEM = { ok: "🟢", atencion: "🟡", fuera: "🔴" };
 // Aplica un `fix` que devuelve el motor (predimensionado) sobre los parámetros del proyecto.
 function aplicarFixChequeo(fix){
@@ -1223,12 +1231,22 @@ function aplicarFixChequeo(fix){
   render();
 }
 let _chkFixes = [];
+const AIS_UBIC = { continua: "Continua por fuera", entre: "Entre montantes" };
+let _aisFixes = [];
+// Chequeo unificado: VIENTO + FRÍO en una sola solapa, todo movido por la CIUDAD. Arriba, el semáforo
+// estructural (viento/nieve/medidas); abajo, la aislación (frío) con su recomendación por zona bioambiental.
 function renderChequeo(body){
   if (!state.zonaViento) state.zonaViento = "media";
-  const { checks, resumen } = predimensionar(toEngineInput(), { zona: state.zonaViento });
-  _chkFixes = [];
+  if (!state.aisl) state.aisl = { tipo: "Lana de vidrio", espesor: 100, ubicacion: "continua" };
+  const { checks, resumen } = predimensionar(toEngineInput(), { zona: state.zonaViento, nieve: state.nieve || "baja" });
+  _chkFixes = []; _aisFixes = [];
   const zonaSel = Object.keys(ZONA_LBL).map(z =>
     `<button class="zbtn ${state.zonaViento===z?'on':''}" data-zona="${z}">${ZONA_LBL[z]}</button>`).join("");
+  // Selector de ciudad: autocompleta el clima. "" = elegir a mano.
+  const ciudadOpts = `<option value="">Elegí tu ciudad…</option>` + CIUDAD_ORDEN.map(id =>
+    `<option value="${id}" ${state.ciudad===id?"selected":""}>${CIUDADES[id].label}</option>`).join("");
+  const c = climaDeCiudad(state.ciudad);
+  const climaTxt = c ? `<p class="climaline">En <b>${c.label}</b>: ${VIENTO_LBL[c.viento]} · ${NIEVE_LBL[c.nieve]} · zona bioambiental ${BIO_LBL[c.bio]}. <span class="muted">Lo cargamos por vos; podés ajustarlo abajo.</span></p>` : "";
   const nMal = resumen.fuera, nRev = resumen.atencion;
   const resTxt = resumen.peor === "ok" ? "Se puede construir así."
     : resumen.peor === "atencion" ? `Ojo con ${nRev} cosa${nRev!==1?"s":""}: conviene revisarla${nRev!==1?"s":""}.`
@@ -1248,66 +1266,69 @@ function renderChequeo(body){
   const tecnico = checks.length ? `<details class="chktec"><summary>Ver los números</summary>
     <table class="chktable"><thead><tr><th></th><th>Ítem</th><th>Tu proyecto</th><th>Lo normal</th></tr></thead>
     <tbody>${filas}</tbody></table></details>` : "";
+
+  // --- FRÍO / aislación (sólo muro/ambiente) --- misma solapa, movido por la zona bioambiental de la ciudad.
+  const r = aislacion(toEngineInput(), { ...state.aisl, zonaBio: state.zonaBio });
+  let frio = "";
+  if (r.area > 0){
+    const seg = (attr, items, sel) => items.map(([v, l]) =>
+      `<button class="zbtn ${sel===v?'on':''}" data-${attr}="${v}">${l}</button>`).join("");
+    const tipoSeg = seg("aistipo", Object.keys(AISLANTES).map(t => [t, t]), state.aisl.tipo);
+    const espSeg = seg("aisesp", ESPESORES.map(e => [e, e + " mm"]), state.aisl.espesor);
+    const ubicSeg = seg("aisubic", Object.entries(AIS_UBIC), state.aisl.ubicacion);
+    const aisCards = r.avisos.map(a => {
+      let btn = "";
+      if (a.fix){ const i = _aisFixes.push(a.fix) - 1; btn = `<div class="chkacts"><button type="button" class="btn sm" data-aisfix="${i}">${a.fixLabel}</button></div>`; }
+      const tono = a.tono === "info" ? "atencion" : a.tono;
+      return `<div class="chkcard ${tono}"><b>${a.tono==="info"?"ℹ️":SEM[tono]||"⚠️"} ${a.titulo}</b><span class="chkwhy">${a.texto}</span>${btn}</div>`;
+    }).join("");
+    frio = `<div class="chksec">
+      <h4 class="chksub">❄️ Frío y aislación <span class="chksubk ${r.estado}">${SEM[r.estado]} ${r.resumen}</span></h4>
+      <p class="sub">Cuánto abriga tu muro (transmitancia K) y cuánto aislante comprar${state.ciudad?` en ${CIUDADES[state.ciudad].label}`:""}. La exigencia cambia con la zona: cuanto más frío, más aislación pide.</p>
+      <div class="aisctrl">
+        <div class="aisrow"><span class="zlbl">Aislante</span><div class="zbtns">${tipoSeg}</div></div>
+        <div class="aisrow"><span class="zlbl">Espesor</span><div class="zbtns">${espSeg}</div></div>
+        <div class="aisrow"><span class="zlbl">Dónde va</span><div class="zbtns">${ubicSeg}</div></div>
+      </div>
+      <div class="aisnums">
+        <div class="aisk ${r.estado}"><b>${r.K.toFixed(2).replace(".",",")}</b><span>K (W/m²K)<br>recom. ≤ ${r.nivel.B.toFixed(2).replace(".",",")} (zona ${r.bio})</span></div>
+        <div class="aisstat"><b>${r.m2} m²</b><span>de aislante a comprar</span></div>
+        <div class="aisstat"><b>${r.area.toFixed(1).replace(".",",")} m²</b><span>de muro (neto)</span></div>
+      </div>
+      <div class="chklist">${aisCards}</div></div>`;
+  }
+
   body.innerHTML = `<div class="pane">
     <div class="chkhead">
       <div><h3 class="chktitle">${SEM[resumen.peor]} ${resTxt}</h3>
-        <p class="sub">Revisamos que tus medidas entren dentro de lo normal antes de que compres o armes. Es orientativo.</p></div>
-      <div class="zona"><span class="zlbl">¿Cuánto viento hay en tu zona?</span><div class="zbtns">${zonaSel}</div></div>
+        <p class="sub">Revisamos que tus medidas y tu clima entren dentro de lo normal antes de que compres o armes. Es orientativo.</p></div>
+      <div class="zona">
+        <span class="zlbl">¿Dónde construís?</span>
+        <select class="ciudadsel" data-ciudad>${ciudadOpts}</select>
+        <span class="zlbl zsub">¿Cuánto viento hay?</span><div class="zbtns">${zonaSel}</div>
+      </div>
     </div>
-    <div class="chklist">${cards}</div>
-    ${tecnico}
-    <p class="chkdisc">⚠ Compara con valores típicos publicados (ConsulSteel · IRAM-IAS U 500-205 · manuales de wood frame). El <b>cálculo estructural, los arriostres y los anclajes los define un profesional habilitado</b> según viento, nieve y cargas (CIRSOC).</p>
+    ${climaTxt}
+    <div class="chksec"><h4 class="chksub">💨 Viento y estructura</h4>
+      <div class="chklist">${cards}</div>${tecnico}</div>
+    ${frio}
+    <p class="chkdisc">⚠ Compara con valores típicos publicados (ConsulSteel · IRAM-IAS U 500-205 · IRAM 11601/11605 · manuales de wood frame). El clima por ciudad es orientativo (CIRSOC 102/104 · IRAM 11603). El <b>cálculo estructural, los arriostres, los anclajes y el proyecto higrotérmico los define un profesional habilitado</b>.</p>
   </div>`;
-  body.querySelectorAll("[data-zona]").forEach(b => b.onclick = () => { state.zonaViento = b.dataset.zona; renderChequeo(body); });
+  body.querySelector("[data-ciudad]")?.addEventListener("change", e => { aplicarCiudad(e.target.value); renderChequeo(body); });
+  // Ajustar el viento a mano desengancha la ciudad (el usuario manda).
+  body.querySelectorAll("[data-zona]").forEach(b => b.onclick = () => { state.zonaViento = b.dataset.zona; state.ciudad = ""; renderChequeo(body); });
   body.querySelectorAll("[data-chkfix]").forEach(b => b.onclick = () => aplicarFixChequeo(_chkFixes[+b.dataset.chkfix]));
-}
-// Calculadora de aislación térmica (orientativa, NO dibuja). Para muros / ambientes.
-const AIS_UBIC = { continua: "Continua por fuera", entre: "Entre montantes" };
-let _aisFixes = [];
-function renderAislacion(body){
-  if (!state.aisl) state.aisl = { tipo: "Lana de vidrio", espesor: 100, ubicacion: "continua" };
-  const r = aislacion(toEngineInput(), state.aisl);
-  if (!(r.area > 0)){ body.innerHTML = `<div class="pane"><p class="sub">La calculadora de aislación cubre por ahora muros y ambientes.</p></div>`; return; }
-  _aisFixes = [];
-  const seg = (attr, items, sel) => items.map(([v, l]) =>
-    `<button class="zbtn ${sel===v?'on':''}" data-${attr}="${v}">${l}</button>`).join("");
-  const tipoSeg = seg("aistipo", Object.keys(AISLANTES).map(t => [t, t]), state.aisl.tipo);
-  const espSeg = seg("aisesp", ESPESORES.map(e => [e, e + " mm"]), state.aisl.espesor);
-  const ubicSeg = seg("aisubic", Object.entries(AIS_UBIC), state.aisl.ubicacion);
-  const cards = r.avisos.map(a => {
-    let btn = "";
-    if (a.fix){ const i = _aisFixes.push(a.fix) - 1; btn = `<div class="chkacts"><button type="button" class="btn sm" data-aisfix="${i}">${a.fixLabel}</button></div>`; }
-    const tono = a.tono === "info" ? "atencion" : a.tono;
-    return `<div class="chkcard ${tono}"><b>${a.tono==="info"?"ℹ️":SEM[tono]||"⚠️"} ${a.titulo}</b><span class="chkwhy">${a.texto}</span>${btn}</div>`;
-  }).join("");
-  body.innerHTML = `<div class="pane">
-    <div class="chkhead">
-      <div><h3 class="chktitle">${SEM[r.estado]} ${r.resumen}</h3>
-        <p class="sub">Cuánto abriga tu muro (transmitancia K) y cuánto aislante comprar. Es orientativo, no reemplaza el cálculo higrotérmico.</p></div>
-    </div>
-    <div class="aisctrl">
-      <div class="aisrow"><span class="zlbl">Aislante</span><div class="zbtns">${tipoSeg}</div></div>
-      <div class="aisrow"><span class="zlbl">Espesor</span><div class="zbtns">${espSeg}</div></div>
-      <div class="aisrow"><span class="zlbl">Dónde va</span><div class="zbtns">${ubicSeg}</div></div>
-    </div>
-    <div class="aisnums">
-      <div class="aisk ${r.estado}"><b>${r.K.toFixed(2).replace(".",",")}</b><span>K (W/m²K)<br>recom. ≤ ${r.nivel.B.toFixed(2).replace(".",",")}</span></div>
-      <div class="aisstat"><b>${r.m2} m²</b><span>de aislante a comprar</span></div>
-      <div class="aisstat"><b>${r.area.toFixed(1).replace(".",",")} m²</b><span>de muro (neto)</span></div>
-    </div>
-    <div class="chklist">${cards}</div>
-    <p class="chkdisc">⚠ Cálculo aproximado según IRAM 11601/11605 (zona bioambiental templado-fría). El proyecto higrotérmico y la barrera de vapor los define un profesional.</p>
-  </div>`;
-  body.querySelectorAll("[data-aistipo]").forEach(b => b.onclick = () => { state.aisl.tipo = b.dataset.aistipo; renderAislacion(body); });
-  body.querySelectorAll("[data-aisesp]").forEach(b => b.onclick = () => { state.aisl.espesor = +b.dataset.aisesp; renderAislacion(body); });
-  body.querySelectorAll("[data-aisubic]").forEach(b => b.onclick = () => { state.aisl.ubicacion = b.dataset.aisubic; renderAislacion(body); });
-  body.querySelectorAll("[data-aisfix]").forEach(b => b.onclick = () => { Object.assign(state.aisl, _aisFixes[+b.dataset.aisfix]); renderAislacion(body); });
+  body.querySelectorAll("[data-aistipo]").forEach(b => b.onclick = () => { state.aisl.tipo = b.dataset.aistipo; renderChequeo(body); });
+  body.querySelectorAll("[data-aisesp]").forEach(b => b.onclick = () => { state.aisl.espesor = +b.dataset.aisesp; renderChequeo(body); });
+  body.querySelectorAll("[data-aisubic]").forEach(b => b.onclick = () => { state.aisl.ubicacion = b.dataset.aisubic; renderChequeo(body); });
+  body.querySelectorAll("[data-aisfix]").forEach(b => b.onclick = () => { Object.assign(state.aisl, _aisFixes[+b.dataset.aisfix]); renderChequeo(body); });
 }
 // Solapa "Guía": consolida los análisis (Chequeo · Aislación · Comparar · Fases) con sub-navegación.
 function renderGuia(body){
   const esMuroAmb = state.kind === "muro" || state.kind === "combinado";
+  // Chequeo ahora incluye viento + frío (aislación) en una sola solapa; ya no hay sub-tab "Aislación".
   const subs = [["chk", "Chequeo"]];
-  if (esMuroAmb) subs.push(["ais", "Aislación"], ["cmp", "Comparar"]);
+  if (esMuroAmb) subs.push(["cmp", "Comparar"]);
   subs.push(["fas", "Fases"]);
   if (!state.guiaSub || !subs.some(s => s[0] === state.guiaSub)) state.guiaSub = "chk";
   body.innerHTML = `<div class="guiawrap">
@@ -1315,7 +1336,7 @@ function renderGuia(body){
       `<button class="gbtn ${state.guiaSub===k?'on':''}" data-gsub="${k}">${l}</button>`).join("")}</div>
     <div class="guiabody" id="guiabody"></div></div>`;
   const gb = body.querySelector("#guiabody");
-  ({ chk: renderChequeo, ais: renderAislacion, cmp: renderComparar, fas: renderFases }[state.guiaSub] || renderChequeo)(gb);
+  ({ chk: renderChequeo, cmp: renderComparar, fas: renderFases }[state.guiaSub] || renderChequeo)(gb);
   body.querySelectorAll("[data-gsub]").forEach(b => b.onclick = () => { state.guiaSub = b.dataset.gsub; renderGuia(body); });
 }
 // ---- Planos por muro (láminas imprimibles para llevar a obra) ----

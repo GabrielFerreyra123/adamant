@@ -126,6 +126,21 @@ function chkPendiente(pend){
       : "El techo está muy empinado: se complica anclar la cubierta.",
     fix: estado === "ok" ? null : p < 25 ? { tipo: "pendiente", valor: 25, label: "Subir a 25 %" } : { tipo: "pendiente", valor: 100, label: "Bajar a 100 %" } });
 }
+// Nieve (orientativo): en zona de nieve, un techo de poca pendiente acumula carga. Sólo avisa si la
+// ciudad trae nieve media/alta; el cálculo de carga de nieve (CIRSOC 104) lo hace el profesional.
+function chkNieve(pend, nieve){
+  if (nieve !== "media" && nieve !== "alta") return null;
+  const p = +pend || 0;
+  const estado = nieve === "alta" ? (p < 25 ? "fuera" : p < 30 ? "atencion" : "ok")
+                                  : (p < 20 ? "atencion" : "ok");
+  return check({ id: "nieve", titulo: "Nieve sobre el techo", label: "Carga de nieve (pendiente)",
+    valor: `${p} % · zona con ${nieve === "alta" ? "mucha" : "algo de"} nieve`,
+    rango: nieve === "alta" ? "recomendado ≥ 30 %" : "recomendado ≥ 20 %", estado,
+    detalle: estado === "ok" ? "La pendiente ayuda a que la nieve resbale y no se acumule."
+      : estado === "atencion" ? "Tu zona tiene nieve y el techo está algo plano: puede juntar peso. Conviene más pendiente o que verifiquen la carga."
+      : "Tu zona tiene mucha nieve y el techo está muy plano: se acumula carga y puede sobreexigir la estructura. Subí la pendiente o pedí el cálculo de nieve.",
+    fix: estado === "ok" ? null : { tipo: "pendiente", valor: nieve === "alta" ? 30 : 25, label: `Subir a ${nieve === "alta" ? 30 : 25} %` } });
+}
 function chkEntrepiso(input){
   const luz = Math.min(+input.largo || 0, +input.ancho || 0);
   if (!(luz > 0)) return null;
@@ -142,6 +157,7 @@ function chkEntrepiso(input){
 // Pre-dimensionado del proyecto. → { zona, checks:[...], resumen:{ok,atencion,fuera,peor} }
 export function predimensionar(input, opts = {}){
   const zona = opts.zona || "media";                       // default neutro; el usuario ajusta su zona
+  const nieve = opts.nieve || "baja";                      // de la ciudad; "baja" no dispara aviso
   const kind = input.kind, checks = [];
   const add = c => c && checks.push(c);
 
@@ -164,10 +180,14 @@ export function predimensionar(input, opts = {}){
     add(chkArriostre(minR === 2 ? "diagonal" : minR === 1 ? "cruz" : "ninguno", ctxArr));
     add(chkAnclaje(zona));
     add(chkDintel(lados.flatMap(l => input["vano" + l] || [])));
-    if (input.llevaTecho) add(chkCabriada(Math.min(+input.largo || 0, +input.ancho || 0)));
+    if (input.llevaTecho){
+      add(chkCabriada(Math.min(+input.largo || 0, +input.ancho || 0)));
+      add(chkNieve(input.techoPendiente, nieve));
+    }
   } else if (kind === "techo"){
     add(chkCabriada(+input.luz || 0));
     add(chkPendiente(input.pendiente));
+    add(chkNieve(input.pendiente, nieve));
   } else if (kind === "piso"){
     add(chkEntrepiso(input));
   }

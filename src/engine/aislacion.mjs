@@ -5,6 +5,7 @@
 //
 // Puro (sin DOM ni Three). Es análisis, no dibujo: respeta "Adamant dibuja solo estructura".
 // ⚠ Valores de literatura (IRAM 11601/11605). El cálculo higrotérmico fino lo hace un profesional.
+import { nivelKporZona } from "./clima.mjs";
 
 // Conductividad térmica λ (W/mK) de aislantes habituales.
 export const AISLANTES = {
@@ -19,8 +20,8 @@ export const ESPESORES = [50, 70, 100, 120];         // mm
 const Rsi = 0.13, Rse = 0.04, R_OTROS = 0.10;
 // Puente térmico: qué fracción del R del aislante sobrevive si va ENTRE montantes (el metal conduce).
 const PUENTE = { steel: 0.50, wood: 0.90 };          // acero: se pierde ~50%; madera puentea poco
-// IRAM 11605, muros, zona bioambiental IV/V (templado-fría): K máximo por nivel (W/m²K).
-const NIVEL = { B: 1.00, C: 1.85 };                  // B = recomendado · C = mínimo
+// El K máximo por nivel (B = recomendado · C = mínimo) sale de la zona bioambiental del proyecto
+// (IRAM 11605): zonas más frías piden K más bajo. Default IV (templada fría) si no se especifica.
 
 const areaVanos = vanos => (vanos || []).reduce((a, v) => a + Math.max(0, (+v.x2 - +v.x1)) * Math.max(0, (+v.h - (+v.sill || 0))), 0);
 
@@ -46,6 +47,7 @@ export function aislacion(input, opts = {}){
   const ubicacion = opts.ubicacion === "entre" ? "entre" : "continua";
   const sistema = input.sistema === "wood" ? "wood" : "steel";
   const lambda = AISLANTES[tipo];
+  const NIVEL = nivelKporZona(opts.zonaBio);          // K máx por zona bioambiental (default IV)
 
   const Rais = (espesor / 1000) / lambda;
   const factor = ubicacion === "entre" ? PUENTE[sistema] : 1;   // continua = corta el puente
@@ -70,6 +72,7 @@ export function aislacion(input, opts = {}){
 
   return {
     area: +area.toFixed(1), m2, tipo, espesor, ubicacion, sistema,
+    bio: opts.zonaBio || "IV",
     K: +K.toFixed(2), R: +Rtot.toFixed(2), factorPuente: factor,
     estado, nivel: NIVEL, avisos,
     resumen: estado === "ok" ? `Bien aislado (K=${K.toFixed(2)}).`
