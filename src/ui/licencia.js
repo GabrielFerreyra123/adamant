@@ -148,3 +148,17 @@ export async function generarDXF(input){
   if (perp) guardarPerpetuo(ph, perp);
   return r.blob();
 }
+
+// OBJ del modelo 3D (server-side; misma pared de pago). Para abrir en SketchUp / Blender / visores 3D.
+export async function generarOBJ(input){
+  const ph = getProyId(), token = tokenPara(ph);
+  if (!token) throw new Error("sin licencia");
+  const r = await fetch("/api/generar", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, projectHash: ph, tipo: "obj", input })
+  });
+  if (!r.ok){ const d = await r.json().catch(() => ({})); throw new Error(d.error || `Error ${r.status}`); }
+  const perp = r.headers.get("X-Adamant-Perpetuo");
+  if (perp) guardarPerpetuo(ph, perp);
+  return r.blob();
+}

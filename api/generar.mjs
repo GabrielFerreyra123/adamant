@@ -4,6 +4,7 @@
 import { verificarLicencia, perpetuoDesdePase, limpiarProy, json, soloPost } from "./_lib.mjs";
 import { exportPDF } from "../src/export/pdf.mjs";
 import { exportDXF } from "../src/export/dxf.mjs";
+import { exportOBJ } from "../src/export/obj.mjs";
 
 export const config = { api: { bodyParser: { sizeLimit: "8mb" } } }; // img del 3D viaja como dataURL
 
@@ -35,7 +36,15 @@ export default async function handler(req, res){
       res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
       return res.end(dxf);
     }
-    json(res, 400, { error: "tipo debe ser pdf o dxf" });
+    if (tipo === "obj"){
+      const { obj, nombre } = exportOBJ(input);
+      const perp = perpetuoDesdePase(lic, ph);
+      if (perp) res.setHeader("X-Adamant-Perpetuo", perp);
+      res.status(200).setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
+      return res.end(obj);
+    }
+    json(res, 400, { error: "tipo debe ser pdf, dxf u obj" });
   } catch (e) {
     console.error("[generar]", e);
     json(res, 500, { error: e.message });

@@ -16,7 +16,7 @@ import { secDims, pieceBoxEngine } from "../engine/geometry.mjs";
 import { buildBraces } from "../engine/brace.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { precioRef, PRECIOS_REF, rubroDe, RUBROS_ORDEN } from "../config/precios-referencia.js";
-import { estadoLicencia, autorizado, iniciarPago, generarPDF, generarDXF, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
+import { estadoLicencia, autorizado, iniciarPago, generarPDF, generarDXF, generarOBJ, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
 import { PRICING } from "../config/pricing.js";
 import { glossHTML, glossForTipo, glossKeyForTipo } from "../content/glosario.js";
 import { initGlosario } from "./glosario-ui.js";
@@ -1612,7 +1612,8 @@ function renderExport(body){
     <p class="sub">${estado} Descargá el PDF de obra completo (resumen, 3D, esquema acotado, lista de compra y cortes optimizados).</p>
     <button class="btn" id="dlpdf">🧾 Descargar PDF de obra</button>
     <button class="btn ghost" id="dldxf">📐 Descargar DXF para tu proyectista</button>
-    <p class="expnote">El DXF abre en AutoCAD/cualquier CAD (en mm) para que tu calculista verifique y selle. Adamant arma la geometría; el cálculo estructural lo define un profesional habilitado.</p>
+    <button class="btn ghost" id="dlobj">🧊 Descargar modelo 3D (OBJ)</button>
+    <p class="expnote">El DXF abre en AutoCAD/cualquier CAD (en mm) para que tu calculista verifique y selle. El OBJ es el modelo 3D para abrir en SketchUp, Blender o cualquier visor. Adamant arma la geometría; el cálculo estructural lo define un profesional habilitado.</p>
     ${renov}
     <div class="expsep">Otro proyecto</div>
     <button class="btn ghost" id="nuevoproy">✚ Empezar un proyecto nuevo</button>
@@ -1653,6 +1654,15 @@ function renderExport(body){
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = `adamant-${state.kind}-${state.params.sistema}.dxf`; a.click(); URL.revokeObjectURL(a.href);
       msg.textContent = "✓ DXF descargado";
+    } catch (e) { fallo(e); }
+  };
+  document.getElementById("dlobj").onclick = async () => {
+    msg.textContent = "Generando modelo 3D…";
+    try {
+      const blob = await generarOBJ(toEngineInput());
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = `adamant-${state.kind}-${state.params.sistema}.obj`; a.click(); URL.revokeObjectURL(a.href);
+      msg.textContent = "✓ Modelo 3D (OBJ) descargado";
     } catch (e) { fallo(e); }
   };
 }

@@ -11,17 +11,17 @@ import { buildBraces } from "../engine/brace.mjs";
 
 // tipo de pieza → capa CAD (nombre + color ACI). Espeja los tags del Ruby/visor.
 const CAPAS = {
-  SOLERAS:    { color: 3,  tipos: ["SOLERA", "SOLERA_SUP", "SOLERA_INF", "SOLERA_VANO", "PLACA_SUP", "PLACA_INF", "DURMIENTE"] },
+  SOLERAS:    { color: 3,  tipos: ["SOLERA", "SOLERA_SUP", "SOLERA_INF", "SOLERA_VANO", "PLACA_SUP", "PLACA_INF", "DURMIENTE", "SOL.PANEL", "SOL.VANO", "SOL.DINTEL"] },
   MONTANTES:  { color: 5,  tipos: ["MONTANTE", "STUD"] },
   VANOS:      { color: 1,  tipos: ["KING", "JACK", "DINTEL", "CABEZAL", "CRIPPLE", "CRIPPLE_SUP", "CRIPPLE_INF", "SILL", "TRIMMER"] },
   TECHO:      { color: 2,  tipos: ["CORDON_SUPERIOR", "CORDON_INFERIOR", "DIAGONAL", "MONTANTE_CABRIADA", "MONTANTE_TIMPANO", "CORREA", "PENDOLON", "LIMATESA", "CUMBRERA", "VIGA_COLA"] },
   ENTREPISO:  { color: 4,  tipos: ["VIGA", "VIGA_DOBLE", "CENEFA", "BLOCKING", "MAESTRA", "VELA"] },
-  ARRIOSTRE:  { color: 6,  tipos: ["DIAGONAL_FLEJE", "FLEJE", "CRUZ"] },
+  ARRIOSTRE:  { color: 6,  tipos: ["DIAGONAL_FLEJE", "FLEJE", "CRUZ", "RIOSTRA"] },
   ESTRUCTURA: { color: 7,  tipos: [] }
 };
 const TIPO_CAPA = {};
 for (const [nom, c] of Object.entries(CAPAS)) c.tipos.forEach(t => (TIPO_CAPA[t] = nom));
-const capaDe = tipo => TIPO_CAPA[tipo] || "ESTRUCTURA";
+export const capaDe = tipo => TIPO_CAPA[tipo] || "ESTRUCTURA";
 const esTecho = tipo => capaDe(tipo) === "TECHO";
 const MIN_LADO = 2; // mm: por debajo de esto una pieza proyectada es un sliver ilegible → se descarta
 
