@@ -1,0 +1,12 @@
+{
+  "name": "Adamant · Diseño de estructuras en seco",
+  "short_name": "Adamant",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "theme_color": "#05151d",
+  "background_color": "#0A1A22",
+  "display": "standalone",
+  "start_url": "/"
+}
