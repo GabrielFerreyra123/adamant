@@ -1,5 +1,14 @@
-// ADAMANT · Landing. JS propio, mínimo y sin dependencias: sólo la aparición al hacer scroll
-// y el año del pie. La landing tiene que funcionar aunque este archivo no cargue.
+// ADAMANT · Landing. JS propio, mínimo: la aparición al hacer scroll, el año del pie y los precios de
+// los planes (desde PRICING, fuente única). La landing tiene que funcionar aunque este archivo no
+// cargue: los precios traen un fallback estático en el HTML que acá se sobrescribe con el valor vigente.
+import { PRICING } from "../config/pricing.js";
+
+const fmtARS = n => "ARS $" + new Intl.NumberFormat("es-AR").format(n);
+document.querySelectorAll("[data-precio]").forEach(el => {
+  const p = PRICING.skus[el.dataset.precio];
+  if (p) el.textContent = fmtARS(p.precio);
+});
+
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const elems = document.querySelectorAll(".reveal");
 

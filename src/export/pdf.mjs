@@ -169,6 +169,29 @@ function drawCompra(doc, materiales, y){
   doc.text(`Presupuesto estimativo · precios de referencia de mercado (${PRECIOS_REF.vigenteDesde}). Verificá con tu corralón.`, M, yn);
   return yn + 5;
 }
+// Avisos que se leen JUNTO a la tabla de cortes (van al taller con el papel):
+//  · piezas que no entran en la barra comercial (`over`) → requieren empalme (D1, reglas 2 y 5);
+//  · el plan NO descuenta la merma de sierra: los largos son netos (regla 3).
+// `plan` es la salida de cutPlan (trae `over` y `barLen` por perfil). Devuelve la y siguiente.
+function drawCortesNotas(doc, plan, y){
+  const M = 14, H = doc.internal.pageSize.getHeight();
+  const conOver = plan.filter(pl => !pl.fleje && pl.over > 0);
+  const totalOver = conOver.reduce((a, pl) => a + pl.over, 0);
+  // Guard de página: estas notas (empalme/merma, reglas 2/3) NO pueden caer fuera de hoja ni pisar el
+  // footer. Si no entran bajo la tabla, van a una página nueva.
+  const need = 6 + (totalOver ? 8 + conOver.length * 3.6 : 0);
+  if (y + need > H - 12){ doc.addPage(); y = 16; }
+  if (totalOver){
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...TANG);
+    doc.text(`${totalOver} pieza(s) más largas que la barra comercial - requieren empalme:`, M, y); y += 4;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...OBS);
+    conOver.forEach(pl => { doc.text(`• ${pl.perfil}: ${pl.over} pieza(s) (barra de ${(pl.barLen/1000).toFixed(2).replace(".", ",")} m)`, M + 2, y); y += 3.6; });
+    y += 1.5;
+  }
+  doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...MUT);
+  doc.text("El plan de corte no descuenta la merma de sierra: los largos son netos, sumá material de reserva.", M, y);
+  return y + 5;
+}
 // Lista de cortes para un conjunto de piezas. Devuelve la y siguiente.
 function drawCortesTabla(doc, piezas, input, titulo, y){
   const M = 14;
@@ -182,7 +205,7 @@ function drawCortesTabla(doc, piezas, input, titulo, y){
     pl.items.map(it => `${it.code}·${it.largo}`).join("  "), `${pl.metros} m · ${pl.rollos} rollo(s)`]));
   autoTable(doc, { startY: y + 2, head: [["Perfil", "Barra/Tira", "Piezas (código·largo mm)", "Sobra"]], body: rows.length ? rows : [["—","","",""]],
     styles: { fontSize: 8, cellPadding: 1.4 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 }, columnStyles: { 3: { halign: "right" } }, margin: { left: M, right: M } });
-  return doc.lastAutoTable.finalY + 6;
+  return drawCortesNotas(doc, plan, doc.lastAutoTable.finalY + 5);
 }
 // Planta acotada del AMBIENTE: recuadro + 4 muros (espesor e) + aberturas marcadas + cotas. Robusto:
 // no depende de pos/axis de las piezas (que en el combinado quedan reubicadas).
@@ -352,6 +375,7 @@ export async function exportPDF(input, opts = {}){
     body: cutRows, styles: { fontSize: 8, cellPadding: 1.4 }, headStyles: { fillColor: OBS, textColor: 255, fontSize: 8 },
     columnStyles: { 3: { halign: "right" } }, margin: { left: M, right: M }
   });
+  drawCortesNotas(doc, plan, doc.lastAutoTable.finalY + 5);
 
   doc.setFontSize(7.5); doc.setTextColor(...MUT);
   doc.text("Cómputo de estimación · reglas del steel frame (IRAM-IAS U 500-205) · verificá las medidas en obra. — Adamant", M, doc.internal.pageSize.getHeight() - 8);

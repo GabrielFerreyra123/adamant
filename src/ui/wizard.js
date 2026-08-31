@@ -16,7 +16,7 @@ import { secDims, pieceBoxEngine } from "../engine/geometry.mjs";
 import { buildBraces } from "../engine/brace.mjs";
 import { getPrice, setPrice, money, loadPrices } from "./prices.js";
 import { precioRef, PRECIOS_REF, rubroDe, RUBROS_ORDEN } from "../config/precios-referencia.js";
-import { estadoLicencia, autorizado, iniciarPago, generarPDF, generarDXF, generarOBJ, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
+import { estadoLicencia, autorizado, iniciarPago, generarPDF, generarDXF, generarOBJ, generarDossier, canjearSiVuelve, nuevoProyecto, getProyId, fetchCortes, restaurarPorCodigo, recuperarPorOperacion } from "./licencia.js";
 import { PRICING } from "../config/pricing.js";
 import { glossHTML, glossForTipo, glossKeyForTipo } from "../content/glosario.js";
 import { initGlosario } from "./glosario-ui.js";
@@ -1613,7 +1613,8 @@ function renderExport(body){
     <button class="btn" id="dlpdf">🧾 Descargar PDF de obra</button>
     <button class="btn ghost" id="dldxf">📐 Descargar DXF para tu proyectista</button>
     <button class="btn ghost" id="dlobj">🧊 Descargar modelo 3D (OBJ)</button>
-    <p class="expnote">El DXF abre en AutoCAD/cualquier CAD (en mm) para que tu calculista verifique y selle. El OBJ es el modelo 3D para abrir en SketchUp, Blender o cualquier visor. Adamant arma la geometría; el cálculo estructural lo define un profesional habilitado.</p>
+    <button class="btn ghost" id="dldossier">📋 Descargar dossier de cumplimiento</button>
+    <p class="expnote">El DXF abre en AutoCAD/cualquier CAD (en mm) para que tu calculista verifique y selle. El OBJ es el modelo 3D para abrir en SketchUp, Blender o cualquier visor. El dossier de cumplimiento ordena los datos de sitio, el semáforo y los supuestos con un espacio de firma, para el profesional que lo revisa. Adamant arma la geometría; el cálculo estructural lo define un profesional habilitado.</p>
     ${renov}
     <div class="expsep">Otro proyecto</div>
     <button class="btn ghost" id="nuevoproy">✚ Empezar un proyecto nuevo</button>
@@ -1663,6 +1664,17 @@ function renderExport(body){
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = `adamant-${state.kind}-${state.params.sistema}.obj`; a.click(); URL.revokeObjectURL(a.href);
       msg.textContent = "✓ Modelo 3D (OBJ) descargado";
+    } catch (e) { fallo(e); }
+  };
+  document.getElementById("dldossier").onclick = async () => {
+    msg.textContent = "Generando dossier…";
+    try {
+      // El clima vive en el estado de la UI (Guía), no en el input del motor: se pasa aparte.
+      const clima = { ciudad: state.ciudad, zonaViento: state.zonaViento, nieve: state.nieve, zonaBio: state.zonaBio };
+      const blob = await generarDossier(toEngineInput(), clima);
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = `adamant-dossier-${state.kind}-${state.params.sistema}.pdf`; a.click(); URL.revokeObjectURL(a.href);
+      msg.textContent = "✓ Dossier descargado";
     } catch (e) { fallo(e); }
   };
 }

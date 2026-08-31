@@ -37,16 +37,90 @@ aluminio con PVC para cielorrasos), autoconstrucción en seco en Bahía Blanca.
 
 ---
 
+## Restricciones no negociables
+
+Cinco reglas duras. No son estilo: cada una existe porque violarla produce material comprado
+y cortado mal, o una cotización que se pierde.
+
+**El entregable de Adamant es una lista con la que alguien compra perfiles y los corta.**
+Un largo mal no se corrige con un refresh: son 6 metros de PGC comprados y cortados mal.
+
+1. **La geometría (`piezas[]`) es la única fuente de verdad.** La lista de corte, el cómputo y
+   el presupuesto se derivan de ella; ningún largo se recalcula por su cuenta en ningún otro
+   lugar. Está escrito como comentario en `src/engine/cuts.mjs` y vale como regla: es lo que
+   impide que geometría y cómputo diverjan.
+
+2. **Un aviso que aparece en pantalla tiene que aparecer en el PDF de obra.** El PDF es el papel
+   que va al taller; la pantalla no viaja. Hoy esta regla está rota — ver `docs/decisiones.md` D1.
+
+3. **Ningún número del PDF se estima en silencio.** Si el optimizador no descuenta merma de
+   sierra, o si el presupuesto usa precios de referencia y no los del corralón, lo dice donde se
+   lee el número, no sólo en este archivo.
+
+4. **Adamant dibuja estructura, no calcula estructura.** El descargo de que el cálculo
+   estructural, los arriostres y los anclajes los define un profesional habilitado se mantiene
+   en la UI y en el PDF. Decisión definitiva de F11-bis.2.
+
+5. **Una pieza que no entra en la barra no se descarta.** `optimizeCuts` filtra los largos
+   mayores a la barra y los cuenta en `over`. Ese conteo tiene que llegar a todos los lugares
+   donde se lee el plan de corte — pantalla, PDF y CSV.
+
+### Cómo se agregan reglas acá
+No por intuición: una regla entra cuando un defecto real la justifica, y se anota en
+`docs/decisiones.md` de dónde salió. Cinco reglas que se cumplen valen más que quince que se leen
+por arriba.
+
 ## Validación (obligatoria antes de "listo")
 
 ```bash
-npm test      # vitest: el motor y los generadores tienen cobertura de tests
-npm run build # el bundle tiene que compilar limpio
+npm run verify   # las tres puertas encadenadas con && (si una falla, corta): test + build + entregable
+```
+
+Encadenado, no en pasos sueltos: `vitest run && vite build && node scripts/entregable.mjs`. Usar
+`&&`, **nunca `;`** — con `;` un build roto pasa si el comando siguiente devuelve cero. Las puertas por
+separado:
+
+```bash
+npm test          # vitest: el motor y los generadores tienen cobertura de tests
+npm run build     # el bundle tiene que compilar limpio
+npm run entregable # genera el PDF de obra de proyectos de muestra en ./.entregable/ y LEE los números
 ```
 
 - Regla: **cualquier cambio en el motor (`src/engine/`) se valida con los tests de `test/`**. La
   geometría (`piezas[]`) es la única fuente de verdad; cortes y materiales se derivan de ella.
 - El visor 3D no se puede manejar headless: la geometría se verifica numéricamente en los tests.
+
+### Método de trabajo (adoptado de Noxis — ver `docs/decisiones.md` D2)
+
+- **Puerta = comando que falla y bloquea, no un checklist.** `npm run entregable` mira el PAPEL que va
+  a la obra (no sólo el código): falla si una pieza cortable desaparece entre geometría y plan de corte
+  (regla 5), o si el PDF no dice lo que la pantalla dice (regla 2), o estima un número en silencio
+  (regla 3). Una puerta que se saltea sin avisar es peor que no tenerla: si no puede correr, falla en rojo.
+- **Test primero:** escribir el test, verificar que **falla por la razón correcta**, después el código.
+- **Mirar el resultado leyendo los números**, no el dibujo. «Lo miré y está bien» no es verificación:
+  abrí el PDF de `./.entregable/` y leé el número que importa (p. ej. cuántas piezas van a empalme).
+- **Verificación por mutación** en los dos o tres tests que más importan: romper la implementación a
+  mano y confirmar que el test (o la puerta) cae. Si sigue verde, no prueba lo que dice. Restaurar siempre.
+- **El defecto típico no es de lógica: es un desacuerdo entre dos lugares** (un número y su unidad, un
+  aviso y su documento). Los tests unitarios ven un lugar a la vez; por eso existe la puerta del entregable.
+- **El registro de decisiones (`docs/decisiones.md`) se escribe en el momento**, con el costo de
+  equivocarse *antes* de saber el resultado.
+
+### Skills de `superpowers` — cuándo alcanzar cada una
+
+Son skills del entorno de Claude Code (marketplace `superpowers`), no archivos del repo. Las que
+rindieron en Noxis, mapeadas al flujo de Adamant:
+
+- `brainstorming` — **antes** de escribir una feature nueva: fija intención y las decisiones de diseño.
+- `writing-plans` — cuando la tarea es multi-paso: convierte el spec en tareas con sus tests.
+- `test-driven-development` — dentro de cada implementación (test que falla primero, por la razón correcta).
+- `systematic-debugging` — ante un bug o test que falla, **antes** de proponer el fix.
+- `verification-before-completion` — antes de decir "listo": correr `npm run verify` y pegar la salida.
+- `requesting-code-review` — en una feature grande o antes de integrar: revisor sin el contexto del que
+  implementó, veredicto explícito que puede bloquear (el built-in `/code-review` sirve para esto).
+- `finishing-a-development-branch` — al cerrar una rama (la que Noxis lamentó no haber usado).
+- `subagent-driven-development` · `dispatching-parallel-agents` · `using-git-worktrees` — sólo cuando el
+  trabajo lo amerita **y el usuario lo pide** (levantan subagentes; no es el default de este proyecto).
 
 ---
 

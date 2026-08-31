@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "entregable": "node scripts/entregable.mjs",
+    "verify": "vitest run && vite build && node scripts/entregable.mjs"
   },
   "keywords": [
     "steel-frame",

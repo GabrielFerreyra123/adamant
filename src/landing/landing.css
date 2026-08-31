@@ -231,6 +231,11 @@ img,svg{ max-width:100%; }
 .plan-free h3{ color:var(--on-surface); }
 .plan-pro h3{ color:var(--primary); }
 .plan-lead{ color:var(--on-surface-variant); margin-bottom:var(--lg); }
+/* Precio del plan: mismo tratamiento tipográfico que el "$0" de las stats (.stat b / .stat span). */
+.plan-precio{ margin-bottom:var(--lg); }
+.plan-precio b{ display:block; font-family:var(--font-title); font-weight:700; font-size:var(--fs-h-lg); line-height:1; color:var(--primary); }
+.plan-free .plan-precio b{ color:var(--tertiary); }
+.plan-precio span{ display:block; margin-top:var(--xs,4px); font-family:var(--font-mono); font-size:var(--fs-data); letter-spacing:var(--ls-data); text-transform:uppercase; color:var(--on-surface-variant); }
 .plan-badge{ position:absolute; top:var(--md); right:var(--md);
   padding:4px 10px; border-radius:var(--r-lg);
   background:var(--primary-container); color:var(--on-primary-container);

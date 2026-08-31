@@ -15,3 +15,6 @@ adamant-ambiente-*.pdf
 
 # Referencias de diseño (no van al build ni al repo)
 design-ref/
+
+# PDFs de muestra que genera `npm run entregable` para mirar el entregable
+.entregable/

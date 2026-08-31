@@ -5,12 +5,13 @@ import { verificarLicencia, perpetuoDesdePase, limpiarProy, json, soloPost } fro
 import { exportPDF } from "../src/export/pdf.mjs";
 import { exportDXF } from "../src/export/dxf.mjs";
 import { exportOBJ } from "../src/export/obj.mjs";
+import { exportDossier } from "../src/export/dossier.mjs";
 
 export const config = { api: { bodyParser: { sizeLimit: "8mb" } } }; // img del 3D viaja como dataURL
 
 export default async function handler(req, res){
   if (!soloPost(req, res)) return;
-  const { token, projectHash, tipo, input, img, precios } = req.body || {};
+  const { token, projectHash, tipo, input, img, precios, clima } = req.body || {};
   const ph = limpiarProy(projectHash);
   const lic = verificarLicencia(token, ph);
   if (!lic.ok) return json(res, 402, { error: `Licencia inválida: ${lic.motivo}` });
@@ -44,7 +45,16 @@ export default async function handler(req, res){
       res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
       return res.end(obj);
     }
-    json(res, 400, { error: "tipo debe ser pdf, dxf u obj" });
+    if (tipo === "dossier"){
+      const { doc, nombre } = await exportDossier(input, { clima: clima || {}, out: "buffer" });
+      const buf = Buffer.from(doc.output("arraybuffer"));
+      const perp = perpetuoDesdePase(lic, ph);
+      if (perp) res.setHeader("X-Adamant-Perpetuo", perp);
+      res.status(200).setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
+      return res.end(buf);
+    }
+    json(res, 400, { error: "tipo debe ser pdf, dxf, obj o dossier" });
   } catch (e) {
     console.error("[generar]", e);
     json(res, 500, { error: e.message });

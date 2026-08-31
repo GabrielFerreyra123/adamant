@@ -84,7 +84,7 @@
           <div class="browser" aria-hidden="true">
             <div class="browser-bar">
               <i></i><i></i><i></i>
-              <span class="url">adamant.app/app/muro_01</span>
+              <span class="url">adamant-livid.vercel.app/app/muro_01</span>
             </div>
             <div class="blueprint">
               <div class="bp-wall">
@@ -208,11 +208,11 @@
         <article class="plan plan-free reveal">
           <h3 class="h-md">Gratis</h3>
           <p class="plan-lead">Todo el diseño, sin límite y sin dar datos.</p>
+          <p class="plan-precio"><b>$0</b><span>para diseñar y calcular</span></p>
           <ul class="plan-lista">
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Diseño ilimitado de muros, pisos, cielorrasos y ambientes</li>
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Visor 3D completo</li>
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Lista de materiales al instante</li>
-            <li class="off"><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M6 18 18 6"/></svg>Optimización de cortes y exportables</li>
           </ul>
           <a class="btn btn-secondary" href="/app">Empezar gratis</a>
         </article>
@@ -221,6 +221,8 @@
           <span class="plan-badge">Un proyecto</span>
           <h3 class="h-md">Proyecto suelto</h3>
           <p class="plan-lead">Un proyecto, con todas las ediciones que necesites. Tuyo para siempre.</p>
+          <!-- Precio inicial = fallback si landing.js no carga; en runtime se sobrescribe desde PRICING (src/config/pricing.js). -->
+          <p class="plan-precio"><b data-precio="proyecto">ARS $17.400</b><span>pago único</span></p>
           <ul class="plan-lista">
             <li class="head"><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Todo lo gratis, más:</li>
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Optimización de cortes por barra comercial (menos desperdicio)</li>
@@ -234,6 +236,8 @@
           <span class="plan-badge">Recomendado</span>
           <h3 class="h-md">Pase de obra · 90 días</h3>
           <p class="plan-lead">Todos los proyectos que quieras durante 90 días. Lo que armes queda tuyo para siempre, aunque venza el pase.</p>
+          <!-- Precio inicial = fallback si landing.js no carga; en runtime se sobrescribe desde PRICING (src/config/pricing.js). -->
+          <p class="plan-precio"><b data-precio="pase90">ARS $34.800</b><span>pago único · 90 días</span></p>
           <ul class="plan-lista">
             <li class="head"><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Todo lo del proyecto suelto, más:</li>
             <li><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Proyectos ilimitados por 90 días</li>
